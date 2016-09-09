@@ -1,29 +1,64 @@
 local cjson = require("cjson");
 
-local tcp = ngx.socket.tcp
-
-local sock, err = tcp()
-
-
-ngx.log(1, "Sock err " .. cjson.encode(err))
-
-local ok, err = sock:connect("func-rabbit", 80)
-
-ngx.log(1, "Connect " .. cjson.encode(ok) .. " err " .. cjson.encode(err))
-
-
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 
-local rabbit, err = rabbitmqstomp:new(nil )
+local rabbit, err = rabbitmqstomp:new()
 
-ngx.log(1,"Rabbit " .. cjson.encode(rabbit) .. " err " .. cjson.encode(err))
+rabbit:set_timeout(10000)
 
--- rabbit:set_timeout(2000)
+local bunny_host = os.getenv("RABBIT_HOST") or os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
 
-local ok, err = rabbit:connect("dpp.rocks" , 80)
+local ok, err = rabbit:connect({host=bunny_host})
 
-ngx.log(1, "Connect3 ok " .. cjson.encode(ok) .. " err " .. cjson.encode(err));
+if err then
+  ngx.header.content_type = "text/plain; charset=utf-8"
+  ngx.say(err)
+  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
 
-ngx.say("<p>Yo, Yo, G!</p>" .. cjson.encode(ngx.req.get_headers()) .. "<hr>" .. cjson.encode(ngx.req.get_method())
+-- get the body
+ngx.req.read_body()
+
+local data = ngx.req.get_body_data()
+
+local msg = cjson.encode({headers=ngx.req.get_headers(), method=ngx.req.get_method(),
+ uri_args=ngx.req.get_uri_args(), host=ngx.var.host, request_uri=ngx.var.request_uri,
+ scheme=ngx.var.scheme, uri=ngx.var.uri, body=data})
+local headers = {}
+headers["destination"] = "/queue/test"
+headers["receipt"] = "msg#1"
+headers["app-id"] = "luaresty"
+headers["persistent"] = "true"
+headers["content-type"] = "application/json"
+
+local ok, err = rabbit:send(msg, headers)
+
+if err then
+  ngx.header.content_type = "text/plain; charset=utf-8"
+  ngx.say(err)
+  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+
+local ok, err = rabbit:subscribe({destination="/queue/test",
+persistent="true", id="123"})
+
+local data, err = rabbit:receive()
+
+if err then
+  ngx.header.content_type = "text/plain; charset=utf-8"
+  ngx.say(err)
+  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+else
+  ngx.status = ngx.HTTP_OK
+  ngx.header.content_type = "application/json; charset=utf-8"
+-- ngx.header.content_type = "text/html; charset=utf-8"
+
+--[[ ngx.say("<p>Yo, Yo, G!</p>" .. cjson.encode(ngx.req.get_headers()) .. "<hr>" .. cjson.encode(ngx.req.get_method())
   .. " " .. cjson.encode(ngx.req.get_uri_args()) .. " " .. ngx.var.host .. " " .. ngx.var.request_uri .. " " ..
-  ngx.var.scheme .. " " .. ngx.var.uri);
+  ngx.var.scheme .. " " .. ngx.var.uri .. "<hr>Rabbit Sez:<br>" .. cjson.encode(err or cjson.decode(data)));
+]]--
+
+ ngx.say(data)
+
+ return ngx.exit(ngx.HTTP_OK)
+end

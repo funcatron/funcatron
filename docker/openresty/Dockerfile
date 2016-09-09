@@ -13,3 +13,5 @@ RUN \
 ADD req.lua /data/
 
 ADD nginx.conf /usr/local/openresty/nginx/conf/
+
+ENTRYPOINT ["/usr/local/openresty/bin/openresty", "-g", "daemon off;  env FUNC_RABBIT_PORT_61613_TCP_ADDR; env RABBIT_HOST;"]
