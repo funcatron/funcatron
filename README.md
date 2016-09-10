@@ -16,4 +16,11 @@ much to see here.
 * `/tron` The execution engine
 * `/func` The stuff to merge into your app
 
- 
+## Communications
+
+[Gitter](https://gitter.im/funcatron)
+
+We don't have a mailing list... yet... but "we" is only 1 person
+
+
+(c) 2016 by David Pollak and those listed in the contributors.md file

@@ -5,6 +5,7 @@
 
   :dependencies [
                  [org.clojure/clojure "1.9.0-alpha11"]
+                 [cheshire "5.6.3"]
                  [com.novemberain/langohr "3.6.1"]]
 
   :main ^:skip-aot tron.core

@@ -1,12 +1,30 @@
 local cjson = require("cjson");
 
+local random = math.random
+
+-- generate a UUID
+local function uuid()
+    local template ='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    return string.gsub(template, '[xy]', function (c)
+        local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)
+        return string.format('%x', v)
+    end)
+end
+
+local rid = ngx.var.request_id
+
+-- we need to seed the random # gen based on current time
+-- plus some randomness from the nginx request id
+math.randomseed(os.time() * rid:byte(1) * rid:byte(2) * rid:byte(3))
+
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 
 local rabbit, err = rabbitmqstomp:new()
 
 rabbit:set_timeout(10000)
 
-local bunny_host = os.getenv("RABBIT_HOST") or os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
+local bunny_host = os.getenv("RABBIT_HOST") or
+   os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
 
 local ok, err = rabbit:connect({host=bunny_host})
 
@@ -21,14 +39,24 @@ ngx.req.read_body()
 
 local data = ngx.req.get_body_data()
 
-local msg = cjson.encode({headers=ngx.req.get_headers(), method=ngx.req.get_method(),
- uri_args=ngx.req.get_uri_args(), host=ngx.var.host, request_uri=ngx.var.request_uri,
- scheme=ngx.var.scheme, uri=ngx.var.uri, body=data})
+local msg_uuid = rid -- uuid()
+
+local msg = cjson.encode({headers=ngx.req.get_headers(),
+                          method=ngx.req.get_method(),
+                          uri_args=ngx.req.get_uri_args(),
+                          host=ngx.var.host,
+                          request_uri=ngx.var.request_uri,
+                          scheme=ngx.var.scheme,
+                          uri=ngx.var.uri,
+                          reply_to = msg_uuid,
+                          body=ngx.encode_base64(data)})
+
 local headers = {}
-headers["destination"] = "/queue/test"
-headers["receipt"] = "msg#1"
-headers["app-id"] = "luaresty"
+headers["destination"] = "/queue/funcatron"
+headers["receipt"] = "msg" .. msg_uuid
+headers["app-id"] = "funcatron-resty"
 headers["persistent"] = "true"
+headers["reply-to"]=msg_uuid
 headers["content-type"] = "application/json"
 
 local ok, err = rabbit:send(msg, headers)
@@ -39,8 +67,9 @@ if err then
   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local ok, err = rabbit:subscribe({destination="/queue/test",
-persistent="true", id="123"})
+local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
+                                  persistent="false",
+                                  id=msg_uuid})
 
 local data, err = rabbit:receive()
 
@@ -49,16 +78,17 @@ if err then
   ngx.say(err)
   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 else
-  ngx.status = ngx.HTTP_OK
-  ngx.header.content_type = "application/json; charset=utf-8"
--- ngx.header.content_type = "text/html; charset=utf-8"
+   local response = cjson.decode(data)
+   ngx.status = response.status or 200
+   for key,value in pairs(response.headers or {})
+   do
+      ngx.header[key] = value
+   end
+   local body=ngx.decode_base64(response.body or "")
 
---[[ ngx.say("<p>Yo, Yo, G!</p>" .. cjson.encode(ngx.req.get_headers()) .. "<hr>" .. cjson.encode(ngx.req.get_method())
-  .. " " .. cjson.encode(ngx.req.get_uri_args()) .. " " .. ngx.var.host .. " " .. ngx.var.request_uri .. " " ..
-  ngx.var.scheme .. " " .. ngx.var.uri .. "<hr>Rabbit Sez:<br>" .. cjson.encode(err or cjson.decode(data)));
-]]--
+   ngx.header["Content-Length"] = body:len()
 
- ngx.say(data)
+   ngx.print(body)
 
- return ngx.exit(ngx.HTTP_OK)
+   return ngx.exit(response.status)
 end
