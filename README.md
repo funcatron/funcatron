@@ -20,21 +20,7 @@ much to see here.
 
 [Gitter](https://gitter.im/funcatron)
 
-<div class="classictemplate template" style="display: block;">
-
-<div id="groupsio_embed_signup">
-<form action="https://groups.io/g/funcatron/signup?u=1931256100834369572" method="post" id="groupsio-embedded-subscribe-form" name="groupsio-embedded-subscribe-form" target="_blank">
-    <div id="groupsio_embed_signup_scroll">
-      <label for="email" id="templateformtitle">Subscribe to our group</label>
-      <input type="email" value="" name="email" class="email" id="email" placeholder="email address" required="">
-    
-    <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_1931256100834369572" tabindex="-1" value=""></div>
-    <div id="templatearchives"></div>
-    <input type="submit" value="Subscribe" name="subscribe" id="groupsio-embedded-subscribe" class="button">
-  </div>
-</form>
-</div>
-</div>
+[Groups.io mailing list](https://groups.io/g/funcatron)
 
 
 
