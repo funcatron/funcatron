@@ -1,0 +1,19 @@
+swagger: '2.0'
+
+info:
+  title: Example API
+  version: '0.1'
+
+paths:
+  /helloworld:
+    get:
+      summary: Returns a greeting.
+      operationId: funcatron.fabsample.SimplyFab
+      parameters:
+        - name: firstname
+          in: query
+          type: string
+          pattern: "^[A-Z][a-z]+"
+      responses:
+          200:
+              description: say hello
