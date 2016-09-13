@@ -5,6 +5,9 @@
             [langohr.consumers :as lcons]
             [cheshire.core :as json]
             [cheshire.parse :as json-parse]
+            [io.sarnowski.swagger1st.core :as s1st]
+            [io.sarnowski.swagger1st.util.security :as s1stsec]
+            [io.sarnowski.swagger1st.context :as s1ctx]
             [langohr.basic :as lb])
   (:gen-class)
   (:import (com.fasterxml.jackson.core JsonFactory)
@@ -76,3 +79,20 @@
     (reset! rb-conn {:conn conn :ch ch :tag tag})))
 
 
+(def sample-swagger
+  "swagger: '2.0'\n\ninfo:\n  title: Example API\n  version: '0.1'\n\npaths:\n  /helloworld:\n    get:\n      summary: Returns a greeting.\n      operationId: example.api/generate-greeting\n      parameters:\n        - name: firstname\n          in: query\n          type: string\n          pattern: \"^[A-Z][a-z]+\"\n      responses:\n          200:\n              description: say hello")
+
+(defn get-jar
+  []
+  (java.util.jar.JarFile. (clojure.java.io/file "resources/test.jar")))
+
+
+
+(comment (defn app
+           []
+           (-> (s1st/context :yaml-cp "my-swagger-api.yaml")
+               (s1st/discoverer)
+               (s1st/mapper)
+               (s1st/parser)
+               (s1st/protector {"oauth2" (s1stsec/allow-all)})
+               (s1st/executor))))
