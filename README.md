@@ -1,5 +1,7 @@
 # Funcatron
 
+[![Join the chat at https://gitter.im/funcatron/exchange](https://badges.gitter.im/funcatron/exchange.svg)](https://gitter.im/funcatron/exchange?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Serverless Java (and Clojure and Scala) functions
 on your Mesos or Kubernetes cluster.
 
