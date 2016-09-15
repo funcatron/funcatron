@@ -29,9 +29,10 @@ local bunny_host = os.getenv("RABBIT_HOST") or
 local ok, err = rabbit:connect({host=bunny_host})
 
 if err then
-  ngx.header.content_type = "text/plain; charset=utf-8"
-  ngx.say(err)
-  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+   ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+   ngx.header.content_type = "text/plain; charset=utf-8"
+   ngx.say(err)
+   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
 -- get the body
@@ -53,6 +54,7 @@ local msg = cjson.encode({headers=ngx.req.get_headers(),
                           remote_port=ngx.var.remote_port,
                           request_uri=ngx.var.request_uri,
                           request_id=ngx.var.request_id,
+                          args=ngx.var.args,
                           remote_user=ngx.var.remote_user,
                           request=ngx.var.request,
                           http_referer=ngx.var.http_referer,
@@ -73,9 +75,10 @@ headers["content-type"] = "application/json"
 local ok, err = rabbit:send(msg, headers)
 
 if err then
-  ngx.header.content_type = "text/plain; charset=utf-8"
-  ngx.say(err)
-  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+   ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+   ngx.header.content_type = "text/plain; charset=utf-8"
+   ngx.say(err)
+   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
 local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
@@ -85,9 +88,10 @@ local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
 local data, err = rabbit:receive()
 
 if err then
-  ngx.header.content_type = "text/plain; charset=utf-8"
-  ngx.say(err)
-  return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+   ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+   ngx.header.content_type = "text/plain; charset=utf-8"
+   ngx.say(err)
+   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 else
    local response = cjson.decode(data)
    ngx.status = response.status or 200

@@ -54,8 +54,6 @@
     )
   )
 
-(defn )
-
 (defn update-jar-info-with-swagger
   "Takes the jar-info and adds the parsed swagger information"
   [jar-info]
