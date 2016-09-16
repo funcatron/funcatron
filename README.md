@@ -1,4 +1,4 @@
-# Funcatron
+# Funcatron ![logo](artwork/40x40.png)
 
 
 Serverless Java (and Clojure and Scala) functions
