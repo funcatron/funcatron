@@ -10,6 +10,10 @@ import scala.collection.JavaConversions._
   */
 class SimplyFab extends Func[java.util.Map[String, Object], Object] {
   override def apply(request: java.util.Map[String, Object], context: Context) = {
+    val logger = context.getLogger();
+
+    logger.error("Yes... I can log!!")
+
     List(Wombat("David", 4232),
       Wombat("Archer", 332) /*,
       Wombat(context.getRequestParams().get("firstname").get(0), 43) */

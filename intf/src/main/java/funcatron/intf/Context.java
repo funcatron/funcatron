@@ -30,11 +30,11 @@ public interface Context {
     String getURI();
 
     /**
-     * Get the request params
+     * Get the Swagger-processed parameters. The map contains sub-maps for "query" and "path"
      *
      * @return the request parameters
      */
-    Map<String, List<String>> getRequestParams();
+    Map<String, Object> getRequestParams();
 
     /**
      * The request scheme (e.g., http, https)

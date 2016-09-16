@@ -1,4 +1,4 @@
-(ns tron.core
+(ns funcatron.tron.core
   (:require [langohr.core :as lc]
             [langohr.channel :as lch]
             [langohr.queue :as lq]
@@ -7,13 +7,19 @@
             [cheshire.parse :as json-parse]
             [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
+            [funcatron.tron.jars :as tj]
+            [clojure.walk :as walk]
             [langohr.basic :as lb])
   (:gen-class)
   (:import (com.fasterxml.jackson.core JsonFactory)
            (com.rabbitmq.client Connection)
            (java.util Base64)
+           (funcatron.helpers SingleClassloader)
            (java.io ByteArrayInputStream Reader InputStream)
-           (org.apache.commons.io IOUtils)))
+           (org.apache.commons.io IOUtils)
+           (com.fasterxml.jackson.databind ObjectMapper)
+           (java.lang.reflect Method Constructor)
+           (org.slf4j LoggerFactory)))
 
 (set! *warn-on-reflection* true)
 
@@ -57,11 +63,6 @@
     )
   )
 
-(def ss3                                                    ;sample-swagger
-
-  "swagger: '2.0'\n\ninfo:\n  title: Example API\n  version: '0.1'\n\npaths:\n  /helloworld:\n    get:\n      summary: Returns a greeting.\n      operationId: tron.core/generate-greeting\n      parameters:\n        - name: firstname\n          in: query\n          required: true\n          type: string\n          pattern: \"^[A-Z][a-z]+\"\n      responses:\n          200:\n              description: say hello\n")
-
-
 (def sample-swagger
   "swagger: '2.0'
 
@@ -91,8 +92,8 @@ paths:
 
 (defn generate-greeting
   [req]
-  ;; (println "Got req " )
-  (clojure.pprint/pprint req)
+
+  ;; (clojure.pprint/pprint req)
   {:foo "bar" "name" (-> req :query-params (get "firstname"))}
   )
 
@@ -122,9 +123,39 @@ paths:
       )
 
 (defn resolve-stuff
-  [& req]
-  ;;  (println "Got " req)
-  generate-greeting)
+  [{:keys [classloader]} req]
+
+  (let [^String op-id (get req "operationId")
+        clz (.loadClass ^ClassLoader classloader op-id)
+        ^Method apply-method (->> (.getMethods clz)
+                         (filter #(= "apply" (.getName ^Method %)))
+                          first)
+        lf-clz (.loadClass ^ClassLoader classloader "org.slf4j.LoggerFactory")
+        new-logger-meth (.getMethod lf-clz "getLogger" (into-array Class [String]))
+
+        logger (.invoke new-logger-meth nil (into-array Object [op-id]))
+        ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
+        ^Constructor constructor (first (.getConstructors ctx-clz))]
+
+    (fn [req]
+      (let [req-s (walk/stringify-keys req)
+            the-array (let [a ^"[Ljava.lang.Object;" (make-array Object 2)]
+                        (aset a 0 req-s)
+                        (aset a 1 logger)
+                        a
+                        )
+            context (.newInstance constructor the-array)
+            func-obj (.newInstance clz)
+            ]
+
+        (.writeValueAsString (ObjectMapper.)
+                             (.invoke apply-method func-obj
+                                      (into-array Object [req-s context])))
+        )
+      )
+    )
+
+  )
 
 (defn put-def-in-meta
   "Inserts the context definition in the functions metadata"
@@ -135,14 +166,15 @@ paths:
   )
 
 (defn make-app
-  [swagger the-jar]
-  (-> (s1st/context :yaml swagger)
+  [the-jar]
+  (-> {:definition     (:swagger the-jar)
+       :chain-handlers (list)}
       (s1st/discoverer)
       (s1st/mapper)
       (s1st/parser)
       (s1st/protector {"oauth2" (s1stsec/allow-all)})
       (s1st/ring wrap-response)
-      (put-def-in-meta s1st/executor :resolver (make-resolver the-jar)))
+      (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
   )
 
 (defn make-ring-request
@@ -154,6 +186,7 @@ paths:
                        (-> req :remote_addr)
                        )
    :uri            (:uri req)
+   :open-resty req
    :query-string   (:args req)
    :scheme         (:scheme req)
    :request-method (.toLowerCase ^String (:method req))
@@ -170,9 +203,11 @@ paths:
 
   (let [payload (parse-and-fix-payload payload)
         ring-request (make-ring-request payload)
-        app (make-app sample-swagger)
+        app (make-app (-> (tj/qq)))
         resp (app ring-request)
         ]
+
+
 
     (let [body (:body resp)
           body (cond
