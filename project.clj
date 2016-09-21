@@ -19,6 +19,8 @@
                  ;; https://mvnrepository.com/artifact/commons-io/commons-io
                  [commons-io/commons-io "2.5"]
 
+                 [dragonmark/util "0.1.3"]
+
                  [com.novemberain/langohr "3.6.1"]]
 
   :profiles {:dev {:dependencies [[ring/ring-mock "0.3.0"]

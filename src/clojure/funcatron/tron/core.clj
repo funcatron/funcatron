@@ -139,27 +139,6 @@ paths:
       (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
   )
 
-(defn make-ring-request
-  "Takes an OpenResty style request and turns it into a Ring style request"
-  [req]
-  {:server-port    (read-string (or (:server_port req) "80"))
-   :server-name    (:host req)
-   :remote-addr    (or (-> req :headers (get "x-remote-addr"))
-                       (-> req :remote_addr)
-                       )
-   :uri            (:uri req)
-   :open-resty req
-   :query-string   (:args req)
-   :scheme         (:scheme req)
-   :request-method (.toLowerCase ^String (:method req))
-   :protocol       (:server_protocol req)
-   :headers        (:headers req)
-   :body           (when-let [^"[B" body (:body req)]
-                     (when (> (count body) 0)
-                       (ByteArrayInputStream. body)))
-   }
-  )
-
 (defn handle-delivery
   [ch metadata payload]
 
@@ -185,14 +164,7 @@ paths:
       (lb/publish ch "" (:reply-to metadata) (.getBytes (json/generate-string (assoc resp :body body)) "UTF-8"))))
   )
 
-(defn listen-to-funcatron
-  "Listen to Funcatron queue"
-  []
-  (close-it)
-  (let [conn (lc/connect)
-        ch (lch/open conn)
-        tag (lcons/subscribe ch "funcatron" handle-delivery {:auto-ack true})]
-    (reset! rb-conn {:conn conn :ch ch :tag tag})))
+
 
 
 
