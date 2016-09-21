@@ -54,8 +54,8 @@ public class ContextImpl implements Context {
      * @return the request parameters
      */
     @Override
-    public Map<String, Object> getRequestParams() {
-        return (Map<String, Object>) data.get("parameters");
+    public Map<String, Map<String, Object>> getRequestParams() {
+        return (Map<String, Map<String, Object>>) data.get("parameters");
     }
 
     /**

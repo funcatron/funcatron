@@ -34,7 +34,7 @@ public interface Context {
      *
      * @return the request parameters
      */
-    Map<String, Object> getRequestParams();
+    Map<String, Map<String, Object>> getRequestParams();
 
     /**
      * The request scheme (e.g., http, https)
