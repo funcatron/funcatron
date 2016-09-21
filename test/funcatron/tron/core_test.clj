@@ -1,6 +1,6 @@
-(ns tron.core-test
+(ns funcatron.tron.core-test
   (:require [clojure.test :refer :all]
-            [tron.core :refer :all]))
+            [funcatron.tron.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."
