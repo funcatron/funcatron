@@ -8,5 +8,5 @@ Implement the Func interface and you're ready to go.
 [![Travis Build](https://travis-ci.org/funcatron/intf.svg?branch=master)](https://travis-ci.org/funcatron/intf)
 
 Just include the `funcatron/intf` artifact
-and a `funcatron.json` or `funcatron.yml` file in a JAR
+and a `funcatron.json` or `funcatron.yml` file in an UberJAR
 and [Bob's your Uncle](https://en.wikipedia.org/wiki/Bob%27s_your_uncle).
