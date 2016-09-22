@@ -1,5 +1,9 @@
 (ns funcatron.tron.util
-  (:require [cheshire.core :as json]))
+  "Utilities for Tron"
+  (:require [cheshire.core :as json]
+            [clojure.spec :as s])
+  (:import (cheshire.prettyprint CustomPrettyPrinter)))
 
-(def pretty-printer
+(def ^CustomPrettyPrinter pretty-printer
+  "a JSON Pretty Printer"
   (json/create-pretty-printer json/default-pretty-print-options))
