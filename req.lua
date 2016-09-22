@@ -70,6 +70,9 @@ headers["receipt"] = "msg" .. msg_uuid
 headers["app-id"] = "funcatron-resty"
 headers["persistent"] = "true"
 headers["reply-to"]=msg_uuid
+headers["x-host"]=ngx.var.host
+headers["x-uri"]=ngx.var.uri
+headers["x-scheme"]=ngx.var.scheme
 headers["content-type"] = "application/json"
 
 local ok, err = rabbit:send(msg, headers)
