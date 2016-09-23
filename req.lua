@@ -90,6 +90,8 @@ local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
 
 local data, err = rabbit:receive()
 
+rabbit:close()
+
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
    ngx.header.content_type = "text/plain; charset=utf-8"
