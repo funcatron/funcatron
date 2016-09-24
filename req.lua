@@ -62,14 +62,16 @@ local msg = cjson.encode({headers=ngx.req.get_headers(),
                           scheme=ngx.var.scheme,
                           uri=ngx.var.uri,
                           reply_to = msg_uuid,
+                          body_base64_encodes=true,
                           body=ngx.encode_base64(data)})
 
 local headers = {}
 headers["destination"] = "/queue/funcatron"
 headers["receipt"] = "msg" .. msg_uuid
 headers["app-id"] = "funcatron-resty"
-headers["persistent"] = "true"
+headers["persistent"] = "false"
 headers["reply-to"]=msg_uuid
+headers["x-method"]=ngx.var.method
 headers["x-host"]=ngx.var.host
 headers["x-uri"]=ngx.var.uri
 headers["x-scheme"]=ngx.var.scheme
