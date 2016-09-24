@@ -42,41 +42,12 @@
     @rb-conn
     ))
 
-(defprotocol ToByteArray
-  "Convert the incoming value to a byte array"
-  (^"[B" to-byte-array [v] "Convert v to a byte array"))
-
-(extend-type String
-  ToByteArray
-  (to-byte-array [^String v] (.getBytes v "UTF-8")))
-
-(extend-type (Class/forName "[B")
-  ToByteArray
-  (to-byte-array [^"[B" v] v))
-
-(extend-type InputStream
-  ToByteArray
-  (to-byte-array [^InputStream v] (IOUtils/toByteArray v)))
-
-(extend-type Map
-  ToByteArray
-  (to-byte-array [^Map v] (to-byte-array (json/generate-string v))))
-
-(defn encode-body
-  "Base64 Encode the body's bytes. Pass data to `to-byte-array` and Base64 encode the result "
-  [data]
-  (.encodeToString (Base64/getEncoder) (to-byte-array data))
-  )
 
 (defn post-to-queue
   "Post a message to a RabbitMQ queue. `data` will be passed to `to-byte-array` to turn it into bytes."
   [queue-name data meta-data]
   (let [conn (ensure-open-connection)]
-    (with-open [ch (lch/open conn)]
-      (lb/publish ch "" queue-name
-                  (to-byte-array data)
-                  meta-data)
-      )))
+    ))
 
 (s/fdef listen-to-queue
         :args (s/cat :queue-name string? :function fn?)
@@ -88,25 +59,4 @@
   returns a function that stops listenings to the queue"
   [queue-name function]
 
-  (let [conn (ensure-open-connection)
-        ch (lch/open conn)
-        handler (fn [^Channel ch metadata payload]
-                  (let [delivery-tag (:delivery-tag metadata)]
-                    (try
-                      (log/trace "About to process " delivery-tag " for queue " queue-name " metadata " metadata)
-                      (function ch metadata payload)
-                      (.basicAck ch (:delivery-tag metadata) false)
-                      (log/trace "Success/ACK " delivery-tag " for queue " queue-name)
-
-                      ;; ack
-                      (catch Exception e
-                        (do
-                          (log/error e "Failed to process " delivery-tag " NACKing with re-queue")
-                          (.basicNack ch (:delivery-tag metadata) false true)
-                          ))))
-                  )
-        _ (.queueDeclarePassive ch queue-name)
-        tag (lcons/subscribe ch queue-name handler {:auto-ack false})]
-    (fn []
-      (lb/cancel ch tag)
-      (.close ch))))
+  )
