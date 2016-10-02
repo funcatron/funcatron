@@ -12,7 +12,8 @@
            (javax.xml.transform TransformerFactory OutputKeys)
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
-           (java.util.function Function)))
+           (java.util.function Function)
+           (clojure.lang IFn)))
 
 
 (set! *warn-on-reflection* true)
@@ -59,10 +60,12 @@
 
 (defmulti fix-payload "Converts a byte-array body into something full by content type"
           (fn [x & _]
-            (let [^String s (-> x
-                                (clojure.string/split #"[^a-zA-Z+\-/0-9]")
-                                first
-                                )]
+            (let [^String s (if (nil? x)
+                              "text/plain"
+                              (-> x
+                                  (clojure.string/split #"[^a-zA-Z+\-/0-9]")
+                                  first
+                                  ))]
               (.toLowerCase
                 s))))
 
@@ -100,3 +103,17 @@
   (reify Function
     (apply [this v] (f v))))
 
+
+(defprotocol FuncMaker "Make a Java function out of stuff"
+  (^Function to-java-function [v] "Convert the incoming thing to a Java Function"))
+
+(extend-type IFn
+  FuncMaker
+  (^Function to-java-function [^IFn f]
+    (reify Function
+      (apply [this param] (f param))
+      )))
+
+(extend-type Function
+  FuncMaker
+  (^Function to-java-function [^Function f] f))

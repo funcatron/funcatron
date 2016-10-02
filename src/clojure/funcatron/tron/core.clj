@@ -139,7 +139,7 @@ paths:
       (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
   )
 
-(defn handle-delivery
+#_(defn handle-delivery
   [ch metadata payload]
 
   (let [payload (parse-and-fix-payload payload)

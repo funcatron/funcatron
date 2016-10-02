@@ -11,7 +11,8 @@
   (:import (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage)
            (java.util.concurrent ConcurrentHashMap)
            (javafx.util Pair)
-           (com.rabbitmq.client Channel)))
+           (com.rabbitmq.client Channel)
+           (java.util.function Function)))
 
 
 (set! *warn-on-reflection* true)
@@ -29,6 +30,9 @@
        (let [conn (lc/connect rabbit-props)]
 
          (log/trace "Openned RabbitMQ Connection")
+
+
+
          (reify MessageBroker
            (isConnected [this] (.isOpen conn))
            (listenToQueue [this queue-name handler]
@@ -37,7 +41,7 @@
                              (let [str-metadata (delay (walk/stringify-keys metadata))
                                    content-type (:content-type metadata)
                                    ^long delivery-tag (:delivery-tag metadata)
-                                   body (delay (f-util/fix-payload payload))
+                                   body (delay (f-util/fix-payload (:content-type metadata) payload))
                                    message (reify MessageBroker$ReceivedMessage
                                              (metadata [this] @str-metadata)
                                              (contentType [this] content-type)
@@ -45,7 +49,14 @@
                                              (ackMessage [this] (.basicAck ch delivery-tag false))
                                              (nackMessage [this re-queue] (.basicNack ch delivery-tag false re-queue))
                                              )]
-                               (.apply handler message)))
+                               (try
+                                 (.apply handler message)
+                                 (.basicAck ch (:delivery-tag metadata) false)
+                                 (catch Exception e
+                                   (do
+                                     (.basicNack ch (:delivery-tag metadata) false true)
+                                     (throw e))))
+                               ))
 
                    tag (lcons/subscribe ch queue-name handler {:auto-ack false})
                    kill-func (fn []
@@ -73,3 +84,7 @@
            (throw e)))))
      ))
 
+(defn listen-to-queue
+  "A helper function that wraps a Clojure function in a Function wrapper"
+  [^MessageBroker broker ^String queue func]
+  (.listenToQueue broker queue (f-util/to-java-function func)))
