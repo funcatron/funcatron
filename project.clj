@@ -4,7 +4,7 @@
   :license {:name "Apache 2.0"}
 
   :dependencies [
-                 [org.clojure/clojure "1.9.0-alpha11"]
+                 [org.clojure/clojure "1.9.0-alpha13"]
                  [cheshire "5.6.3"]
                  ;; https://mvnrepository.com/artifact/io.sarnowski/swagger1st
                  [io.sarnowski/swagger1st "0.21.0"]
@@ -33,6 +33,9 @@
                                   ]}
              :uberjar {:aot :all}
              }
+
+
+  :min-lein-version "2.7.1"
 
   :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
