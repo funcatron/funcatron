@@ -1,4 +1,6 @@
 language: clojure
 
+lein: 2.7.1 # version 2 and up
+
 jdk:
   - oraclejdk8
