@@ -1,7 +1,8 @@
 (ns funcatron.tron.util
   "Utilities for Tron"
   (:require [cheshire.core :as json]
-            [clojure.spec :as s])
+            [clojure.spec :as s]
+            [funcatron.tron.walk :as walk])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map)
            (org.apache.commons.io IOUtils)
@@ -12,7 +13,6 @@
            (javax.xml.transform TransformerFactory OutputKeys)
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
-           (java.util.function Function)
            (clojure.lang IFn)))
 
 
@@ -24,23 +24,23 @@
 
 (defprotocol ToByteArray
   "Convert the incoming value to a byte array"
-  (^"[B" to-byte-array [v] "Convert v to a byte array"))
+  (^"[B" to-byte-array [v] "Convert v to a byte array and return the content type and byte array"))
 
 (extend-type String
   ToByteArray
-  (to-byte-array [^String v] (.getBytes v "UTF-8")))
+  (to-byte-array [^String v] ["text/plain" (.getBytes v "UTF-8")]))
 
 (extend-type (Class/forName "[B")
   ToByteArray
-  (to-byte-array [^"[B" v] v))
+  (to-byte-array [^"[B" v] ["application/octet-stream" v]))
 
 (extend-type InputStream
   ToByteArray
-  (to-byte-array [^InputStream v] (IOUtils/toByteArray v)))
+  (to-byte-array [^InputStream v] ["application/octet-stream" (IOUtils/toByteArray v)]))
 
 (extend-type Map
   ToByteArray
-  (to-byte-array [^Map v] (to-byte-array (json/generate-string v))))
+  (to-byte-array [^Map v] ["application/json" (second (to-byte-array (json/generate-string v)))]))
 
 (extend-type Node
   ToByteArray
@@ -50,7 +50,7 @@
       (let [source (DOMSource. n)
             out (ByteArrayOutputStream.)]
         (.transform transformer source (StreamResult. out))
-        (.toByteArray out)))))
+        ["text/xml" (.toByteArray out)]))))
 
 (defn encode-body
   "Base64 Encode the body's bytes. Pass data to `to-byte-array` and Base64 encode the result "
@@ -61,7 +61,7 @@
 (defmulti fix-payload "Converts a byte-array body into something full by content type"
           (fn [x & _]
             (let [^String s (if (nil? x)
-                              "text/plain"
+                              "application/octet-stream"
                               (-> x
                                   (clojure.string/split #"[^a-zA-Z+\-/0-9]")
                                   first
@@ -72,7 +72,7 @@
 (defmethod fix-payload "application/json"
   [content-type ^"[B" bytes]
   (let [jackson (ObjectMapper.)]
-    (.readValue jackson bytes Map)
+    (walk/keywordize-keys (.readValue jackson bytes Map))
     )
   )
 
@@ -97,6 +97,10 @@
   [_ ^"[B" bytes]
   bytes)
 
+(defmethod fix-payload "application/octet-stream"
+  [_ ^"[B" bytes]
+  bytes)
+
 (defn ^Function promote-to-function
   "Promotes a Clojure IFn to a Java function"
   [f]
@@ -105,15 +109,15 @@
 
 
 (defprotocol FuncMaker "Make a Java function out of stuff"
-  (^Function to-java-function [v] "Convert the incoming thing to a Java Function"))
+  (^java.util.function.Function to-java-function [v] "Convert the incoming thing to a Java Function"))
 
 (extend-type IFn
   FuncMaker
-  (^Function to-java-function [^IFn f]
+  (^java.util.function.Function to-java-function [^IFn f]
     (reify Function
       (apply [this param] (f param))
       )))
 
-(extend-type Function
+(extend-type java.util.function.Function
   FuncMaker
-  (^Function to-java-function [^Function f] f))
+  (^java.util.function.Function to-java-function [^java.util.function.Function f] f))

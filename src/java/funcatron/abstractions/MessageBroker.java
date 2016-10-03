@@ -1,6 +1,6 @@
 package funcatron.abstractions;
 
-import javafx.util.Pair;
+import funcatron.helpers.Tuple2;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -91,7 +91,7 @@ public interface MessageBroker extends Closeable {
      * Get a list of all the listeners. It's a Pair of the queue name and the Runnable to cancel the listening
      * @return a list of all the listeners
      */
-    List<Pair<String, Runnable>> listeners();
+    List<Tuple2<String, Runnable>> listeners();
 
     /**
      * Close the connection to the message broker and shuts down all the listeners
