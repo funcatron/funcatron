@@ -19,16 +19,18 @@
                  ;; https://mvnrepository.com/artifact/commons-io/commons-io
                  [commons-io/commons-io "2.5"]
 
+                 [ring "1.5.0"]
+                 [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
                  [dragonmark/util "0.1.3"]
 
                  [com.novemberain/langohr "3.6.1"]]
 
-  :profiles {:dev {:dependencies [[ring/ring-mock "0.3.0"]
-                                  [ring/ring-core "1.4.0"]
-                                  [ring/ring-devel "1.4.0"]
+  :profiles {:dev {:dependencies [                          ;;ring/ring-mock "0.3.0"]
+                                  ;; [ring/ring-core "1.4.0"]
+                                  [ring/ring-devel "1.5.0"]
                                   [javax.servlet/servlet-api "2.5"]
 
-                                  [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
+
                                   ;; [criterium "0.4.3"]
                                   ]}
              :uberjar {:aot :all}

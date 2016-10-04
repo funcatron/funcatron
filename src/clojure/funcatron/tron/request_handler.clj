@@ -36,7 +36,7 @@
 (defn message-handler
   [ch meta payload])
 
-(defn register-rabbit-handler
+#_(defn register-rabbit-handler
   "Register to handle requests to the incoming Tron queue"
   [the-func]
   (rabbit/listen-to-queue

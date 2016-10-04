@@ -101,10 +101,10 @@
   [_ ^"[B" bytes]
   bytes)
 
-(defn ^Function promote-to-function
+(defn ^java.util.function.Function promote-to-function
   "Promotes a Clojure IFn to a Java function"
   [f]
-  (reify Function
+  (reify java.util.function.Function
     (apply [this v] (f v))))
 
 
@@ -114,7 +114,7 @@
 (extend-type IFn
   FuncMaker
   (^java.util.function.Function to-java-function [^IFn f]
-    (reify Function
+    (reify java.util.function.Function
       (apply [this param] (f param))
       )))
 
