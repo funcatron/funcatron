@@ -185,7 +185,7 @@ testing and debugging purposes.
 Every request has a unique ID and each log line includes the unique ID so it's
 possible to correlate a request as it moves across the cluster.
 
-<img alt="architecture" src="/images/arch.svg" width="100%">
+<img alt="architecture" src="http://funcatron.org/images/arch.svg" width="100%">
 
 ### Notes
 
@@ -232,7 +232,7 @@ are currently supported.
 
 ## Contributing
 
-Please see [CONTRIBUTING](http://github.com/funcatron/tron/CONTRIBUTING.md) for details on
+Please see [CONTRIBUTING](https://github.com/funcatron/tron/blob/master/CONTRIBUTING.md) for details on
 how to make a contribution.
 
 ## Licenses and Support
