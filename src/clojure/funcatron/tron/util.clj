@@ -71,10 +71,19 @@
 
 (defmethod fix-payload "application/json"
   [content-type ^"[B" bytes]
-  (let [jackson (ObjectMapper.)]
-    (walk/keywordize-keys (.readValue jackson bytes Map))
-    )
-  )
+  (let [jackson (ObjectMapper.)
+        info1 (walk/keywordize-keys (.readValue jackson bytes Map))
+        body (if
+               (and (true? (:body_base64_encoded info1))
+                    (:body info1)
+                    (< 0 (count (:body info1)))
+                    )
+               (fix-payload (:content_type info1) (.decode (Base64/getDecoder) ^String (:body info1)))
+
+               (:body info1)
+               )
+        ]
+    (assoc info1 :body body)))
 
 (defmethod fix-payload "text/plain"
   [content-type ^"[B" bytes]

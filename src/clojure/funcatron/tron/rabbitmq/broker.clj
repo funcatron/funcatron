@@ -39,11 +39,12 @@
            (isConnected [this] (.isOpen conn))
            (listenToQueue [this queue-name handler]
              (let [ch (lch/open conn)
+                   _ (.queueDeclare ch queue-name false false false {})
                    handler (fn [^Channel ch metadata payload]
                              (let [str-metadata (delay (walk/stringify-keys metadata))
                                    content-type (:content-type metadata)
                                    ^long delivery-tag (:delivery-tag metadata)
-                                   body (delay (f-util/fix-payload content-type payload))
+                                   body (delay (walk/stringify-keys (f-util/fix-payload content-type payload)))
                                    message (reify MessageBroker$ReceivedMessage
                                              (metadata [this] @str-metadata)
                                              (contentType [this] content-type)
@@ -56,7 +57,7 @@
                                  (.basicAck ch delivery-tag false)
                                  (catch Exception e
                                    (do
-                                     (.basicNack ch delivery-tag false true)
+                                     (.basicNack ch delivery-tag false false)
                                      (throw e))))
                                ))
 
@@ -64,8 +65,7 @@
                    kill-func (fn []
                                (.remove listeners tag)
                                (lb/cancel ch tag)
-                               (.close ch))
-                   ]
+                               (.close ch))]
                (.put listeners tag (Tuple2. queue-name kill-func))
                kill-func))
 
