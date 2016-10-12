@@ -1,26 +1,10 @@
 (ns funcatron.tron.core
-  (:require [langohr.core :as lc]
-            [langohr.channel :as lch]
-            [langohr.queue :as lq]
-            [langohr.consumers :as lcons]
-            [cheshire.core :as json]
-            [cheshire.parse :as json-parse]
-            [io.sarnowski.swagger1st.core :as s1st]
+  (:require [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
-            [funcatron.tron.jars :as tj]
-            [clojure.walk :as walk]
             [clojure.spec :as s]
             [langohr.basic :as lb])
   (:gen-class)
-  (:import (com.fasterxml.jackson.core JsonFactory)
-           (com.rabbitmq.client Connection)
-           (java.util Base64)
-           (funcatron.helpers SingleClassloader)
-           (java.io ByteArrayInputStream Reader InputStream)
-           (org.apache.commons.io IOUtils)
-           (com.fasterxml.jackson.databind ObjectMapper)
-           (java.lang.reflect Method Constructor)
-           (org.slf4j LoggerFactory)))
+  )
 
 (set! *warn-on-reflection* true)
 
@@ -59,19 +43,7 @@ paths:
   {:foo "bar" "name" (-> req :query-params (get "firstname"))}
   )
 
-(defn wrap-response
-  "A ring handler that wraps the response with appropriate stuff"
-  [handler]
-  (fn [req]
-    (let [resp (handler req)]
-      (cond
-        :else {:status 200
 
-               :headers {"Content-Type" "application/json"}
-               :body resp})
-      )
-    )
-  )
 
 #_(defn my-func
       [handler]
@@ -84,60 +56,11 @@ paths:
         )
       )
 
-(defn resolve-stuff
-  [{:keys [classloader]} req]
 
-  (let [^String op-id (get req "operationId")
-        clz (.loadClass ^ClassLoader classloader op-id)
-        ^Method apply-method (->> (.getMethods clz)
-                         (filter #(= "apply" (.getName ^Method %)))
-                          first)
-        lf-clz (.loadClass ^ClassLoader classloader "org.slf4j.LoggerFactory")
-        new-logger-meth (.getMethod lf-clz "getLogger" (into-array Class [String]))
 
-        logger (.invoke new-logger-meth nil (into-array Object [op-id]))
-        ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
-        ^Constructor constructor (first (.getConstructors ctx-clz))]
 
-    (fn [req]
-      (let [req-s (walk/stringify-keys req)
-            the-array (let [a ^"[Ljava.lang.Object;" (make-array Object 2)]
-                        (aset a 0 req-s)
-                        (aset a 1 logger)
-                        a
-                        )
-            context (.newInstance constructor the-array)
-            func-obj (.newInstance clz)
-            ]
 
-        (.writeValueAsString (ObjectMapper.)
-                             (.invoke apply-method func-obj
-                                      (into-array Object [req-s context])))
-        )
-      )
-    )
 
-  )
-
-(defn put-def-in-meta
-  "Inserts the context definition in the functions metadata"
-  [context func & args]
-  (let [ret (apply func context args)]
-    (with-meta ret {:swagger (:definition context)})
-    )
-  )
-
-(defn make-app
-  [the-jar]
-  (-> {:definition     (:swagger the-jar)
-       :chain-handlers (list)}
-      (s1st/discoverer)
-      (s1st/mapper)
-      (s1st/parser)
-      (s1st/protector {"oauth2" (s1stsec/allow-all)})
-      (s1st/ring wrap-response)
-      (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
-  )
 
 #_(defn handle-delivery
   [ch metadata payload]

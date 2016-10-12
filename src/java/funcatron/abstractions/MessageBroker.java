@@ -20,14 +20,8 @@ public interface MessageBroker extends Closeable {
      */
     boolean isConnected();
 
-    /**
-     * A generic message
-     */
-    interface Message {
 
-    }
-
-    interface ReceivedMessage extends Message {
+    interface ReceivedMessage {
         /**
          * Metadata associated with the message including headers, etc.
          * @return the metadata associated with the message
@@ -50,6 +44,12 @@ public interface MessageBroker extends Closeable {
         Object body();
 
         /**
+         * Return the raw bytes that make up the message body
+         * @return the raw bytes that make up the message body
+         */
+        byte[] rawBody();
+
+        /**
          * Acknowledge the message
          *
          * @throws IOException if there's a communication error
@@ -64,6 +64,12 @@ public interface MessageBroker extends Closeable {
          * @throws IOException
          */
         void nackMessage(boolean reQueue) throws IOException;
+
+        /**
+         * Returns the message broker associated with this message
+         * @return the message broker
+         */
+        MessageBroker messageBroker();
     }
 
     /**
@@ -75,7 +81,7 @@ public interface MessageBroker extends Closeable {
      *
      * @throws IOException if something goes pear-shaped
      */
-    Runnable listenToQueue(String queueName, Function<Message, Void> handler) throws IOException;
+    Runnable listenToQueue(String queueName, Function<ReceivedMessage, Void> handler) throws IOException;
 
     /**
      * Send a message to the named queue

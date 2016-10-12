@@ -1,10 +1,9 @@
 (ns funcatron.tron.util
   "Utilities for Tron"
   (:require [cheshire.core :as json]
-            [clojure.spec :as s]
-            [funcatron.tron.walk :as walk])
+            [clojure.spec :as s])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
-           (java.util Base64 Map)
+           (java.util Base64 Map Map$Entry List)
            (org.apache.commons.io IOUtils)
            (java.io InputStream ByteArrayInputStream ByteArrayOutputStream)
            (com.fasterxml.jackson.databind ObjectMapper)
@@ -13,10 +12,55 @@
            (javax.xml.transform TransformerFactory OutputKeys)
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
-           (clojure.lang IFn)))
+           (clojure.lang IFn)
+           (funcatron.abstractions Router$Message)))
 
 
 (set! *warn-on-reflection* true)
+
+(defn walk
+  "Walk Clojure data structures and 'do the right thing'"
+  [element-f key-f data]
+  (let [m (element-f data)
+        f (partial walk element-f key-f)]
+    (cond
+
+      (list? m) (map f m)
+      (instance? List m) (mapv f m)
+      (instance? Map m) (into {} (map (fn [^Map$Entry me]
+                                        (let [k (.getKey me)]
+                                          [(key-f k) (f (.getValue me))]
+                                          )) (.entrySet ^Map m)))
+
+      :else m
+      )
+    )
+  )
+
+(defn kwd-to-string
+  "Converts a keyword to a String"
+  [kw?]
+  (if (keyword? kw?) (name kw?) kw?)
+  )
+
+(defn string-to-kwd
+  "Converts a String to a Keyword"
+  [s?]
+  (if (string? s?) (keyword s?) s?))
+
+(defn stringify-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (stringify-keys identity m))
+  ([f m] (walk f kwd-to-string m))
+  )
+
+(defn keywordize-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (keywordize-keys identity m))
+  ([f m] (walk f string-to-kwd m))
+  )
+
+
 
 (def ^CustomPrettyPrinter pretty-printer
   "a JSON Pretty Printer"
@@ -72,18 +116,9 @@
 (defmethod fix-payload "application/json"
   [content-type ^"[B" bytes]
   (let [jackson (ObjectMapper.)
-        info1 (walk/keywordize-keys (.readValue jackson bytes Map))
-        body (if
-               (and (true? (:body_base64_encoded info1))
-                    (:body info1)
-                    (< 0 (count (:body info1)))
-                    )
-               (fix-payload (:content_type info1) (.decode (Base64/getDecoder) ^String (:body info1)))
-
-               (:body info1)
-               )
+        info1 (keywordize-keys (.readValue jackson bytes Map))
         ]
-    (assoc info1 :body body)))
+    info1))
 
 (defmethod fix-payload "text/plain"
   [content-type ^"[B" bytes]
@@ -130,3 +165,49 @@
 (extend-type java.util.function.Function
   FuncMaker
   (^java.util.function.Function to-java-function [^java.util.function.Function f] f))
+
+(defn as-int
+  "Take anything and try to convert it to an int"
+  ([s] (as-int s 0))
+  ([s default]
+   (try
+     (cond
+       (nil? s) default
+       (string? s) (read-string s)
+       (int? s) s
+       (instance? Number s) (.longValue ^Number s)
+       :else default
+       )
+
+     (catch Exception e default))
+    ))
+
+(defn make-ring-request
+  "Takes normalized request and turns it into a Ring style request"
+  [^Router$Message req]
+  (let [headers (keywordize-keys (get (.body req) "headers"))
+        body (get (.body req) "body")
+        body (cond
+               (nil? body) nil
+               (string? body) (ByteArrayInputStream. (.getBytes ^String body "UTF-8"))
+               (bytes? body) (ByteArrayInputStream. ^"[B" body)
+
+               :else nil
+               )
+        ret {:server-port    (.port req)
+         :server-name    (.host req)
+         :remote-addr    (.remoteAddr req)
+         :uri            (.uri req)
+         :router-message req
+         :query-string   (.args req)
+         :scheme         (.scheme req)
+         :request-method (.toLowerCase ^String (.method req))
+         :protocol       (.protocol req)
+         :headers        headers
+         :body           body
+         }
+        ]
+    (println "Ring req " ret)
+    ret
+    )
+  )
