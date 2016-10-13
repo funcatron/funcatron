@@ -4,6 +4,7 @@
             [funcatron.tron.routers.jar-router :as jarr])
 
   (:gen-class)
+  (:import [net.razorvine.pyro NameServerProxy])
   )
 
 (set! *warn-on-reflection* true)

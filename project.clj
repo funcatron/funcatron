@@ -19,6 +19,9 @@
                  ;; https://mvnrepository.com/artifact/commons-io/commons-io
                  [commons-io/commons-io "2.5"]
 
+                 ;; https://mvnrepository.com/artifact/net.razorvine/pyrolite
+                 [net.razorvine/pyrolite "4.13"]
+
                  [ring "1.5.0"]
                  [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
                  [dragonmark/util "0.1.3"]
