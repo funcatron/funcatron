@@ -76,6 +76,7 @@ local headers =
       ["x-server-addr"]=ngx.var.server_addr,
       ["x-request-uri"]=ngx.var.request_uri,
       ["x-scheme"]=ngx.var.scheme,
+      ["x-uri-args"]=ngx.var.args,
       ["x-request-id"]=ngx.var.request_id}
 
 headers["destination"] = "/amq/queue/funcatron"
