@@ -68,7 +68,7 @@
 
 (defprotocol ToByteArray
   "Convert the incoming value to a byte array"
-  (^"[B" to-byte-array [v] "Convert v to a byte array and return the content type and byte array"))
+  (to-byte-array [v] "Convert v to a byte array and return the content type and byte array"))
 
 (extend-type String
   ToByteArray
@@ -195,19 +195,18 @@
                :else nil
                )
         ret {:server-port    (.port req)
-         :server-name    (.host req)
-         :remote-addr    (.remoteAddr req)
-         :uri            (.uri req)
-         :router-message req
-         :query-string   (.args req)
-         :scheme         (.scheme req)
-         :request-method (.toLowerCase ^String (.method req))
-         :protocol       (.protocol req)
-         :headers        headers
-         :body           body
-         }
+             :server-name    (.host req)
+             :remote-addr    (.remoteAddr req)
+             :uri            (.uri req)
+             :router-message req
+             :query-string   (.args req)
+             :scheme         (.scheme req)
+             :request-method (.toLowerCase ^String (or (.method req) "GET"))
+             :protocol       (.protocol req)
+             :headers        headers
+             :body           body
+             }
         ]
-    (println "Ring req " ret)
     ret
     )
   )

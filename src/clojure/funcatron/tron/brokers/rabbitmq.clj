@@ -7,6 +7,7 @@
             [funcatron.tron.util :as f-util]
             [langohr.channel :as lch]
             [langohr.consumers :as lcons]
+            [clojure.pprint :as pprint]
             [funcatron.tron.brokers.shared :as shared]
             )
   (:import (funcatron.abstractions MessageBroker)
@@ -20,20 +21,17 @@
 
 ;; FIXME add more logging
 
-
-(defn- build-rabbit-handler
-  [^Function handler ^MessageBroker broker]
-  (fn [^Channel ch metadata payload]
-    (let [
+(defn- handle-rabbit-request
+  "A separate function that handles the request"
+  [^Function handler ^MessageBroker broker ^Channel ch metadata payload]
+  (try
+    (let [metadata (merge metadata (:headers metadata))
           delivery-tag (:delivery-tag metadata)
           message (shared/build-message broker
-                                 metadata payload
-                                 (fn [] (.basicAck ch delivery-tag false))
-                                 (fn [re-queue] (.basicNack ch delivery-tag false re-queue)))
-          ]
-      (println "Yo!!")
-      (future
-        (println "In future")
+                                        metadata payload
+                                        (fn [] (.basicAck ch delivery-tag false))
+                                        (fn [re-queue] (.basicNack ch delivery-tag false re-queue)))]
+      (future                                               ;; FIXME do our own thread pool
         (try
           (.apply handler message)
           (.basicAck ch delivery-tag false)
@@ -42,9 +40,16 @@
               (.basicNack ch delivery-tag false false)
               (log/error e "Failed to dispatch")
               (throw e)))))
+      nil
+      )
+    (catch Exception e
+      (log/error e "Failed to dispatch request " metadata))))
 
-      ))
-  )
+(defn- build-rabbit-handler
+  [^Function handler ^MessageBroker broker]
+  (fn [^Channel ch metadata payload]
+    (handle-rabbit-request handler broker ch metadata payload)
+    ))
 
 (defn ^MessageBroker create-broker
   "Create a RabbitMQ MessageBroker instance"

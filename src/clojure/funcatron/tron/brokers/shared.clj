@@ -23,28 +23,26 @@
 (defn- delay-fix-body
   "Converts a byte array of body into the a correct data structure"
   [metadata ^"[B" payload]
-  (delay (let [basic (f-util/fix-payload (:content-type metadata) payload)
-               fixed (if (:body basic)
-                       (let [body-bytes (if (:body-base64-encoded basic)
-                                          (.decode (Base64/getDecoder) ^String (:body basic))
-                                          (:body basic))
-                             body-bytes (if (or (nil? body-bytes) (= 0 (count body-bytes))) nil body-bytes)
-                             ]
-                         (assoc basic :body body-bytes)
-                         )
-                       basic
-                       )
-               ]
-           (f-util/stringify-keys fix-rabbit-long-string fixed)
-           )))
+  (delay
+    (let [basic (f-util/fix-payload (:content-type metadata) payload)
+          fixed (if (:body basic)
+                  (let [body-bytes (if (:body-base64-encoded basic)
+                                     (.decode (Base64/getDecoder) ^String (:body basic))
+                                     (:body basic))
+                        body-bytes (if (or (nil? body-bytes) (= 0 (count body-bytes))) nil body-bytes)
+                        ]
+                    (assoc basic :body body-bytes)
+                    )
+                  basic
+                  )
+          ]
+      (f-util/stringify-keys fix-rabbit-long-string fixed))))
 
 (defn ^MessageBroker$ReceivedMessage build-message
   "Builds a message from the metadata and payload"
   [^MessageBroker broker metadata ^"[B" payload ack-fn nack-fn]
-  (println "Building message ")
   (let [str-metadata (delay-metadata metadata)
         content-type (:content-type metadata)
-        ^long delivery-tag (:delivery-tag metadata)
         body (delay-fix-body metadata payload)
         message (reify MessageBroker$ReceivedMessage
                   (metadata [this] @str-metadata)
@@ -55,7 +53,6 @@
                   (nackMessage [this re-queue] (nack-fn re-queue))
                   (messageBroker [this] broker)
                   )]
-    (println "Message " message)
     message)
   )
 

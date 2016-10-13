@@ -12,7 +12,7 @@
            (java.util UUID Base64)
            (java.lang.reflect Method Constructor)
            (com.fasterxml.jackson.databind ObjectMapper)
-           (funcatron.abstractions Router)
+           (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)))
 
 
@@ -168,6 +168,31 @@
         (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
     )
 
+(defn- route-to-jar
+  "Routes the message to the JAR file"
+  [^Router$Message message the-app reply?]
+  (let [ring-req (f-util/make-ring-request message)
+        resp (the-app ring-req)]
+
+    (when (and reply? (.replyTo message))
+      (let [body (:body resp)
+            body (cond
+                   (instance? String body)
+                   (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
+
+                   (instance? InputStream body)
+                   (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
+
+                   :else
+                   (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
+                   )]
+        (.sendMessage (.messageBroker (.underlyingMessage message)) (.replyTo message) {}
+                      (.getBytes (json/generate-string (assoc resp :body body)) "UTF-8"))
+        ))
+
+    resp
+    ))
+
 (defn ^Router build-router
   "Take a JAR file (as a File or String) and create a Router"
   ([file] (build-router file true))
@@ -176,29 +201,7 @@
          the-app (make-app the-jar)]
      (reify Router
        (routeMessage [this message]
-         (let [ring-req (f-util/make-ring-request message)
-               resp (the-app ring-req)]
-           (println "Response: " resp)
-
-           (when (and reply? (.replyTo message))
-             (let [body (:body resp)
-                   body (cond
-                          (instance? String body)
-                          (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
-
-                          (instance? InputStream body)
-                          (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
-
-                          :else
-                          (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
-                          )]
-               (.sendMessage (.messageBroker (.underlyingMessage message)) (.replyTo message) {}
-                             (.getBytes (json/generate-string (assoc resp :body body)) "UTF-8"))
-               ))
-
-           resp
-           )))
-     )))
+         (route-to-jar message the-app reply?))))))
 
 
 (defn qq
