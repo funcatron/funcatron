@@ -10,6 +10,8 @@ RUN \
    make install && \
    mkdir /data
 
+RUN apt-get install -y dnsutils
+
 ADD req.lua /data/
 
 ADD nginx.conf /usr/local/openresty/nginx/conf/
@@ -18,5 +20,3 @@ ADD start_openresty.sh /usr/local/openresty/bin
 
 
 ENTRYPOINT ["/bin/bash", "/usr/local/openresty/bin/start_openresty.sh"]
-
-

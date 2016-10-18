@@ -26,7 +26,16 @@ rabbit:set_timeout(10000)
 local bunny_host = os.getenv("RABBIT_HOST") or
    os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
 
-local ok, err = rabbit:connect({host=bunny_host})
+local bunny_port = tonumber(os.getenv("RABBIT_PORT") or "61613")
+
+local bunny_user = os.getenv("RABBIT_USER") or "guest"
+
+local bunny_pwd = os.getenv("RABBIT_PWD") or "guest"
+
+local ok, err = rabbit:connect({host=bunny_host,
+                                port=bunny_port,
+                                username=bunny_user,
+                                password=bunny_pwd})
 
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
