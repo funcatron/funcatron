@@ -9,6 +9,8 @@ fi
 
 
 if [ ! -z "$MESOS_TASK_ID" ]; then
+    echo "It's a Meso containers, so discover _stomp._rabbit-funcatron._tcp.marathon.mesos" 1>&2
+
     HOST=""
     PORT=""
 
@@ -27,6 +29,7 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
     }
 
     while [[ -z "$PORT" || -z "$HOST" ]] ; do
+        echo "In host/port loop: Host: $HOST, Port: $PORT" 1>&2
         sleep 1
         host
         port
@@ -35,11 +38,13 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
     export RABBIT_HOST=$HOST
     export RABBIT_PORT=$PORT
 
+    echo "Discovered the port... starting OpenResty" 1>&2
     #while [ true ] ; do
     #    echo "Hello Marathon $HOST $PORT" >&2
     #    sleep 5
     #done
 fi
 
+echo "Starting OpenResty"
 
 /usr/local/openresty/bin/openresty -g "daemon off;  env FUNC_RABBIT_PORT_61613_TCP_ADDR; env RABBIT_HOST; env RABBIT_PORT ; env RABBIT_USER ; env RABBIT_PWD"
