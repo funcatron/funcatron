@@ -43,8 +43,10 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
     #    echo "Hello Marathon $HOST $PORT" >&2
     #    sleep 5
     #done
+else
+    echo "Not in an orchestration env... that we know of..." 1>&2
 fi
 
 echo "Starting OpenResty"
 
-/usr/local/openresty/bin/openresty -g "daemon off;  env FUNC_RABBIT_PORT_61613_TCP_ADDR; env RABBIT_HOST; env RABBIT_PORT ; env RABBIT_USER ; env RABBIT_PWD"
+/usr/local/openresty/bin/openresty -g "daemon off;  env FUNC_RABBIT_PORT_61613_TCP_ADDR; env RABBIT_HOST; env RABBIT_PORT ; env RABBIT_USER ; env RABBIT_PWD ;"
