@@ -18,5 +18,6 @@ ADD nginx.conf /usr/local/openresty/nginx/conf/
 
 ADD start_openresty.sh /usr/local/openresty/bin
 
+EXPOSE 80
 
 ENTRYPOINT ["/bin/bash", "/usr/local/openresty/bin/start_openresty.sh"]
