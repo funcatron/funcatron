@@ -9,7 +9,7 @@ fi
 
 
 if [ ! -z "$MESOS_TASK_ID" ]; then
-    echo "It's a Meso containers, so discover _stomp._rabbit-funcatron._tcp.marathon.mesos" 1>&2
+    echo "It's a Meso substrate, so discover _stomp._rabbit-funcatron._tcp.marathon.mesos" 1>&2
 
     HOST=""
     PORT=""
