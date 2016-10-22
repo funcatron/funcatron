@@ -96,10 +96,10 @@
         (.transform transformer source (StreamResult. out))
         ["text/xml" (.toByteArray out)]))))
 
-(defn encode-body
+(defn ^String encode-body
   "Base64 Encode the body's bytes. Pass data to `to-byte-array` and Base64 encode the result "
   [data]
-  (.encodeToString (Base64/getEncoder) (to-byte-array data))
+  (.encodeToString (Base64/getEncoder) (second (to-byte-array data)))
   )
 
 (defmulti fix-payload "Converts a byte-array body into something full by content type"

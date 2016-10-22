@@ -22,6 +22,8 @@
                  ;; https://mvnrepository.com/artifact/net.razorvine/pyrolite
                  [net.razorvine/pyrolite "4.13"]
 
+                 [http-kit "2.2.0"]
+
                  [ring "1.5.0"]
                  [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
                  [dragonmark/util "0.1.3"]
