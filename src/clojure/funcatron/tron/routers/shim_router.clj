@@ -5,9 +5,9 @@
             [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
             [io.sarnowski.swagger1st.context :as s1ctx])
-  (:import (java.net ServerSocket Socket)
+  (:import (java.net ServerSocket Socket SocketException)
            (java.util Base64 UUID)
-           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream)))
+           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)))
 
 
 (set! *warn-on-reflection* true)
@@ -18,15 +18,55 @@
 
 
 
+
+
+(defn- shutdown-socket
+  "Close the server-socket"
+  []
+  (locking sync-obj
+    (let [ss @shim-socket]
+      (swap! shim-socket #(-> %
+                              (dissoc ::swagger)
+                              (dissoc ::input)
+                              (dissoc ::output)
+                              (dissoc ::socket)))
+      (when-let [inputa (::input ss)]
+        (doseq
+          [input [inputa]]
+          (try
+            (.close ^InputStream input)
+            (catch Exception e nil)))
+        )
+      (when-let [outputs (::output ss)]
+        (doseq [output [outputs]]
+          (try
+            (.close ^OutputStream output)
+            (catch Exception e nil)))
+        )
+      (when-let [sockets (::socket ss)]
+        (doseq [socket [sockets]]
+          (try
+            (.close ^Socket socket)
+            (catch Exception e nil)))
+        )
+      )))
+
 (defn send-message
   [message]
   (let [b64 (fu/encode-body message)]
-    (doseq [out-x (::output @shim-socket)]
-      (let [out (BufferedWriter. (OutputStreamWriter. ^OutputStream out-x "UTF-8"))]
-        (locking sync-obj
-          (.write out b64)
-          (.write out "\n")
-          (.flush out))))))
+    (try
+      (doseq [out-x (filter identity [(::output @shim-socket)])]
+        (let [out (BufferedWriter. (OutputStreamWriter. ^OutputStream out-x "UTF-8"))]
+          (locking sync-obj
+            (.write out b64)
+            (.write out "\n")
+            (.flush out))))
+      (catch IOException io
+        (do
+          (clojure.tools.logging/log :error io "Failed to send message")
+          (shutdown-socket)
+          ))
+      )))
 
 (defn- shutdown
   "Close the server-socket"
@@ -36,19 +76,19 @@
       (reset! shim-socket nil)
       (when-let [inputa (::input ss)]
         (doseq
-          [input inputa]
+          [input [inputa]]
           (try
             (.close ^InputStream input)
             (catch Exception e nil)))
         )
       (when-let [outputs (::output ss)]
-        (doseq [output outputs]
+        (doseq [output [outputs]]
           (try
             (.close ^OutputStream output)
             (catch Exception e nil)))
         )
       (when-let [sockets (::socket ss)]
-        (doseq [socket sockets]
+        (doseq [socket [sockets]]
           (try
             (.close ^Socket socket)
             (catch Exception e nil)))
@@ -62,22 +102,22 @@
   [swagger-str]
   (swap! shim-socket dissoc ::swagger)
   (when-let [sd (try
-             (s1ctx/load-swagger-definition
-               :yaml
-               swagger-str
-               )
-             (catch Exception e1
-               (try
-                 (s1ctx/load-swagger-definition
-                   :json
-                   swagger-str
-                   )
-                 (catch Exception e2
-                   (do
-                     (clojure.tools.logging/log :error e1 "Failed to parse as YAML")
-                     (clojure.tools.logging/log :error e2 "Failed to parse as JSON")
-                     nil
-                     )))))]
+                  (s1ctx/load-swagger-definition
+                    :yaml
+                    swagger-str
+                    )
+                  (catch Exception e1
+                    (try
+                      (s1ctx/load-swagger-definition
+                        :json
+                        swagger-str
+                        )
+                      (catch Exception e2
+                        (do
+                          (clojure.tools.logging/log :error e1 "Failed to parse as YAML")
+                          (clojure.tools.logging/log :error e2 "Failed to parse as JSON")
+                          nil
+                          )))))]
     (swap! shim-socket assoc ::swagger sd)
     ))
 
@@ -92,70 +132,89 @@
 (defn- listen-to-input
   "Listen to the incoming socket"
   [^InputStream input]
-  (let [in (BufferedReader. (InputStreamReader. input "UTF-8"))]
+  (let [in (BufferedReader. (InputStreamReader. input "UTF-8"))
+        continue (atom true)]
     (try
-      (while true
-        (when-let [line (.readLine in)]
-          (let [bytes (.decode (Base64/getDecoder) line)
-                map (json/parse-stream (BufferedReader. (InputStreamReader. (ByteArrayInputStream. bytes) "UTF-8")))
-                map (fu/keywordize-keys map)
-                cmd (:cmd map)]
-            (cond
-              (= "setSwagger" cmd)
-              (set-swagger (:swagger map))
+      (while @continue
+        (let [line (.readLine in)]
+          (if line
+            (let [bytes (.decode (Base64/getDecoder) line)
+                  map (json/parse-stream (BufferedReader. (InputStreamReader. (ByteArrayInputStream. bytes) "UTF-8")))
+                  map (fu/keywordize-keys map)
+                  cmd (:cmd map)]
+              (cond
+                (= "setSwagger" cmd)
+                (set-swagger (:swagger map))
 
-              (= "hello" cmd)
-              (clojure.tools.logging/log :info "We got hello from the client")
+                (= "hello" cmd)
+                (clojure.tools.logging/log :info "We got hello from the client")
 
-              (= "reply" cmd)
-              (do-reply map)
+                (= "reply" cmd)
+                (do-reply map)
 
-              :else nil
+                :else nil
+                )
               )
+            (reset! continue false)
             )))
-      (finally (println "Exiting input loop"))
+      (finally
+        (shutdown-socket)
+        )
       )))
 
 (defn- listen-to-socket
   "Accept socket connections"
   [^ServerSocket server-socket]
+  (shutdown)
   (reset! shim-socket {::server-socket server-socket
-                       ::socket []
-                       ::input []
-                       ::requests {}
-                       ::output []})
+                       ::socket        nil
+                       ::input         nil
+                       ::requests      {}
+                       ::output        nil})
   (try
     (while (not (.isClosed server-socket))
       (let [socket (.accept server-socket)
             input (.getInputStream socket)
             output (.getOutputStream socket)
             thread (Thread. (fn [] (listen-to-input input)) "Input Listener")]
-        (swap! shim-socket #(merge-with into % {::socket [socket]
-                                                ::input  [input]
-                                                ::output [output]}))
+        (swap! shim-socket #(merge % {::socket socket
+                                      ::input  input
+                                      ::output output}))
         (.start thread)
         )
 
       )
-    (catch Exception e (clojure.tools.logging/log :error e "Closed server socket" ))
-    (finally (shutdown)))
+    (catch SocketException se nil)                          ;; don't worry about closed socket closing
+    (catch Exception e (clojure.tools.logging/log :error e "Closed server socket"))
+    (finally
+      (shutdown)))
   )
 
 (defn exec-app
   [op-i req]
-  (println "In exec app for " op-i)
-  (let [uuid (.toString (UUID/randomUUID))
-        p (promise)]
-    (swap! shim-socket assoc-in [::requests uuid] p)
-    (send-message {:cmd     "invoke"
-                   :headers (:headers req)
-                   :class op-i
-                   :replyTo uuid
-                   :body    (if (:body req) (fu/encode-body (:body req)) nil)})
-    (let [answer (deref p 10000 ::failed)]
-      (if (= ::failed answer)
-        {:status 500 :body "Didn't get the answer"}
-        answer))))
+  (let [req2 (dissoc req :swagger)
+        req2 (assoc req2 :body (get-in req [:parameters :body]))]
+    (let [uuid (.toString (UUID/randomUUID))
+          p (promise)]
+      (swap! shim-socket assoc-in [::requests uuid] p)
+      (send-message {:cmd     "invoke"
+                     :headers (:headers req)
+                     :class   op-i
+                     :replyTo uuid
+                     :body    (if (:body req2) (json/generate-string (:body req2)) nil)})
+      (let [answer (deref p 10000 ::failed)]
+        (if (= ::failed answer)
+          {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"}
+          (let [response (:response answer)
+                response (update response :headers fu/stringify-keys)
+                response (if (and (:body response) (:decodeBody answer))
+                           (assoc response
+                             :body
+                             (ByteArrayInputStream. (.decode (Base64/getDecoder) ^String (:body response))))
+                           response)
+                ]
+            response
+            ))))))
 
 (defn resolve-app
   [req]
@@ -189,9 +248,11 @@
 (defn http-handler
   [req]
   (if-let [swagger (::swagger @shim-socket)]
-    (let [app (make-app swagger)]
-      (app req))
-    {:status 404 :body "I'm swagger-less"}
+    (let [app (make-app swagger)
+          resp (app req)]
+      resp
+      )
+    {:status 404 :headers {"Content-Type" "text/plain"} :body "No Swagger Defined. Unable to route request\n"}
     ))
 
 (defonce end-server (atom nil))
