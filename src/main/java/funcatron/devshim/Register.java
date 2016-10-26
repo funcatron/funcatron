@@ -386,8 +386,20 @@ public class Register {
         }
     }
 
+    public static void register(File funcatronFile) throws Exception {
+        register("localhost", 54657, funcatronFile);
+    }
+
+    public static void register(String host, File funcatronFile) throws Exception {
+        register(host, 54657, funcatronFile);
+    }
+
+    public static void register(int port, File funcatronFile) throws Exception {
+        register("localhost", port, funcatronFile);
+    }
+
     public static void main(String[] argv) throws Exception {
-        register("localhost", 55667, new File("src/main/resources/funcatron.yml"));
+        register("localhost", 54657, new File("src/main/resources/funcatron.yml"));
         System.out.println("Funcatron registered");
     }
 }
