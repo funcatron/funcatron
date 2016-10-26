@@ -265,7 +265,7 @@
 
 (defn -main
   "The uberjar entrypoint"
-  [args]
+  [& args]
   (run-server)
   (setup 54657)
   )
