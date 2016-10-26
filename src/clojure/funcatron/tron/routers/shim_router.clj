@@ -193,6 +193,7 @@
 
 (defn exec-app
   [op-i req]
+  (clojure.tools.logging/log :info "Dispatching request to " op-i)
   (let [req2 (dissoc req :swagger)
         req2 (assoc req2 :body (get-in req [:parameters :body]))]
     (let [uuid (.toString (UUID/randomUUID))
@@ -203,9 +204,12 @@
                      :class   op-i
                      :replyTo uuid
                      :body    (if (:body req2) (json/generate-string (:body req2)) nil)})
+      (clojure.tools.logging/log :info "Sent the request over the wire to the IDE/App ")
       (let [answer (deref p 10000 ::failed)]
         (if (= ::failed answer)
-          {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"}
+          (do
+            (clojure.tools.logging/log :info "Timed Out after 10 Seconds")
+            {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"})
           (let [response (:response answer)
                 response (update response :headers fu/stringify-keys)
                 response (if (and (:body response) (:decodeBody answer))
@@ -214,6 +218,7 @@
                              (ByteArrayInputStream. (.decode (Base64/getDecoder) ^String (:body response))))
                            response)
                 ]
+            (clojure.tools.logging/log :info "Got a response. Status code " (:status response))
             response
             ))))))
 
@@ -248,12 +253,15 @@
 
 (defn http-handler
   [req]
+  (clojure.tools.logging/log :info "Incoming request to " (:uri req))
   (if-let [swagger (::swagger @shim-socket)]
     (let [app (make-app swagger)
           resp (app req)]
       resp
       )
-    {:status 404 :headers {"Content-Type" "text/plain"} :body "No Swagger Defined. Unable to route request\n"}
+    (do
+      (clojure.tools.logging/log :info "No Connection from dev-shim or no Swagger file defined")
+      {:status 404 :headers {"Content-Type" "text/plain"} :body "No Swagger Defined. Unable to route request\n"})
     ))
 
 (defonce end-server (atom nil))
@@ -268,4 +276,5 @@
   [& args]
   (run-server)
   (setup 54657)
+  (clojure.tools.logging/log :info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
   )
