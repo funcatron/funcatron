@@ -1,4 +1,5 @@
 (ns funcatron.tron.routers.shim-router
+  (:gen-class)
   (:require [funcatron.tron.util :as fu]
             [cheshire.core :as json]
             [org.httpkit.server :as kit]
