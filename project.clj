@@ -47,6 +47,6 @@
   :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
   :javac-options     ["-target" "1.8" "-source" "1.8"]
-  :main ^:skip-aot funcatron.tron.core
+  :main ^:skip-aot funcatron.tron.routers.shim_router
   :target-path "target/%s"
   )
