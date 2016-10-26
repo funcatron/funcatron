@@ -262,7 +262,7 @@
   (reset! end-server
           (kit/run-server #'http-handler {:port 3000})))
 
-(def -main
+(defn -main
   "The uberjar entrypoint"
   [args]
   (run-server)
