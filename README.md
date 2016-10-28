@@ -13,7 +13,7 @@ mvn archetype:generate  \
    -DarchetypeVersion=0.1.0 \
    -DgroupId=my.stellar \
    -DartifactId=thang \
-   -DarchetypeCatalog=https://clojars.org/repo
+   -DarchetypeRepository=https://clojars.org/repo
 ```
 
 To run the Funcatron dev server:
