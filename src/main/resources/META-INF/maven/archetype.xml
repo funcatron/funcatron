@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<archetype>
+    <id>starter</id>
+    <sources>
+        <source>src/main/java/MyFunction.java</source>
+        <source>src/main/java/MyPojo.java</source>
+    </sources>
+    <testSources>
+        <source>src/test/java/MyFunctionTest.java</source>
+    </testSources>
+
+    <fileSets>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory>src/main/resources</directory>
+
+            <includes>
+                <include>**/*.yaml</include>
+            </includes>
+        </fileSet>
+
+    </fileSets>
+</archetype>

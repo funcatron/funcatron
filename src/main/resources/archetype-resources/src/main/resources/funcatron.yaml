@@ -1,0 +1,33 @@
+swagger: "2.0"
+info:
+  version: 1.0.0
+  title: Funcatron Starter App
+  description: A sample of using Swagger to define a Funcatron route
+  license:
+    name: MIT
+    url: http://github.com/gruntjs/grunt/blob/master/LICENSE-MIT
+host: myserver.func.a.tron
+basePath: /api
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /sample:
+    get:
+      description: get sample information
+      operationId: ${package}.MyFunction
+      responses:
+        "200":
+          description: sample response
+    post:
+      description: Creates new sample data
+      operationId: ${package}.MyFunction
+      responses:
+        "200":
+          description: sample response
+        default:
+          description: unexpected error
+
