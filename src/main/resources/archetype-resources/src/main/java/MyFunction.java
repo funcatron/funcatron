@@ -46,6 +46,10 @@ public class MyFunction implements Func<MyPojo, MyPojo>
      */
     public static void main( String[] args ) throws Exception
     {
-        Register.register("localhost", 54657, new File("src/main/resources/funcatron.yaml"));
+        System.out.println("Starting connection to Funcatron dev server");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -p 3000:3000 -p 54657:54657 funcatron/dev-docker:latest");
+
+        Register.register(funcatronDevHost(), funcatronDevPort(),
+                new File("src/main/resources/funcatron.yaml"));
     }
 }
