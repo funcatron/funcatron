@@ -193,7 +193,7 @@
 
 (defn exec-app
   [op-i req]
-  (clojure.tools.logging/log :info "Dispatching request to " op-i)
+  (clojure.tools.logging/log :info (str "Dispatching request to " op-i))
   (let [req2 (dissoc req :swagger)
         req2 (assoc req2 :body (get-in req [:parameters :body]))]
     (let [uuid (.toString (UUID/randomUUID))
@@ -218,7 +218,7 @@
                              (ByteArrayInputStream. (.decode (Base64/getDecoder) ^String (:body response))))
                            response)
                 ]
-            (clojure.tools.logging/log :info "Got a response. Status code " (:status response))
+            (clojure.tools.logging/log :info (str "Got a response. Status code " (:status response)))
             response
             ))))))
 
@@ -253,7 +253,7 @@
 
 (defn http-handler
   [req]
-  (clojure.tools.logging/log :info "Incoming request to " (:uri req))
+  (clojure.tools.logging/log :info (str "Incoming request to " (:uri req)))
   (if-let [swagger (::swagger @shim-socket)]
     (let [app (make-app swagger)
           resp (app req)]
