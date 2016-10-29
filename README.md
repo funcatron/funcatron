@@ -10,7 +10,7 @@ To use the archetype:
 mvn archetype:generate  \
    -DarchetypeGroupId=funcatron \
    -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.1.0 \
+   -DarchetypeVersion=0.1.1 \
    -DgroupId=my.stellar \
    -DartifactId=thang \
    -DarchetypeRepository=https://clojars.org/repo

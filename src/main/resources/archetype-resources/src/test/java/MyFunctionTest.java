@@ -25,7 +25,7 @@ public class MyFunctionTest
      */
     public static Test suite()
     {
-        return new TestSuite( MyFunction.class );
+        return new TestSuite( MyFunctionTest.class );
     }
 
     /**
