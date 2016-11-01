@@ -7,7 +7,7 @@
             [funcatron.tron.util :as f-util]
             [langohr.channel :as lch]
             [langohr.consumers :as lcons]
-            [clojure.pprint :as pprint]
+            [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared]
             )
   (:import (funcatron.abstractions MessageBroker)
@@ -51,11 +51,30 @@
     (handle-rabbit-request handler broker ch metadata payload)
     ))
 
+(defn- fix-props
+  "Override :hosts, :port, :password :username based on command line"
+  [props]
+  (let [opts (:options @opts/command-line-options)]
+    {:hosts    (or (:rabbit_host opts)
+                   (:hosts props)
+                   "localhost")
+     :port     (or (:rabbit_port opts)
+                   (:port props)
+                   5672)
+
+     :username (or (:rabbit_username opts)
+                   (:username props))
+
+     :password (or (:rabbit_password opts)
+                   (:password props))
+     }))
+
 (defn ^MessageBroker create-broker
   "Create a RabbitMQ MessageBroker instance"
   ([] (create-broker (::rabbit-connection @d-props/info)))
   ([params]
    (let [rabbit-props (or params {})
+         rabbit-props (fix-props rabbit-props)
          listeners (ConcurrentHashMap.)]
      (log/trace "About to open RabbitMQ Connection using " rabbit-props)
      (try

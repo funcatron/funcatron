@@ -20,7 +20,7 @@
                  [commons-io/commons-io "2.5"]
 
                  ;; https://mvnrepository.com/artifact/net.razorvine/pyrolite
-                 [net.razorvine/pyrolite "4.13"]
+                 ;; [net.razorvine/pyrolite "4.13"]
 
                  [http-kit "2.2.0"]
 
@@ -28,25 +28,38 @@
                  [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
                  [dragonmark/util "0.1.3"]
 
+                 ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava
+                 ; [com.mesosphere.mesos.rx.java/mesos-rxjava "0.1.0"]
+                 ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-protobuf-client
+                 [com.mesosphere.mesos.rx.java/mesos-rxjava-protobuf-client "0.1.0"]
+                 ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-client
+                 [com.mesosphere.mesos.rx.java/mesos-rxjava-client "0.1.0"]
+
+                 [org.clojure/tools.cli "0.3.5"]
+                 [overtone/at-at "1.2.0"]
+                 [zookeeper-clj "0.9.4"]
+
                  [com.novemberain/langohr "3.6.1"]]
 
-  :profiles {:dev {:dependencies [                          ;;ring/ring-mock "0.3.0"]
-                                  ;; [ring/ring-core "1.4.0"]
-                                  [ring/ring-devel "1.5.0"]
-                                  [javax.servlet/servlet-api "2.5"]
+  :profiles {:dev     {:dependencies [;;ring/ring-mock "0.3.0"]
+                                      ;; [ring/ring-core "1.4.0"]
+                                      [ring/ring-devel "1.5.0"]
+                                      [javax.servlet/servlet-api "2.5"]
 
 
-                                  ;; [criterium "0.4.3"]
-                                  ]}
+                                      ;; [criterium "0.4.3"]
+                                      ]}
              :uberjar {:aot :all}
              }
 
 
   :min-lein-version "2.7.1"
 
-  :source-paths      ["src/clojure"]
+  :repositories {"Maven Central" "https://repo1.maven.org/maven2/"}
+
+  :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
-  :javac-options     ["-target" "1.8" "-source" "1.8"]
+  :javac-options ["-target" "1.8" "-source" "1.8"]
   :main funcatron.tron.routers.shim-router
   :target-path "target/%s"
   )

@@ -271,9 +271,9 @@
   (reset! end-server
           (kit/run-server #'http-handler {:port 3000})))
 
-(defn -main
-  "The uberjar entrypoint"
-  [& args]
+(defn start-dev-server
+  "The dev server entrypoint"
+  []
   (run-server)
   (setup 54657)
   (clojure.tools.logging/log :info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
