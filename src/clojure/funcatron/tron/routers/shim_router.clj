@@ -5,6 +5,7 @@
             [org.httpkit.server :as kit]
             [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
+            [funcatron.tron.options :as the-opts]
             [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.net ServerSocket Socket SocketException)
            (java.util Base64 UUID)
@@ -205,10 +206,10 @@
                      :replyTo uuid
                      :body    (if (:body req2) (json/generate-string (:body req2)) nil)})
       (clojure.tools.logging/log :info "Sent the request over the wire to the IDE/App ")
-      (let [answer (deref p 10000 ::failed)]
+      (let [answer (deref p (* 1000 (-> @the-opts/command-line-options :options :dev_request_timeout)) ::failed)]
         (if (= ::failed answer)
           (do
-            (clojure.tools.logging/log :info "Timed Out after 10 Seconds")
+            (clojure.tools.logging/log :info "Timed Out")
             {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"})
           (let [response (:response answer)
                 response (update response :headers fu/stringify-keys)
@@ -269,12 +270,12 @@
 (defn run-server
   []
   (reset! end-server
-          (kit/run-server #'http-handler {:port 3000})))
+          (kit/run-server #'http-handler {:port (-> @the-opts/command-line-options :options :web_port)})))
 
 (defn start-dev-server
   "The dev server entrypoint"
   []
   (run-server)
-  (setup 54657)
+  (setup (-> @the-opts/command-line-options :options :shim_port))
   (clojure.tools.logging/log :info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
   )
