@@ -1,4 +1,4 @@
-(ns funcatron.tron.routers.shim-router
+(ns funcatron.tron.modes.dev-mode
   (:gen-class)
   (:require [funcatron.tron.util :as fu]
             [cheshire.core :as json]

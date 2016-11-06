@@ -7,17 +7,17 @@
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
-   [[nil "--web_port PORT" "Web Server Port number (default 3000)"
+   [nil "--web_port PORT" "Web Server Port number (default 3000)"
      :default 3000
      :parse-fn #(Integer/parseInt %)
      :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
-    [[nil "--shim_port PORT" "Dev Mode Shim Server Port number (default 54657)"
+    [nil "--shim_port PORT" "Dev Mode Shim Server Port number (default 54657)"
       :default 54657
       :parse-fn #(Integer/parseInt %)
       :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
-     [[nil "--dev_request_timeout SECONDS" "How long to wait in dev-mode before timing out a request"
+     [nil "--dev_request_timeout SECONDS" "How long to wait in dev-mode before timing out a request"
        :default 60
        :parse-fn #(Integer/parseInt %)
        :validate [#(< 0 % 6000) "Must be a number between 1 and 6000"]]

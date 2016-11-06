@@ -1,5 +1,5 @@
 (ns funcatron.tron.core
-  (:require [funcatron.tron.routers.shim-router :as shimmy]
+  (:require [funcatron.tron.modes.dev-mode :as shimmy]
             [clojure.tools.logging :as log]
             [funcatron.tron.options :as the-opts]
             [clojure.tools.cli :as cli])
@@ -8,11 +8,6 @@
   )
 
 (set! *warn-on-reflection* true)
-
-
-
-
-
 
 (defn tryit
   [& args]
@@ -36,6 +31,8 @@
 
       (-> opts :options :devmode)
       (shimmy/start-dev-server)
+
+      (-> opts :options :)
       )
     ))
 
