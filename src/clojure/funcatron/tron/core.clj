@@ -2,6 +2,7 @@
   (:require [funcatron.tron.modes.dev-mode :as shimmy]
             [clojure.tools.logging :as log]
             [funcatron.tron.options :as the-opts]
+            [funcatron.tron.modes.tron-mode :as tronny]
             [clojure.tools.cli :as cli])
 
   (:gen-class)
@@ -32,7 +33,8 @@
       (-> opts :options :devmode)
       (shimmy/start-dev-server)
 
-      ; (-> opts :options :)
+      (-> opts :options :tron)
+      (tronny/start-tron-server)
       )
     ))
 

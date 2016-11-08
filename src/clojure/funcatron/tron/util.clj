@@ -1,11 +1,13 @@
 (ns funcatron.tron.util
   "Utilities for Tron"
   (:require [cheshire.core :as json]
-            [clojure.spec :as s])
+            [clojure.spec :as s]
+            [org.httpkit.server :as kit]
+            [funcatron.tron.options :as the-opts])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List)
            (org.apache.commons.io IOUtils)
-           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream)
+           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File)
            (com.fasterxml.jackson.databind ObjectMapper)
            (javax.xml.parsers DocumentBuilderFactory)
            (org.w3c.dom Node)
@@ -13,7 +15,8 @@
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
            (clojure.lang IFn)
-           (funcatron.abstractions Router$Message)))
+           (funcatron.abstractions Router$Message)
+           (io.netty.handler.codec.base64 Base64Encoder)))
 
 
 (set! *warn-on-reflection* true)
@@ -210,3 +213,33 @@
     ret
     )
   )
+
+(defn run-server
+  "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler. `the-atom` is where to put the 'stop the server' function."
+  [function the-atom]
+  (reset! the-atom
+          (kit/run-server function {:max-body (* 256 1024 1024) ;; 256mb max size
+
+                                    :port (or
+                                            (-> @the-opts/command-line-options :options :web_port)
+                                            3000)})))
+
+(defprotocol CalcSha256
+  "Calculate the SHA for something"
+  (sha256 [file]))
+
+(extend File
+  CalcSha256
+  {:sha256 (fn [file]
+             (.getBytes "Heyyl"))})
+
+(defprotocol ABase64Encoder
+  (base64encode [what]))
+
+(extend (Class/forName "[B")
+  ABase64Encoder
+  {:base64encode (fn [^"[B" bytes] (.encodeToString (Base64/getEncoder) bytes))})
+
+(extend nil
+  ABase64Encoder
+  {:base64encode (fn [^"[B" bytes] (.encodeToString (Base64/getEncoder) bytes))})

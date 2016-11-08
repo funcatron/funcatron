@@ -4,7 +4,7 @@
   :license {:name "Apache 2.0"}
 
   :dependencies [
-                 [org.clojure/clojure "1.9.0-alpha13"]
+                 [org.clojure/clojure "1.9.0-alpha14"]
                  [cheshire "5.6.3"]
                  ;; https://mvnrepository.com/artifact/io.sarnowski/swagger1st
                  [io.sarnowski/swagger1st "0.21.0"]
@@ -39,6 +39,8 @@
                  [overtone/at-at "1.2.0"]
                  [zookeeper-clj "0.9.4"]
 
+                 [compojure "1.5.1"]
+
                  [com.novemberain/langohr "3.6.1"]]
 
   :profiles {:dev     {:dependencies [;;ring/ring-mock "0.3.0"]
@@ -60,6 +62,6 @@
   :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
   :javac-options ["-target" "1.8" "-source" "1.8"]
-  :main funcatron.tron.routers.shim-router
+  :main funcatron.tron.core
   :target-path "target/%s"
   )

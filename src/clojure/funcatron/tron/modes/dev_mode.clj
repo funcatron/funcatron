@@ -9,7 +9,8 @@
             [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.net ServerSocket Socket SocketException)
            (java.util Base64 UUID)
-           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)))
+           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)
+           (clojure.lang IFn)))
 
 
 (set! *warn-on-reflection* true)
@@ -178,7 +179,7 @@
       (let [socket (.accept server-socket)
             input (.getInputStream socket)
             output (.getOutputStream socket)
-            thread (Thread. (fn [] (listen-to-input input)) "Input Listener")]
+            thread (Thread. ^IFn (fn [] (listen-to-input input)) "Input Listener")]
         (swap! shim-socket #(merge % {::socket socket
                                       ::input  input
                                       ::output output}))
@@ -246,7 +247,7 @@
   (locking sync-obj
     (shutdown)
     (let [socket (ServerSocket. port)
-          thread (Thread. (fn [] (listen-to-socket socket)) "Socket Acceptor")]
+          thread (Thread. ^IFn (fn [] (listen-to-socket socket)) "Socket Acceptor")]
       (.start thread)
       )
     )
@@ -267,15 +268,12 @@
 
 (defonce end-server (atom nil))
 
-(defn run-server
-  []
-  (reset! end-server
-          (kit/run-server #'http-handler {:port (-> @the-opts/command-line-options :options :web_port)})))
+
 
 (defn start-dev-server
   "The dev server entrypoint"
   []
-  (run-server)
+  (fu/run-server #'http-handler end-server)
   (setup (-> @the-opts/command-line-options :options :shim_port))
   (clojure.tools.logging/log :info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
   )
