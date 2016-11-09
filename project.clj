@@ -20,7 +20,7 @@
                  [commons-io/commons-io "2.5"]
 
                  ;; https://mvnrepository.com/artifact/net.razorvine/pyrolite
-                 ;; [net.razorvine/pyrolite "4.13"]
+                 [net.razorvine/pyrolite "4.13"]
 
                  [http-kit "2.2.0"]
 
@@ -40,6 +40,9 @@
                  [zookeeper-clj "0.9.4"]
 
                  [compojure "1.5.1"]
+                 [ring/ring-json "0.4.0"]
+
+                 [com.cognitect/transit-clj "0.8.293"]
 
                  [com.novemberain/langohr "3.6.1"]]
 

@@ -3,7 +3,7 @@
             [clojure.string :as cs]
             [funcatron.tron.options :as opts]))
 
-(def zk-client (atom nil) )
+(defonce zk-client (atom nil) )
 
 (defn- connect-to-zookeeper
   "Set up the connection to Zookeeper"

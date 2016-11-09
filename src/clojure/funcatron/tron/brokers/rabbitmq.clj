@@ -55,18 +55,22 @@
   "Override :hosts, :port, :password :username based on command line"
   [props]
   (let [opts (:options @opts/command-line-options)]
-    {:hosts    (or (:rabbit_host opts)
-                   (:hosts props)
-                   "localhost")
+    {:hosts    (let [z (or (:rabbit_host opts)
+                           (:hosts props)
+                           "localhost")]
+                 (if (string? z) [z] z)
+                 )
      :port     (or (:rabbit_port opts)
                    (:port props)
                    5672)
 
      :username (or (:rabbit_username opts)
-                   (:username props))
+                   (:username props)
+                   "guest")
 
      :password (or (:rabbit_password opts)
-                   (:password props))
+                   (:password props)
+                   "guest")
      }))
 
 (defn ^MessageBroker create-broker
@@ -119,4 +123,16 @@
     ))
 
 
+
+(defmethod shared/dispatch-wire-queue "rabbit"
+  [opts]
+  (create-broker nil))
+
+(defmethod shared/dispatch-wire-queue nil
+  [opts]
+  (create-broker nil))
+
+(defmethod shared/dispatch-wire-queue :default
+  [opts]
+  (create-broker nil))
 

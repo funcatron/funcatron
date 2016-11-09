@@ -3,11 +3,14 @@
   (:require [cheshire.core :as json]
             [clojure.spec :as s]
             [org.httpkit.server :as kit]
-            [funcatron.tron.options :as the-opts])
+            [funcatron.tron.options :as the-opts]
+            [cognitect.transit :as transit]
+            [io.sarnowski.swagger1st.context :as s1ctx]
+            [clojure.tools.logging :as log])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List)
            (org.apache.commons.io IOUtils)
-           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File)
+           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream)
            (com.fasterxml.jackson.databind ObjectMapper)
            (javax.xml.parsers DocumentBuilderFactory)
            (org.w3c.dom Node)
@@ -16,7 +19,9 @@
            (javax.xml.transform.stream StreamResult)
            (clojure.lang IFn)
            (funcatron.abstractions Router$Message)
-           (io.netty.handler.codec.base64 Base64Encoder)))
+           (java.security MessageDigest)
+           (java.util.jar JarFile JarEntry)
+           (java.util.concurrent Executors ExecutorService)))
 
 
 (set! *warn-on-reflection* true)
@@ -228,10 +233,37 @@
   "Calculate the SHA for something"
   (sha256 [file]))
 
+(extend InputStream
+  CalcSha256
+  {:sha256 (fn [^InputStream is]
+             (let [md (MessageDigest/getInstance "SHA-256")
+                   ba (byte-array 1024)]
+               (loop []
+                 (let [cnt (.read is ba)]
+                   (when (>= cnt 0)
+                     (if (> cnt 0) (.update md ba 0 cnt))
+                     (recur)
+                     )))
+               (.close is)
+               (.digest md)))})
+
 (extend File
   CalcSha256
-  {:sha256 (fn [file]
-             (.getBytes "Heyyl"))})
+  {:sha256 (fn [^File file]
+             (sha256 (FileInputStream. file))
+             )})
+
+(extend String
+  CalcSha256
+  {:sha256 (fn [^String str]
+             (sha256 (.getBytes str "UTF-8"))
+             )})
+
+(extend (Class/forName "[B")
+  CalcSha256
+  {:sha256 (fn [^"[B" bytes]
+             (sha256 (ByteArrayInputStream. bytes))
+             )})
 
 (defprotocol ABase64Encoder
   (base64encode [what]))
@@ -240,6 +272,86 @@
   ABase64Encoder
   {:base64encode (fn [^"[B" bytes] (.encodeToString (Base64/getEncoder) bytes))})
 
+(extend String
+  ABase64Encoder
+  {:base64encode (fn [^String bytes] (base64encode (.getBytes bytes "UTF-8")))})
+
 (extend nil
   ABase64Encoder
-  {:base64encode (fn [^"[B" bytes] (.encodeToString (Base64/getEncoder) bytes))})
+  {:base64encode (fn [the-nil] "")})
+
+(def funcatron-file-regex
+  #"(?:.*\/|^)funcatron\.(json|yml|yaml)$")
+
+(defn- funcatron-file-type
+  "Is the entry a Funcatron definition file"
+  [^JarEntry jar-entry]
+  (second (re-matches funcatron-file-regex (.getName jar-entry))))
+
+(def ^:private file-type-mapping
+  {"yaml" :yaml
+   "yml" :yaml
+   "json" :json})
+
+(defn get-swagger-from-jar
+  "Take a JarFile and get the swagger definition"
+  [^JarFile jar]
+  (let [entries (-> jar .entries enumeration-seq)
+        entries (map (fn [x] {:e x :type (funcatron-file-type x)}) entries)
+        entries (filter :type entries)
+        entries (mapcat (fn [{:keys [e type]}]
+                          (try
+                            [(s1ctx/load-swagger-definition
+                               (file-type-mapping type)
+                               (slurp (.getInputStream jar e))
+                               )]
+                            (catch Exception e
+                              (do
+                                (log/error e "Failed to get Swagger information")
+                                nil)
+                              )
+                            )
+                          ) entries)
+        ]
+    (first entries)
+    )
+  )
+
+(defn find-swagger-info
+  "Tries to figure out the file type and then comb through it to figure out the Swagger file and the file type"
+  [^File file]
+  (or
+    (try (let [ret (get-swagger-from-jar (JarFile. file))]
+           (println "Ret is " ret)
+           {:type :jar :swagger (keywordize-keys ret)})
+         (catch Exception e nil))))
+
+
+(defn ^"[B" transit-encode
+  "Takes an object and transit-encodes the object. Returns a byte array"
+  [obj]
+  (let [out (ByteArrayOutputStream. 4096)
+        writer (transit/writer out :json)]
+    (transit/write writer obj)
+    (.toByteArray out)))
+
+(defn transit-decode
+  "Takes a byte array and returns the transit decoded object"
+  [^"[B" bytes]
+  (let [in (ByteArrayInputStream. bytes)
+        reader (transit/reader in :json)]
+  (transit/read reader)))
+
+(defonce ^ExecutorService ^:private thread-pool (Executors/newCachedThreadPool))
+
+(defn run-in-pool
+  [func]
+  (cond
+    (instance? Runnable func)
+    (.submit thread-pool ^Runnable func)
+
+    (instance? Callable func)
+    (.submit thread-pool ^Callable func)
+
+    :else
+    (throw (Exception. (str "The class " (.getClass ^Object func) " is neither Callable nor Runnable")))))

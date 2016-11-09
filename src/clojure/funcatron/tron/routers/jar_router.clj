@@ -45,18 +45,6 @@
      }
     ))
 
-(def funcatron-file-regex
-  #"(?:.*\/|^)funcatron\.(json|yml|yaml)$")
-
-(defn- funcatron-file-type
-  "Is the entry a Funcatron definition file"
-  [^JarEntry jar-entry]
-  (second (re-matches funcatron-file-regex (.getName jar-entry))))
-
-(def ^:private file-type-mapping
-  {"yaml" :yaml
-   "yml" :yaml
-   "json" :json})
 
 (s/fdef get-swagger
         :args (s/cat :jar-info ::jar-info)
@@ -65,27 +53,8 @@
 (defn get-swagger
   "Take the output from jar-info-from-file and get the swagger definition"
   [jar-info]
-  (let [^JarFile jar (::jar jar-info)
-        entries (-> jar .entries enumeration-seq)
-        entries (map (fn [x] {:e x :type (funcatron-file-type x)}) entries)
-        entries (filter :type entries)
-        entries (mapcat (fn [{:keys [e type]}]
-                          (try
-                            [(s1ctx/load-swagger-definition
-                               (file-type-mapping type)
-                               (slurp (.getInputStream jar e))
-                               )]
-                            (catch Exception e
-                              (do
-                                (log/error e "Failed to get Swagger information")
-                                nil)
-                              )
-                            )
-                          ) entries)
-        ]
-    (first entries)
-    )
-  )
+  (let [^JarFile jar (::jar jar-info)]
+    (funcatron.tron.util/get-swagger-from-jar jar)))
 
 (s/fdef update-jar-info-with-swagger
         :args (s/cat :jar-info ::jar-info)
