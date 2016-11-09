@@ -9,7 +9,7 @@
             [langohr.consumers :as lcons]
             [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared]
-            )
+            [funcatron.tron.util :as fu])
   (:import (funcatron.abstractions MessageBroker)
            (java.util.concurrent ConcurrentHashMap)
            (com.rabbitmq.client Channel)
@@ -31,15 +31,16 @@
                                         metadata payload
                                         (fn [] (.basicAck ch delivery-tag false))
                                         (fn [re-queue] (.basicNack ch delivery-tag false re-queue)))]
-      (future                                               ;; FIXME do our own thread pool
-        (try
-          (.apply handler message)
-          (.basicAck ch delivery-tag false)
-          (catch Exception e
-            (do
-              (.basicNack ch delivery-tag false false)
-              (log/error e "Failed to dispatch")
-              (throw e)))))
+      (fu/run-in-pool
+        (fn []
+          (try
+            (.apply handler message)
+            (.basicAck ch delivery-tag false)
+            (catch Exception e
+              (do
+                (.basicNack ch delivery-tag false false)
+                (log/error e "Failed to dispatch")
+                (throw e))))))
       nil
       )
     (catch Exception e
@@ -85,6 +86,17 @@
        (let [conn (lc/connect rabbit-props)]
          (log/trace "Openned RabbitMQ Connection")
          (reify MessageBroker
+           (queueDepth [this queue-name]
+             (with-open [ch (lch/open conn)]
+               (let [answer (.basicGet ch queue-name false)]
+                 (if answer
+                   (try
+                     (-> answer .getMessageCount)
+                     (finally (.basicNack ch (-> answer .getEnvelope .getDeliveryTag) false true)))
+                   0
+                   )
+                 )
+               ))
            (isConnected [this] (.isOpen conn))
            (listenToQueue [this queue-name handler]
              (let [ch (lch/open conn)

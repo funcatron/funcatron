@@ -8,7 +8,8 @@
             [funcatron.tron.store.shared :as shared-s]
             [compojure.route :refer [not-found resources]])
   (:import (java.io File)
-           (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)))
+           (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)
+           (java.net URLEncoder)))
 
 
 
@@ -17,6 +18,49 @@
 (defonce ^:private -message-queue (atom nil))
 
 (defonce ^:private -backing-store (atom nil))
+
+(defonce ^:private the-network (atom {}))
+
+(defonce ^:private route-map (atom []))
+
+(defonce ^:private desired-state
+         (atom {:front-ends 1
+                :runners 1}))
+
+(defonce ^:private actual-state
+         (atom {:front-ends []
+                :runners []}))
+
+
+(defn route-to-sha
+  "Get a SHA for the route"
+  [host path]
+  (-> (str host ";" path)
+      fu/sha256
+      fu/base64encode
+      URLEncoder/encode
+      )
+  )
+
+(defn add-to-route-map
+  "Adds a route to the route table"
+  [host path]
+  (let [sha (route-to-sha host path)
+        data {:host host :path path :queue sha}]
+    (swap!
+      route-map
+      (fn [rm]
+        (let [rm (remove #(= (:queue %) sha) rm)
+              rm (conj rm data)
+              rm (sort
+                   (fn [{:keys [path]} y]
+                     (let [py (:path y)]
+                       (- (count py) (count path)))
+                     )
+                   rm)]
+          (into [] rm))
+        )))
+  )
 
 (defn ^MessageBroker message-queue
   "The message queue/broker"
@@ -101,8 +145,15 @@
 
 (defmulti dispatch-tron-message
           "Dispatch the incoming message"
-          (fn [msg & _] (-> msg :type))
+          (fn [msg & _] (-> msg :action))
           )
+
+(defmethod dispatch-tron-message "heartbeat"
+  [{:keys [from]} & _]
+  (swap! the-network assoc-in [from :last-seen] (System/currentTimeMillis))
+  )
+
+
 
 (defn- handle-tron-messages
   "Handle messages sent to the tron queue"
