@@ -21,7 +21,8 @@
            (funcatron.abstractions Router$Message)
            (java.security MessageDigest)
            (java.util.jar JarFile JarEntry)
-           (java.util.concurrent Executors ExecutorService)))
+           (java.util.concurrent Executors ExecutorService)
+           (java.util.function Function)))
 
 
 (set! *warn-on-reflection* true)
@@ -355,3 +356,53 @@
 
     :else
     (throw (Exception. (str "The class " (.getClass ^Object func) " is neither Callable nor Runnable")))))
+
+(defprotocol ToClojureFunc
+  "Converts a Function into a Clojure Function"
+  (to-clj-func [f]))
+
+(extend nil
+  ToClojureFunc
+  {:to-clj-func (fn [_] (fn [& _]))})
+
+(extend IFn
+  ToClojureFunc
+  {:to-clj-func (fn [^IFn c] c)}
+  )
+
+(extend Function
+  ToClojureFunc
+  {:to-clj-func (fn [^Function c] (fn [a & _] (.apply c a)))})
+
+(extend Callable
+  ToClojureFunc
+  {:to-clj-func (fn [^Callable c] (fn [& _] (.call c)))})
+
+(extend Runnable
+  ToClojureFunc
+  {:to-clj-func (fn [^Runnable c] (fn [& _] (.run c)))})
+
+(defprotocol ToJavaFunction
+  "Converts a wide variety of stuff into a Java function"
+  (to-java-fn [f]))
+
+(extend nil
+  ToJavaFunction
+  {:to-java-fn (fn [_] (reify Function (apply [this _] nil)))})
+
+(extend IFn
+  ToJavaFunction
+  {:to-java-fn (fn [^IFn f] (reify Function (apply [this a] (f a))))})
+
+(extend Function
+  ToJavaFunction
+  {:to-java-fn (fn [^Function f] f)})
+
+(extend Callable
+  ToJavaFunction
+  {:to-java-fn (fn [^Callable f] (reify Function (apply [this a] (.call f))))})
+
+(extend Runnable
+  ToJavaFunction
+  {:to-java-fn (fn [^Runnable f] (reify Function (apply [this a] (.run f))))})
+
