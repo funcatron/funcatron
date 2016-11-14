@@ -38,9 +38,7 @@
   (-> (str host ";" path)
       fu/sha256
       fu/base64encode
-      URLEncoder/encode
-      )
-  )
+      URLEncoder/encode))
 
 (defn add-to-route-map
   "Adds a route to the route table"

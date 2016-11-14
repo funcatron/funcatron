@@ -23,5 +23,5 @@ public interface ContainerSubstrate {
 
     void stopService(UUID id, Function<Tuple2<TaskState, Map<String, String>>, Void> monitor) throws IOException;
 
-    enum TaskState {Unknown, Starting, Running, Stopping, Ended}
+    enum TaskState {Requested, Unknown, Starting, Running, RequestedStop, Stopping, Stopped}
 }

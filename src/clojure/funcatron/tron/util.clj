@@ -22,7 +22,8 @@
            (java.security MessageDigest)
            (java.util.jar JarFile JarEntry)
            (java.util.concurrent Executors ExecutorService)
-           (java.util.function Function)))
+           (java.util.function Function)
+           (funcatron.helpers Tuple2 Tuple3)))
 
 
 (set! *warn-on-reflection* true)
@@ -406,3 +407,22 @@
   ToJavaFunction
   {:to-java-fn (fn [^Runnable f] (reify Function (apply [this a] (.run f))))})
 
+(defprotocol TupleUtil
+  (from-tuple [this])
+  (to-tuple [this]))
+
+(extend List
+  TupleUtil
+  {:from-tuple (fn [this] this)
+   :to-tuple   (fn [lst] (if (< 2 (count lst))
+                           (Tuple2. (first lst) (second lst))
+                           (let [[a b c] lst] (Tuple3. a b c))))})
+
+(extend nil
+  TupleUtil
+  {:from-tuple (fn [this] this)
+   :to-tuple   (fn [lst] (Tuple2. nil nil))})
+
+(extend Tuple2
+  {:from-tuple (fn [^Tuple2 this] (.toList this))
+   :to-tuple   (fn [tuple] tuple)})
