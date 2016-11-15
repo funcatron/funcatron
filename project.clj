@@ -44,6 +44,8 @@
 
                  [com.cognitect/transit-clj "0.8.293"]
 
+                 [camel-snake-kebab "0.4.0"]
+
                  [com.novemberain/langohr "3.6.1"]]
 
   :profiles {:dev     {:dependencies [;;ring/ring-mock "0.3.0"]

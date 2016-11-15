@@ -13,6 +13,13 @@ import java.util.function.Function;
  * to start, stop, and monitor
  */
 public interface ContainerSubstrate {
+    /**
+     * Get all the internal information for the substrate... the results depend on
+     * the implementation. This is mostly for debugging purposes
+     * @return
+     */
+    Object allInfo();
+
     void startService(String type,
                       UUID id,
                       List<Tuple2<String, String>> envVars,

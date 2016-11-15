@@ -20,6 +20,8 @@ package funcatron.mesos;
  */
 
 import com.mesosphere.mesos.rx.java.MesosClient;
+import com.mesosphere.mesos.rx.java.util.UserAgentEntries;
+import funcatron.abstractions.ContainerSubstrate;
 import funcatron.helpers.Tuple2;
 import funcatron.helpers.Tuple3;
 import org.slf4j.Logger;
@@ -28,7 +30,10 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.*;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Lists.newArrayList;
+import static com.mesosphere.mesos.rx.java.protobuf.ProtoUtils.protoToString;
+import static com.mesosphere.mesos.rx.java.util.UserAgentEntries.userAgentEntryForMavenArtifact;
 import static java.util.stream.Collectors.groupingBy;
 
 import com.mesosphere.mesos.rx.java.MesosClientBuilder;
@@ -44,6 +49,9 @@ import org.apache.mesos.v1.scheduler.Protos.Event;
 import org.jetbrains.annotations.NotNull;
 import rx.Observable;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -52,6 +60,7 @@ import static com.mesosphere.mesos.rx.java.SinkOperations.sink;
 import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.decline;
 import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.subscribe;
 import static rx.Observable.from;
+import static rx.Observable.just;
 
 /**
  * A relatively simple Mesos framework that launches {@code sleep $SLEEP_SECONDS} tasks for offers it receives.
@@ -62,7 +71,10 @@ import static rx.Observable.from;
 public final class MesosController {
     private static final Logger LOGGER = LoggerFactory.getLogger(MesosController.class);
 
-    public final class DesiredTask {
+    /**
+     * If we've got a task we want to launch, this class describes it
+     */
+    public static final class DesiredTask {
         public final double memory;
         public final double cpu;
         public final String role;
@@ -70,7 +82,7 @@ public final class MesosController {
         public final String image;
         public final List<Tuple2<String, String>> env;
 
-        public DesiredTask(UUID id,String image, double memory, double cpu, String role, final List<Tuple2<String, String>> env) {
+        public DesiredTask(UUID id, String image, double memory, double cpu, String role, final List<Tuple2<String, String>> env) {
             this.id = id;
             this.image = image;
             this.memory = memory;
@@ -84,30 +96,68 @@ public final class MesosController {
         }
     }
 
+    /**
+     * Something that manages state has to implement this interface
+     */
     public interface StateManager {
-        default FrameworkID getFwId() {
-            return FrameworkID.newBuilder().setValue("Funcatron-" + UUID.randomUUID()).build();
-        }
+        boolean isDone();
 
-        void update(UUID taskID, TaskStatus status, TaskState taskState);
+        FrameworkID getFwId();
+
+        void update(UUID taskID, TaskStatus status, ContainerSubstrate.TaskState taskState);
 
         List<DesiredTask> currentDesiredTasks();
 
         List<Tuple3<AgentID, ExecutorID, UUID>> shutdownTasks();
     }
 
+    public static ContainerSubstrate.TaskState toOurState(TaskState state) {
+        switch (state) {
+            case TASK_STARTING:
+            case TASK_STAGING:
+                return ContainerSubstrate.TaskState.Starting;
+
+            case TASK_RUNNING:
+                return ContainerSubstrate.TaskState.Running;
+
+            case TASK_KILLING:
+                return ContainerSubstrate.TaskState.Stopping;
+
+            case TASK_FAILED:
+            case TASK_FINISHED:
+            case TASK_KILLED:
+            case TASK_LOST:
+            case TASK_ERROR:
+                return ContainerSubstrate.TaskState.Stopped;
+
+            default:
+                return ContainerSubstrate.TaskState.Unknown;
+
+        }
+    }
+
+    public static Map<String, Object> statusToMap(TaskStatus status) {
+        return status.getAllFields().entrySet().
+                stream().
+                collect(Collectors.toMap(e -> e.getKey().getName(),
+                        e -> e.getValue()));
+
+    }
+
     public static MesosClient<Call, Event> buildClient(final URI mesosUri, final StateManager stateObject) {
-        final MesosClientBuilder<Call, Event> clientBuilder = ProtobufMesosClientBuilder.schedulerUsingProtos()
-                .mesosUri(mesosUri);
+        final MesosClientBuilder<Call, Event> clientBuilder =
+                ProtobufMesosClientBuilder.schedulerUsingProtos()
+                        .mesosUri(mesosUri)
+                        .applicationUserAgentEntry(UserAgentEntries.literal("Funcatron", "0.1"));
 
         final Call subscribeCall = subscribe(
                 stateObject.getFwId(),
                 Protos.FrameworkInfo.newBuilder()
                         .setId(stateObject.getFwId())
                         .setUser(Optional.ofNullable(System.getenv("user")).orElse("root")) // https://issues.apache.org/jira/browse/MESOS-3747
-                        .setName("Funcatron")
+                        .setName("funcatron")
                         .setFailoverTimeout(0)
-                        .setRole("*")
+                        .setRole("*".trim())
                         .build()
         );
 
@@ -126,8 +176,10 @@ public final class MesosController {
                             .filter(event -> event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().hasUuid())
                             .doOnNext(event -> {
                                 final TaskStatus status = event.getUpdate().getStatus();
-
-                                stateObject.update(UUID.fromString(status.getTaskId().getValue()), status, status.getState());
+                                System.out.println("Update event " + event);
+                                stateObject.update(UUID.fromString(status.getTaskId().getValue()),
+                                        status,
+                                        toOurState(status.getState()));
                             })
                             .map(event -> {
                                 final TaskStatus status = event.getUpdate().getStatus();
@@ -144,9 +196,9 @@ public final class MesosController {
 
                                 Stream<SinkOperation<Call>> dogs = toShut.stream().map(ae -> sink(shutdownTasks(stateObject.getFwId(),
                                         ae._1(), ae._2()),
-                                        () ->  toShut.forEach(ae2 -> stateObject.update(ae2._3(),
+                                        () -> toShut.forEach(ae2 -> stateObject.update(ae2._3(),
                                                 null,
-                                                TaskState.TASK_KILLING))));
+                                                ContainerSubstrate.TaskState.Stopping))));
 
 
                                 return Observable.from(dogs.collect(Collectors.toList()));
@@ -154,10 +206,17 @@ public final class MesosController {
 
                     final Observable<Optional<SinkOperation<Call>>> errorLogger = events
                             .filter(event -> event.getType() == Event.Type.ERROR || (event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().getState() == TaskState.TASK_ERROR))
-                            .doOnNext(e -> LOGGER.warn("Task Error: {}", ProtoUtils.protoToString(e)))
+                            .doOnNext(e -> LOGGER.warn("Task Error: {}", protoToString(e)))
                             .map(e -> Optional.empty());
 
-                    return offerEvaluations.mergeWith(updateStatusAck).mergeWith(errorLogger).mergeWith(shutdownStatus);
+                    final Observable<Optional<SinkOperation<Call>>> endIt = events
+                            .filter(event -> event.getType() == Event.Type.ERROR || (event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().getState() == TaskState.TASK_ERROR))
+                            .doOnNext(e -> {
+                                if (stateObject.isDone()) throw new RuntimeException("Done with stream");
+                            })
+                            .map(e -> Optional.empty());
+
+                    return offerEvaluations.mergeWith(endIt).mergeWith(updateStatusAck).mergeWith(errorLogger).mergeWith(shutdownStatus);
                 });
 
         return clientBuilder.build();
@@ -216,8 +275,8 @@ public final class MesosController {
                         invokeTasks(frameworkId, ids, tasks),
                         () -> tasks.forEach(task ->
                                 state.update(UUID.fromString(task.getTaskId().getValue()),
-                                null,
-                                TaskState.TASK_STAGING)),
+                                        null,
+                                        ContainerSubstrate.TaskState.Starting)),
                         (e) -> LOGGER.warn("", e)
                 );
             } else {
@@ -257,7 +316,7 @@ public final class MesosController {
             @NotNull final FrameworkID frameworkId,
             @NotNull final AgentID agentID,
             @NotNull final ExecutorID executorID
-            ) {
+    ) {
         return Call.newBuilder()
                 .setFrameworkId(frameworkId)
                 .setType(Call.Type.SHUTDOWN).setShutdown(
@@ -272,10 +331,10 @@ public final class MesosController {
         dockerInfoBuilder.setImage(imageName);
 
         for (int i = 0; i < envVars.size(); i++) {
-            Tuple2<String,String> var = envVars.get(i);
+            Tuple2<String, String> var = envVars.get(i);
             dockerInfoBuilder.addParameters(i, Parameter.newBuilder().
                     setKey("--env").
-                    setValue(var._1()+"='"+var._2()+"'").build());
+                    setValue(var._1() + "='" + var._2() + "'").build());
         }
 
         ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder();
@@ -296,47 +355,6 @@ public final class MesosController {
                         .setName("mem")
                         .setType(Value.Type.SCALAR)
                         .setScalar(Value.Scalar.newBuilder().setValue(mem))).
-                setName(imageName+ ": " + tid.getValue());
+                        setName(imageName + ": " + tid.getValue());
     }
-
-//    @NotNull
-//    private static TaskInfo sleepTask(
-//            @NotNull final AgentID agentId,
-//            @NotNull final String taskId,
-//            @NotNull final String cpusRole,
-//            final double cpus,
-//            @NotNull final String memRole,
-//            final double mem
-//    ) {
-//        final String sleepSeconds = Optional.ofNullable(System.getenv("SLEEP_SECONDS")).orElse("15");
-//        return TaskInfo.newBuilder()
-//                .setName(taskId)
-//                .setTaskId(
-//                        TaskID.newBuilder()
-//                                .setValue(taskId)
-//                )
-//                .setAgentId(agentId)
-//                .setCommand(
-//                        CommandInfo.newBuilder()
-//                                .setEnvironment(Environment.newBuilder()
-//                                        .addVariables(
-//                                                Environment.Variable.newBuilder()
-//                                                        .setName("SLEEP_SECONDS").setValue(sleepSeconds)
-//                                        ))
-//                                .setValue("env | sort && sleep $SLEEP_SECONDS")
-//                )
-//                .addResources(Resource.newBuilder()
-//                        .setName("cpus")
-//                        .setRole(cpusRole)
-//                        .setType(Value.Type.SCALAR)
-//                        .setScalar(Value.Scalar.newBuilder().setValue(cpus)))
-//                .addResources(Resource.newBuilder()
-//                        .setName("mem")
-//                        .setRole(memRole)
-//                        .setType(Value.Type.SCALAR)
-//                        .setScalar(Value.Scalar.newBuilder().setValue(mem)))
-//                .build();
-//    }
-
-
 }

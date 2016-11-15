@@ -6,6 +6,7 @@
             [funcatron.tron.options :as the-opts]
             [cognitect.transit :as transit]
             [io.sarnowski.swagger1st.context :as s1ctx]
+            [camel-snake-kebab.core :refer :all]
             [clojure.tools.logging :as log])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List)
@@ -70,6 +71,11 @@
   ([f m] (walk f string-to-kwd m))
   )
 
+(defn kebab-keywordize-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (keywordize-keys identity m))
+  ([f m] (walk f ->kebab-case-keyword m))
+  )
 
 
 (def ^CustomPrettyPrinter pretty-printer
