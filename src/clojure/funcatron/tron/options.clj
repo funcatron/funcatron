@@ -44,6 +44,8 @@
    [nil "--store_type TYPE" "The type of backing store, e.g. zookeeper"
     :default "zookeeper"]
 
+   [nil "--substrate_type TYPE" "The type of Container substrate: mesos, k8s, swarm"]
+
 
    [nil "--tron_queue name" "The name of the queue the Tron listens on"
     :default "for_tron"

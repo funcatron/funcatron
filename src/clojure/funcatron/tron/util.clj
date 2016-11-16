@@ -6,7 +6,7 @@
             [funcatron.tron.options :as the-opts]
             [cognitect.transit :as transit]
             [io.sarnowski.swagger1st.context :as s1ctx]
-            [camel-snake-kebab.core :refer :all]
+            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List)
@@ -65,6 +65,12 @@
   ([f m] (walk f kwd-to-string m))
   )
 
+(defn camel-stringify-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (camel-stringify-keys identity m))
+  ([f m] (walk f csk/->camelCaseString m))
+  )
+
 (defn keywordize-keys
   "Recursively transforms all map keys from keywords to strings."
   ([m] (keywordize-keys identity m))
@@ -73,8 +79,8 @@
 
 (defn kebab-keywordize-keys
   "Recursively transforms all map keys from keywords to strings."
-  ([m] (keywordize-keys identity m))
-  ([f m] (walk f ->kebab-case-keyword m))
+  ([m] (kebab-keywordize-keys identity m))
+  ([f m] (walk f csk/->kebab-case-keyword m))
   )
 
 

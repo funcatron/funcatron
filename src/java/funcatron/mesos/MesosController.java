@@ -19,27 +19,29 @@ package funcatron.mesos;
  * Copied from the mesos rx codebase, but updated to be more generic
  */
 
+import com.google.protobuf.GeneratedMessage;
 import com.mesosphere.mesos.rx.java.MesosClient;
 import com.mesosphere.mesos.rx.java.util.UserAgentEntries;
 import funcatron.abstractions.ContainerSubstrate;
 import funcatron.helpers.Tuple2;
 import funcatron.helpers.Tuple3;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.*;
 
-import static com.google.common.base.Preconditions.checkState;
+
 import static com.google.common.collect.Lists.newArrayList;
 import static com.mesosphere.mesos.rx.java.protobuf.ProtoUtils.protoToString;
-import static com.mesosphere.mesos.rx.java.util.UserAgentEntries.userAgentEntryForMavenArtifact;
+
 import static java.util.stream.Collectors.groupingBy;
 
 import com.mesosphere.mesos.rx.java.MesosClientBuilder;
 import com.mesosphere.mesos.rx.java.SinkOperation;
 import com.mesosphere.mesos.rx.java.SinkOperations;
-import com.mesosphere.mesos.rx.java.protobuf.ProtoUtils;
+
 import com.mesosphere.mesos.rx.java.protobuf.ProtobufMesosClientBuilder;
 import com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls;
 import org.apache.mesos.v1.Protos;
@@ -49,10 +51,7 @@ import org.apache.mesos.v1.scheduler.Protos.Event;
 import org.jetbrains.annotations.NotNull;
 import rx.Observable;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,7 +59,7 @@ import static com.mesosphere.mesos.rx.java.SinkOperations.sink;
 import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.decline;
 import static com.mesosphere.mesos.rx.java.protobuf.SchedulerCalls.subscribe;
 import static rx.Observable.from;
-import static rx.Observable.just;
+
 
 /**
  * A relatively simple Mesos framework that launches {@code sleep $SLEEP_SECONDS} tasks for offers it receives.
@@ -100,17 +99,49 @@ public final class MesosController {
      * Something that manages state has to implement this interface
      */
     public interface StateManager {
+        /**
+         * Return true if the connection should be closed
+         *
+         * @return true if the connection should be closed
+         */
         boolean isDone();
 
+        /**
+         * Get the framework ID
+         *
+         * @return
+         */
         FrameworkID getFwId();
 
+        /**
+         * Send a status update
+         *
+         * @param taskID    the taskID
+         * @param status    the status (may be null)
+         * @param taskState the state
+         */
         void update(UUID taskID, TaskStatus status, ContainerSubstrate.TaskState taskState);
 
+        /**
+         * Get a list of desired tasks
+         *
+         * @return the tasks the state manager wants to start
+         */
         List<DesiredTask> currentDesiredTasks();
 
+        /**
+         * Get a list of the tasks the state manager wants to stop
+         *
+         * @return the tasks the state manager wants to stop
+         */
         List<Tuple3<AgentID, ExecutorID, UUID>> shutdownTasks();
     }
 
+    /**
+     * Convert from MesosController state to ContainerSubstrate (generic) state
+     * @param state the Mesos state
+     * @return the generic Funcatron state
+     */
     public static ContainerSubstrate.TaskState toOurState(TaskState state) {
         switch (state) {
             case TASK_STARTING:
@@ -136,15 +167,30 @@ public final class MesosController {
         }
     }
 
-    public static Map<String, Object> statusToMap(TaskStatus status) {
+    /**
+     * Given a GeneratedMessage object, get a Map of the state. Why? More Clojure-friendly
+     *
+     * @param status the GeneratedMessage
+     * @return a key/value set of the fields
+     */
+    public static Map<String, Object> statusToMap(GeneratedMessage status) {
         return status.getAllFields().entrySet().
                 stream().
                 collect(Collectors.toMap(e -> e.getKey().getName(),
-                        e -> e.getValue()));
+                        Map.Entry::getValue));
 
     }
 
-    public static MesosClient<Call, Event> buildClient(final URI mesosUri, final StateManager stateObject) {
+    /**
+     * Build a client to Mesos using JavaRX as the means of dealing with events
+     *
+     * @param mesosUri the URI for the mesos instance
+     * @param stateObject the object the deals with state
+     *
+     * @return a MesosClient
+     */
+    public static MesosClient<Call, Event> buildClient(final URI mesosUri,
+                                                       final StateManager stateObject) {
         final MesosClientBuilder<Call, Event> clientBuilder =
                 ProtobufMesosClientBuilder.schedulerUsingProtos()
                         .mesosUri(mesosUri)
@@ -154,7 +200,7 @@ public final class MesosController {
                 stateObject.getFwId(),
                 Protos.FrameworkInfo.newBuilder()
                         .setId(stateObject.getFwId())
-                        .setUser(Optional.ofNullable(System.getenv("user")).orElse("root")) // https://issues.apache.org/jira/browse/MESOS-3747
+                        .setUser(Optional.ofNullable(System.getenv("user")).orElse("root"))
                         .setName("funcatron")
                         .setFailoverTimeout(0)
                         .setRole("*".trim())
@@ -176,7 +222,6 @@ public final class MesosController {
                             .filter(event -> event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().hasUuid())
                             .doOnNext(event -> {
                                 final TaskStatus status = event.getUpdate().getStatus();
-                                System.out.println("Update event " + event);
                                 stateObject.update(UUID.fromString(status.getTaskId().getValue()),
                                         status,
                                         toOurState(status.getState()));
@@ -210,9 +255,8 @@ public final class MesosController {
                             .map(e -> Optional.empty());
 
                     final Observable<Optional<SinkOperation<Call>>> endIt = events
-                            .filter(event -> event.getType() == Event.Type.ERROR || (event.getType() == Event.Type.UPDATE && event.getUpdate().getStatus().getState() == TaskState.TASK_ERROR))
                             .doOnNext(e -> {
-                                if (stateObject.isDone()) throw new RuntimeException("Done with stream");
+                                if (stateObject.isDone()) throw new EndOfSession("Done with stream");
                             })
                             .map(e -> Optional.empty());
 
@@ -221,6 +265,20 @@ public final class MesosController {
 
         return clientBuilder.build();
     }
+
+    /**
+     * A marker exception thrown if the session is over
+     */
+    public static class EndOfSession extends RuntimeException {
+        public EndOfSession(String reason) {
+            super(reason);
+        }
+    }
+
+    /**
+     * A list of UUIDs that we've launched so we don't launch duplicates
+     */
+    private static ConcurrentHashSet<UUID> launched = new ConcurrentHashSet<>();
 
     @NotNull
     private static SinkOperation<Call> handleOffer(final Offer offer, final StateManager state) {
@@ -244,7 +302,6 @@ public final class MesosController {
 
             final List<TaskInfo> tasks = newArrayList();
 
-            final HashSet<UUID> serviced = new HashSet<>();
 
             for (int i = 0; i < cpuList.size(); i++) {
 
@@ -255,14 +312,14 @@ public final class MesosController {
                 double availableMem = mem.getScalar().getValue();
                 for (DesiredTask dt : desired) {
                     final String desiredRole = dt.role;
-                    if (!serviced.contains(dt.id) && desiredRole.equals(cpus.getRole()) && desiredRole.equals(mem.getRole())) {
+                    if (!launched.contains(dt.id) && desiredRole.equals(cpus.getRole()) && desiredRole.equals(mem.getRole())) {
 
                         final double cpusPerTask = dt.cpu;
                         final double memMbPerTask = dt.memory;
                         if (availableCpu >= cpusPerTask && availableMem >= memMbPerTask) {
                             availableCpu -= cpusPerTask;
                             availableMem -= memMbPerTask;
-                            serviced.add(dt.id);
+                            launched.add(dt.id);
                             tasks.add(dt.createTaskInfo(agentId));
                         }
                     }
@@ -325,7 +382,22 @@ public final class MesosController {
                 .build();
     }
 
-    public static TaskInfo.Builder taskFor(String imageName, UUID taskID, double cpus, double mem, List<Tuple2<String, String>> envVars) {
+    /**
+     * Take a series of parameters and build a TaskInfo that
+     * starts the Docker image with the appropriate parameters
+     *
+     * @param imageName the name of the docker image to run
+     * @param taskID    the task id
+     * @param cpus      the number of CPUs to allocate
+     * @param mem       the memory to allocate
+     * @param envVars   environment variables to set in the docker container
+     * @return
+     */
+    private static TaskInfo.Builder taskFor(String imageName,
+                                           UUID taskID,
+                                           double cpus,
+                                           double mem,
+                                           List<Tuple2<String, String>> envVars) {
         ContainerInfo.DockerInfo.Builder dockerInfoBuilder = ContainerInfo.DockerInfo.newBuilder();
 
         dockerInfoBuilder.setImage(imageName);
@@ -333,8 +405,8 @@ public final class MesosController {
         for (int i = 0; i < envVars.size(); i++) {
             Tuple2<String, String> var = envVars.get(i);
             dockerInfoBuilder.addParameters(i, Parameter.newBuilder().
-                    setKey("--env").
-                    setValue(var._1() + "='" + var._2() + "'").build());
+                    setKey("env").
+                    setValue(var._1() + "=" + var._2()).build());
         }
 
         ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder();

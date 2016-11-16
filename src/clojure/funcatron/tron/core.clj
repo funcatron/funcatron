@@ -3,9 +3,6 @@
             [clojure.tools.logging :as log]
             [funcatron.tron.options :as the-opts]
             [funcatron.tron.modes.tron-mode :as tronny]
-            [funcatron.tron.brokers.rabbitmq]
-            [funcatron.tron.brokers.inmemory]
-            [funcatron.tron.store.zookeeper]
             [clojure.tools.cli :as cli])
 
   (:gen-class)

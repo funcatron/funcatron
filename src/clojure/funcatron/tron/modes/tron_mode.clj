@@ -6,7 +6,8 @@
             [compojure.core :refer [GET defroutes POST]]
             [funcatron.tron.brokers.shared :as shared-b]
             [funcatron.tron.store.shared :as shared-s]
-            [compojure.route :refer [not-found resources]])
+            [compojure.route :refer [not-found resources]]
+            )
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)
            (java.net URLEncoder)))
@@ -164,7 +165,7 @@
 
 (defn- connect-to-message-queue
   []
-  (let [queue (shared-b/dispatch-wire-queue)]
+  (let [queue (shared-b/wire-up-queue)]
     (reset! -message-queue queue)
     (.listenToQueue queue (or "tron") (fu/promote-to-function
                                         (fn [msg]
@@ -183,6 +184,11 @@
 (defn start-tron-server
   "Start the Tron mode server"
   []
+  (require     ;; load a bunch of the namespaces to register wiring
+    '[funcatron.tron.brokers.rabbitmq]
+    '[funcatron.tron.brokers.inmemory]
+    '[funcatron.tron.store.zookeeper]
+    '[funcatron.tron.substrate.mesos-substrate])
   (fu/run-server #'ring-handler shutdown-server)
   (connect-to-message-queue)
   (connect-to-store))
