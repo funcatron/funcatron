@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * A 2 element Tuple
  */
-public final class Tuple2<A, B> {
+public class Tuple2<A, B> {
 
     private final A a;
     private final B b;

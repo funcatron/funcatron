@@ -105,4 +105,13 @@ public interface MessageBroker extends Closeable {
      * @throws IOException if there's a problem
      */
     void close() throws IOException;
+
+    /**
+     * How many messages in the queue?
+     *
+     * @param queueName the name of the queue to test
+     * @return the number of items in the queue
+     * @throws IOException if something went wonky
+     */
+    long queueDepth(String queueName) throws IOException;
 }

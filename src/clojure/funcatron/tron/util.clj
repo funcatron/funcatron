@@ -1,11 +1,17 @@
 (ns funcatron.tron.util
   "Utilities for Tron"
   (:require [cheshire.core :as json]
-            [clojure.spec :as s])
+            [clojure.spec :as s]
+            [org.httpkit.server :as kit]
+            [funcatron.tron.options :as the-opts]
+            [cognitect.transit :as transit]
+            [io.sarnowski.swagger1st.context :as s1ctx]
+            [camel-snake-kebab.core :as csk]
+            [clojure.tools.logging :as log])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List)
            (org.apache.commons.io IOUtils)
-           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream)
+           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream)
            (com.fasterxml.jackson.databind ObjectMapper)
            (javax.xml.parsers DocumentBuilderFactory)
            (org.w3c.dom Node)
@@ -13,7 +19,12 @@
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
            (clojure.lang IFn)
-           (funcatron.abstractions Router$Message)))
+           (funcatron.abstractions Router$Message)
+           (java.security MessageDigest)
+           (java.util.jar JarFile JarEntry)
+           (java.util.concurrent Executors ExecutorService)
+           (java.util.function Function)
+           (funcatron.helpers Tuple2 Tuple3)))
 
 
 (set! *warn-on-reflection* true)
@@ -54,12 +65,23 @@
   ([f m] (walk f kwd-to-string m))
   )
 
+(defn camel-stringify-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (camel-stringify-keys identity m))
+  ([f m] (walk f csk/->camelCaseString m))
+  )
+
 (defn keywordize-keys
   "Recursively transforms all map keys from keywords to strings."
   ([m] (keywordize-keys identity m))
   ([f m] (walk f string-to-kwd m))
   )
 
+(defn kebab-keywordize-keys
+  "Recursively transforms all map keys from keywords to strings."
+  ([m] (kebab-keywordize-keys identity m))
+  ([f m] (walk f csk/->kebab-case-keyword m))
+  )
 
 
 (def ^CustomPrettyPrinter pretty-printer
@@ -210,3 +232,209 @@
     ret
     )
   )
+
+(defn run-server
+  "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler. `the-atom` is where to put the 'stop the server' function."
+  [function the-atom]
+  (reset! the-atom
+          (kit/run-server function {:max-body (* 256 1024 1024) ;; 256mb max size
+
+                                    :port (or
+                                            (-> @the-opts/command-line-options :options :web_port)
+                                            3000)})))
+
+(defprotocol CalcSha256
+  "Calculate the SHA for something"
+  (sha256 [file]))
+
+(extend InputStream
+  CalcSha256
+  {:sha256 (fn [^InputStream is]
+             (let [md (MessageDigest/getInstance "SHA-256")
+                   ba (byte-array 1024)]
+               (loop []
+                 (let [cnt (.read is ba)]
+                   (when (>= cnt 0)
+                     (if (> cnt 0) (.update md ba 0 cnt))
+                     (recur)
+                     )))
+               (.close is)
+               (.digest md)))})
+
+(extend File
+  CalcSha256
+  {:sha256 (fn [^File file]
+             (sha256 (FileInputStream. file))
+             )})
+
+(extend String
+  CalcSha256
+  {:sha256 (fn [^String str]
+             (sha256 (.getBytes str "UTF-8"))
+             )})
+
+(extend (Class/forName "[B")
+  CalcSha256
+  {:sha256 (fn [^"[B" bytes]
+             (sha256 (ByteArrayInputStream. bytes))
+             )})
+
+(defprotocol ABase64Encoder
+  (base64encode [what]))
+
+(extend (Class/forName "[B")
+  ABase64Encoder
+  {:base64encode (fn [^"[B" bytes] (.encodeToString (Base64/getEncoder) bytes))})
+
+(extend String
+  ABase64Encoder
+  {:base64encode (fn [^String bytes] (base64encode (.getBytes bytes "UTF-8")))})
+
+(extend nil
+  ABase64Encoder
+  {:base64encode (fn [the-nil] "")})
+
+(def funcatron-file-regex
+  #"(?:.*\/|^)funcatron\.(json|yml|yaml)$")
+
+(defn- funcatron-file-type
+  "Is the entry a Funcatron definition file"
+  [^JarEntry jar-entry]
+  (second (re-matches funcatron-file-regex (.getName jar-entry))))
+
+(def ^:private file-type-mapping
+  {"yaml" :yaml
+   "yml" :yaml
+   "json" :json})
+
+(defn get-swagger-from-jar
+  "Take a JarFile and get the swagger definition"
+  [^JarFile jar]
+  (let [entries (-> jar .entries enumeration-seq)
+        entries (map (fn [x] {:e x :type (funcatron-file-type x)}) entries)
+        entries (filter :type entries)
+        entries (mapcat (fn [{:keys [e type]}]
+                          (try
+                            [(s1ctx/load-swagger-definition
+                               (file-type-mapping type)
+                               (slurp (.getInputStream jar e))
+                               )]
+                            (catch Exception e
+                              (do
+                                (log/error e "Failed to get Swagger information")
+                                nil)
+                              )
+                            )
+                          ) entries)
+        ]
+    (first entries)
+    )
+  )
+
+(defn find-swagger-info
+  "Tries to figure out the file type and then comb through it to figure out the Swagger file and the file type"
+  [^File file]
+  (or
+    (try (let [ret (get-swagger-from-jar (JarFile. file))]
+           (println "Ret is " ret)
+           {:type :jar :swagger (keywordize-keys ret)})
+         (catch Exception e nil))))
+
+
+(defn ^"[B" transit-encode
+  "Takes an object and transit-encodes the object. Returns a byte array"
+  [obj]
+  (let [out (ByteArrayOutputStream. 4096)
+        writer (transit/writer out :json)]
+    (transit/write writer obj)
+    (.toByteArray out)))
+
+(defn transit-decode
+  "Takes a byte array and returns the transit decoded object"
+  [^"[B" bytes]
+  (let [in (ByteArrayInputStream. bytes)
+        reader (transit/reader in :json)]
+  (transit/read reader)))
+
+(defonce ^ExecutorService ^:private thread-pool (Executors/newCachedThreadPool))
+
+(defn run-in-pool
+  [func]
+  (cond
+    (instance? Runnable func)
+    (.submit thread-pool ^Runnable func)
+
+    (instance? Callable func)
+    (.submit thread-pool ^Callable func)
+
+    :else
+    (throw (Exception. (str "The class " (.getClass ^Object func) " is neither Callable nor Runnable")))))
+
+(defprotocol ToClojureFunc
+  "Converts a Function into a Clojure Function"
+  (to-clj-func [f]))
+
+(extend nil
+  ToClojureFunc
+  {:to-clj-func (fn [_] (fn [& _]))})
+
+(extend IFn
+  ToClojureFunc
+  {:to-clj-func (fn [^IFn c] c)}
+  )
+
+(extend Function
+  ToClojureFunc
+  {:to-clj-func (fn [^Function c] (fn [a & _] (.apply c a)))})
+
+(extend Callable
+  ToClojureFunc
+  {:to-clj-func (fn [^Callable c] (fn [& _] (.call c)))})
+
+(extend Runnable
+  ToClojureFunc
+  {:to-clj-func (fn [^Runnable c] (fn [& _] (.run c)))})
+
+(defprotocol ToJavaFunction
+  "Converts a wide variety of stuff into a Java function"
+  (to-java-fn [f]))
+
+(extend nil
+  ToJavaFunction
+  {:to-java-fn (fn [_] (reify Function (apply [this _] nil)))})
+
+(extend IFn
+  ToJavaFunction
+  {:to-java-fn (fn [^IFn f] (reify Function (apply [this a] (f a))))})
+
+(extend Function
+  ToJavaFunction
+  {:to-java-fn (fn [^Function f] f)})
+
+(extend Callable
+  ToJavaFunction
+  {:to-java-fn (fn [^Callable f] (reify Function (apply [this a] (.call f))))})
+
+(extend Runnable
+  ToJavaFunction
+  {:to-java-fn (fn [^Runnable f] (reify Function (apply [this a] (.run f))))})
+
+(defprotocol TupleUtil
+  (from-tuple [this])
+  (to-tuple [this]))
+
+(extend List
+  TupleUtil
+  {:from-tuple (fn [this] this)
+   :to-tuple   (fn [lst] (if (< 2 (count lst))
+                           (Tuple2. (first lst) (second lst))
+                           (let [[a b c] lst] (Tuple3. a b c))))})
+
+(extend nil
+  TupleUtil
+  {:from-tuple (fn [this] this)
+   :to-tuple   (fn [lst] (Tuple2. nil nil))})
+
+(extend Tuple2
+  {:from-tuple (fn [^Tuple2 this] (.toList this))
+   :to-tuple   (fn [tuple] tuple)})

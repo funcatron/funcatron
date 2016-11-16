@@ -16,6 +16,10 @@
    (when (not (map? @queue-atom)) (reset! queue-atom {}))
    (let [listeners (ConcurrentHashMap.)]
      (reify MessageBroker
+       (queueDepth [this queue-name]
+         (if-let [the-atom (get @queue-atom queue-name)]
+           (count @the-atom)
+           0))
        (isConnected [this] true)
        (listenToQueue [this queue-name handler]
          (let [atom-holder (atom (atom []))]

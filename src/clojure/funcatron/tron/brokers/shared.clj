@@ -1,5 +1,6 @@
 (ns funcatron.tron.brokers.shared
-  (:require [funcatron.tron.util :as f-util])
+  (:require [funcatron.tron.util :as fu]
+            [funcatron.tron.options :as the-opts])
   (:import (com.rabbitmq.client LongString)
            (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker)
            (java.util Base64)
@@ -17,14 +18,14 @@
 (defn- delay-metadata
   "Delays the conversion of the metadata"
   [metadata]
-  (delay (f-util/stringify-keys fix-rabbit-long-string metadata))
+  (delay (fu/stringify-keys fix-rabbit-long-string metadata))
   )
 
 (defn- delay-fix-body
   "Converts a byte array of body into the a correct data structure"
   [metadata ^"[B" payload]
   (delay
-    (let [basic (f-util/fix-payload (:content-type metadata) payload)
+    (let [basic (fu/fix-payload (:content-type metadata) payload)
           fixed (if (:body basic)
                   (let [body-bytes (if (:body-base64-encoded basic)
                                      (.decode (Base64/getDecoder) ^String (:body basic))
@@ -36,7 +37,7 @@
                   basic
                   )
           ]
-      (f-util/stringify-keys fix-rabbit-long-string fixed))))
+      (fu/stringify-keys fix-rabbit-long-string fixed))))
 
 (defn ^MessageBroker$ReceivedMessage build-message
   "Builds a message from the metadata and payload"
@@ -65,4 +66,14 @@
 (defn listen-to-queue
   "A helper function that wraps a Clojure function in a Function wrapper"
   [^MessageBroker broker ^String queue func]
-  (.listenToQueue broker queue (f-util/to-java-function func)))
+  (.listenToQueue broker queue (fu/to-java-function func)))
+
+(defmulti ^MessageBroker dispatch-wire-queue "A multi-method that dispatches to the right queue provider/creator"
+          (fn [opts] (-> opts :options :queue_type))
+          )
+
+(defn wire-up-queue
+  "Based on the run-time options, wire up an appropriate message queue."
+  []
+  (dispatch-wire-queue @the-opts/command-line-options)
+  )

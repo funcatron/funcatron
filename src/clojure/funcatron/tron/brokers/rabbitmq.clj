@@ -7,9 +7,9 @@
             [funcatron.tron.util :as f-util]
             [langohr.channel :as lch]
             [langohr.consumers :as lcons]
-            [clojure.pprint :as pprint]
+            [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared]
-            )
+            [funcatron.tron.util :as fu])
   (:import (funcatron.abstractions MessageBroker)
            (java.util.concurrent ConcurrentHashMap)
            (com.rabbitmq.client Channel)
@@ -31,15 +31,16 @@
                                         metadata payload
                                         (fn [] (.basicAck ch delivery-tag false))
                                         (fn [re-queue] (.basicNack ch delivery-tag false re-queue)))]
-      (future                                               ;; FIXME do our own thread pool
-        (try
-          (.apply handler message)
-          (.basicAck ch delivery-tag false)
-          (catch Exception e
-            (do
-              (.basicNack ch delivery-tag false false)
-              (log/error e "Failed to dispatch")
-              (throw e)))))
+      (fu/run-in-pool
+        (fn []
+          (try
+            (.apply handler message)
+            (.basicAck ch delivery-tag false)
+            (catch Exception e
+              (do
+                (.basicNack ch delivery-tag false false)
+                (log/error e "Failed to dispatch")
+                (throw e))))))
       nil
       )
     (catch Exception e
@@ -51,17 +52,51 @@
     (handle-rabbit-request handler broker ch metadata payload)
     ))
 
+(defn- fix-props
+  "Override :hosts, :port, :password :username based on command line"
+  [props]
+  (let [opts (:options @opts/command-line-options)]
+    {:hosts    (let [z (or (:rabbit_host opts)
+                           (:hosts props)
+                           "localhost")]
+                 (if (string? z) [z] z)
+                 )
+     :port     (or (:rabbit_port opts)
+                   (:port props)
+                   5672)
+
+     :username (or (:rabbit_username opts)
+                   (:username props)
+                   "guest")
+
+     :password (or (:rabbit_password opts)
+                   (:password props)
+                   "guest")
+     }))
+
 (defn ^MessageBroker create-broker
   "Create a RabbitMQ MessageBroker instance"
   ([] (create-broker (::rabbit-connection @d-props/info)))
   ([params]
    (let [rabbit-props (or params {})
+         rabbit-props (fix-props rabbit-props)
          listeners (ConcurrentHashMap.)]
      (log/trace "About to open RabbitMQ Connection using " rabbit-props)
      (try
        (let [conn (lc/connect rabbit-props)]
          (log/trace "Openned RabbitMQ Connection")
          (reify MessageBroker
+           (queueDepth [this queue-name]
+             (with-open [ch (lch/open conn)]
+               (let [answer (.basicGet ch queue-name false)]
+                 (if answer
+                   (try
+                     (-> answer .getMessageCount)
+                     (finally (.basicNack ch (-> answer .getEnvelope .getDeliveryTag) false true)))
+                   0
+                   )
+                 )
+               ))
            (isConnected [this] (.isOpen conn))
            (listenToQueue [this queue-name handler]
              (let [ch (lch/open conn)
@@ -100,4 +135,16 @@
     ))
 
 
+
+(defmethod shared/dispatch-wire-queue "rabbit"
+  [opts]
+  (create-broker nil))
+
+(defmethod shared/dispatch-wire-queue nil
+  [opts]
+  (create-broker nil))
+
+(defmethod shared/dispatch-wire-queue :default
+  [opts]
+  (create-broker nil))
 

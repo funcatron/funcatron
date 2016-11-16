@@ -1,14 +1,16 @@
-(ns funcatron.tron.routers.shim-router
+(ns funcatron.tron.modes.dev-mode
   (:gen-class)
   (:require [funcatron.tron.util :as fu]
             [cheshire.core :as json]
             [org.httpkit.server :as kit]
             [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
+            [funcatron.tron.options :as the-opts]
             [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.net ServerSocket Socket SocketException)
            (java.util Base64 UUID)
-           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)))
+           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)
+           (clojure.lang IFn)))
 
 
 (set! *warn-on-reflection* true)
@@ -177,7 +179,7 @@
       (let [socket (.accept server-socket)
             input (.getInputStream socket)
             output (.getOutputStream socket)
-            thread (Thread. (fn [] (listen-to-input input)) "Input Listener")]
+            thread (Thread. ^IFn (fn [] (listen-to-input input)) "Input Listener")]
         (swap! shim-socket #(merge % {::socket socket
                                       ::input  input
                                       ::output output}))
@@ -205,10 +207,10 @@
                      :replyTo uuid
                      :body    (if (:body req2) (json/generate-string (:body req2)) nil)})
       (clojure.tools.logging/log :info "Sent the request over the wire to the IDE/App ")
-      (let [answer (deref p 10000 ::failed)]
+      (let [answer (deref p (* 1000 (-> @the-opts/command-line-options :options :dev_request_timeout)) ::failed)]
         (if (= ::failed answer)
           (do
-            (clojure.tools.logging/log :info "Timed Out after 10 Seconds")
+            (clojure.tools.logging/log :info "Timed Out")
             {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"})
           (let [response (:response answer)
                 response (update response :headers fu/stringify-keys)
@@ -245,7 +247,7 @@
   (locking sync-obj
     (shutdown)
     (let [socket (ServerSocket. port)
-          thread (Thread. (fn [] (listen-to-socket socket)) "Socket Acceptor")]
+          thread (Thread. ^IFn (fn [] (listen-to-socket socket)) "Socket Acceptor")]
       (.start thread)
       )
     )
@@ -266,15 +268,12 @@
 
 (defonce end-server (atom nil))
 
-(defn run-server
-  []
-  (reset! end-server
-          (kit/run-server #'http-handler {:port 3000})))
 
-(defn -main
-  "The uberjar entrypoint"
-  [& args]
-  (run-server)
-  (setup 54657)
+
+(defn start-dev-server
+  "The dev server entrypoint"
+  []
+  (fu/run-server #'http-handler end-server)
+  (setup (-> @the-opts/command-line-options :options :shim_port))
   (clojure.tools.logging/log :info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
   )
