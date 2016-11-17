@@ -1,41 +1,9 @@
 local cjson = require("cjson");
 
-local random = math.random
-
--- generate a UUID
-local function uuid()
-    local template ='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
-    return string.gsub(template, '[xy]', function (c)
-        local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)
-        return string.format('%x', v)
-    end)
-end
+local funcatron = require("/data/funcatron")
 
 local rid = ngx.var.request_id
 
--- we need to seed the random # gen based on current time
--- plus some randomness from the nginx request id
-math.randomseed(os.time() * rid:byte(1) * rid:byte(2) * rid:byte(3))
-
-local rabbitmqstomp = require("resty/rabbitmqstomp")
-
-local rabbit, err = rabbitmqstomp:new()
-
-rabbit:set_timeout(10000)
-
-local bunny_host = os.getenv("RABBIT_HOST") or
-   os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
-
-local bunny_port = tonumber(os.getenv("RABBIT_PORT") or "61613")
-
-local bunny_user = os.getenv("RABBIT_USER") or "guest"
-
-local bunny_pwd = os.getenv("RABBIT_PWD") or "guest"
-
-local ok, err = rabbit:connect({host=bunny_host,
-                                port=bunny_port,
-                                username=bunny_user,
-                                password=bunny_pwd})
 
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
@@ -49,7 +17,7 @@ ngx.req.read_body()
 
 local data = ngx.req.get_body_data()
 
-local msg_uuid = rid -- uuid()
+local msg_uuid = rid
 
 local msg = cjson.encode({headers=ngx.req.get_headers(),
                           method=ngx.req.get_method(),
@@ -95,6 +63,15 @@ headers["persistent"] = "false"
 headers["reply-to"]=msg_uuid
 headers["content-type"] = "application/json"
 
+local rabbit, err = funcatron.rabbit_connection()
+
+if err then
+   ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+   ngx.header.content_type = "text/plain; charset=utf-8"
+   ngx.say(err)
+   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+
 local ok, err = rabbit:send(msg, headers)
 
 if err then
@@ -104,13 +81,24 @@ if err then
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
-                                  persistent="false",
-                                  id=msg_uuid})
+local the_answer = 42
+local the_fn = function()
+   {
+      local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
+                                        persistent="false",
+                                        id=msg_uuid})
 
-local data, err = rabbit:receive()
+      local data, err = rabbit:receive()
 
-rabbit:close()
+      rabbit:close()
+
+      corountine.yield(data)
+
+   }
+
+   local co = corountine.create(function() {
+
+   })
 
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
