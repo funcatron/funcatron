@@ -10,6 +10,14 @@ RUN \
    make install && \
    mkdir /data
 
+RUN \
+  cd /tmp && \
+  curl -fSL https://raw.githubusercontent.com/bungle/lua-resty-random/master/lib/resty/random.lua -o random.lua && \
+  cp random.lua /usr/local/openresty/lualib
+
+RUN apt-get update && \
+    apt-get upgrade -y
+
 RUN apt-get install -y dnsutils
 
 ADD req.lua /data/

@@ -5,12 +5,17 @@ local funcatron = require("/data/funcatron")
 local rid = ngx.var.request_id
 
 
+local target_queue, err = funcatron.route_for(ngx.var.host,
+                                              ngx.var.uri)
+
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
+
+
 
 -- get the body
 ngx.req.read_body()
@@ -44,7 +49,6 @@ local msg = cjson.encode({headers=ngx.req.get_headers(),
 
 local headers =
    {["x-method"]=ngx.req.get_method(),
-      -- ["x-uri-args"]=ngx.req.get_uri_args(),
       ["x-uri"]=ngx.var.uri,
       ["x-host"]=ngx.var.host,
       ["x-remote-addr"]=ngx.var.remote_addr,
@@ -56,7 +60,7 @@ local headers =
       ["x-uri-args"]=ngx.var.args,
       ["x-request-id"]=ngx.var.request_id}
 
-headers["destination"] = "/amq/queue/funcatron"
+headers["destination"] = "/amq/queue/" .. target_queue
 headers["receipt"] = "msg" .. msg_uuid
 headers["app-id"] = "funcatron-resty"
 headers["persistent"] = "false"
@@ -81,24 +85,10 @@ if err then
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local the_answer = 42
-local the_fn = function()
-   {
-      local ok, err = rabbit:subscribe({destination="/queue/" .. msg_uuid,
-                                        persistent="false",
-                                        id=msg_uuid})
+-- close the rabbit connection
+rabbit:close()
 
-      local data, err = rabbit:receive()
-
-      rabbit:close()
-
-      corountine.yield(data)
-
-   }
-
-   local co = corountine.create(function() {
-
-   })
+local response, err = funcatron.get_response(msg_uuid)
 
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
@@ -106,7 +96,6 @@ if err then
    ngx.say(err)
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 else
-   local response = cjson.decode(data)
    ngx.status = response.status or 200
    for key,value in pairs(response.headers or {})
    do
