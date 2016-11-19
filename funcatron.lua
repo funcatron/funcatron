@@ -25,19 +25,22 @@ local rabbitmqstomp = require("resty/rabbitmqstomp")
 local bunny_host = os.getenv("RABBIT_HOST") or
    os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
 
-local bunny_port = tonumber(os.getenv("RABBIT_PORT") or "61613")
+local bunny_port = (tonumber(os.getenv("RABBIT_PORT") or "61613")) or 61613
 
 local bunny_user = os.getenv("RABBIT_USER") or "guest"
 
 local bunny_pwd = os.getenv("RABBIT_PWD") or "guest"
 
-local tron_queue = "funcatron"
+local tron_queue = os.getenv("TRON_QUEUE") or "tron"
 
+local dev_mode = os.getenv("DEV_MODE") or true
+
+ngx.log(ngx.ALERT, "Hey... this is an alert")
 
 function funcatron.rabbit_connection()
    local rabbit, err = rabbitmqstomp:new()
 
-   rabbit:set_timeout(10000)
+   rabbit:set_timeout(1000002)
 
    local ok, err =
       rabbit:connect({host=bunny_host,
@@ -66,6 +69,11 @@ local response_handlers = {}
 local function register_and_listen()
    local rabbit, err = funcatron.rabbit_connection()
 
+   if dev_mode then
+      ngx.log(ngx.ALERT, "Dev mode: setting up listen mode")
+   end
+
+
    if err then
       -- on connection failure, try again in 1/3 of second
       ngx.timer.at(0.3, register_and_listen)
@@ -88,7 +96,7 @@ local function register_and_listen()
                              ["msg-id"]=msg_uuid})
 
    local headers = {["x-type"] = "awake",
-      desintation=("/amq/queue/" .. tron_queue),
+      destination=("/amq/queue/" .. tron_queue),
       persistent="false",
       ["content-type"]="application/json",
       receipt=msg_uuid
@@ -108,7 +116,12 @@ local function register_and_listen()
                                      id=funcatron.instance_uuid})
 
    while true do
+      if dev_mode then
+         ngx.log(ngx.ALERT, "Dev mode: in listen loop")
+      end
+
       local data, err = rabbit:receive()
+
       if err then
          if err ~= "timeout" then -- ignore timeouts
             -- otherwise close the socket and re-register
@@ -119,6 +132,10 @@ local function register_and_listen()
       else
          local response = cjson.decode(data)
          local the_func = response_handlers[response.action]
+         if dev_mode then
+            ngx.log(ngx.ALERT, "Dev mode: got action: " .. response.action)
+         end
+
          if the_func then
             the_func(response)
          else
@@ -263,6 +280,10 @@ end
 local function heartbeat()
    local rabbit, err = funcatron.rabbit_connection()
 
+   if dev_mode then
+      ngx.log(ngx.ALERT, "In heartbeat... and dev mode")
+   end
+
    -- {:action "heartbeat"
    --     :msg-id UUID-string
    --     :from UUID-String
@@ -278,7 +299,7 @@ local function heartbeat()
                                 ["msg-id"]=msg_uuid})
 
       local headers = {["x-type"] = "heartbeat",
-         desintation=("/amq/queue/" .. tron_queue),
+         destination=("/amq/queue/" .. tron_queue),
          persistent="false",
          ["content-type"]="application/json",
          receipt=msg_uuid
