@@ -56,6 +56,8 @@
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
+   [nil "--bundle_store DIRECTORY" "Where to store uploaded bundles"]
+
    [nil "--devmode" "Dev Mode"]
    [nil "--runner" "Runner Mode"]
    [nil "--tron" "Manager Tron Mode"]

@@ -2,17 +2,20 @@
   (:require [funcatron.tron.util :as fu]
             [clojure.java.io :as cio]
             [clojure.tools.logging :as log]
-            [ring.middleware.json :refer [wrap-json-response]]
+            [ring.middleware.json :as rm-json :refer [wrap-json-response]]
             [compojure.core :refer [GET defroutes POST]]
             [funcatron.tron.brokers.shared :as shared-b]
             [funcatron.tron.store.shared :as shared-s]
+            [funcatron.tron.options :as f-opts]
             [compojure.route :refer [not-found resources]]
             )
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)
-           (java.net URLEncoder)))
+           (java.net URLEncoder)
+           (java.util UUID)))
 
 
+(set! *warn-on-reflection* true)
 
 (defonce ^:private shutdown-server (atom nil))
 
@@ -24,6 +27,8 @@
 
 (defonce ^:private route-map (atom []))
 
+(defonce ^:private func-bundles (atom {}))
+
 (defonce ^:private desired-state
          (atom {:front-ends 1
                 :runners 1}))
@@ -32,6 +37,66 @@
          (atom {:front-ends []
                 :runners []}))
 
+(def ^:private storage-directory
+  (delay
+    (let [^String the-dir (or (-> @f-opts/command-line-options :options :bundle_store)
+                      (str (get (System/getProperties) "user.home")
+                           (get (System/getProperties) "file.separator")
+                           "funcatron_bundles"
+                           ))
+          the-dir (File. the-dir)
+          ]
+      (.mkdirs the-dir)
+      the-dir)))
+
+(defn- clean-network
+  "Remove everything from the network that's old"
+  []
+  ()
+  (let [too-old (- (System/currentTimeMillis) (* 1000 60 15))] ;; if we haven't seen a node in 15 minutes, clean it
+    (swap!
+      the-network
+      (fn [cur]
+        (into
+          {}
+          (remove #(> too-old (:last-seen (second %))) cur))))))
+
+
+(defn- sha-and-swagger-for-file
+  "Get the Sha256 and swagger information for the file"
+  [file]
+  (let [sha (fu/sha256 file)
+        sha (fu/base64encode sha)
+        {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info} (fu/find-swagger-info file)]
+    {:sha sha :type type :swagger swagger :host host :basePath basePath :file-info file-info}
+    ))
+
+(defn- load-func-bundles
+  "Reads the func bundles from the storage directory"
+  []
+  (let [dir ^File @storage-directory
+        files (filter #(and (.isFile ^File %)
+                            (.endsWith (.getName ^File %) ".funcbundle"))
+                      (.listFiles dir))]
+    (doseq [file files]
+      (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
+        (if (and type file-info)
+          (swap! func-bundles assoc sha {:file file :swagger swagger}))))))
+
+(defn- try-to-load-route-map
+  "Try to load the route map"
+  []
+  (let [file (File. ^File @storage-directory "route_map.data")]
+    (try
+      (if (.exists file)
+        (let [bundles @func-bundles
+              data (slurp file)
+              data (read-string data)]
+          (if (map? data)
+            (let [data (into {} (filter #(contains? bundles (-> % second :sha)) data))]
+              (reset! route-map data)))))
+      (catch Exception e (log/error e "Failed to load route map"))
+      )))
 
 (defn route-to-sha
   "Get a SHA for the route"
@@ -43,9 +108,9 @@
 
 (defn add-to-route-map
   "Adds a route to the route table"
-  [host path]
+  [host path bundle-sha]
   (let [sha (route-to-sha host path)
-        data {:host host :path path :queue sha}]
+        data {:host host :path path :queue sha :sha bundle-sha}]
     (swap!
       route-map
       (fn [rm]
@@ -66,6 +131,36 @@
   []
   @-message-queue)
 
+(defn- send-route-map
+  "Sends the route map to a destination"
+  ([where] (send-route-map where @route-map))
+  ([where the-map]
+   (.sendMessage (message-queue) where
+                 {:content-type "application/json"}
+                 {:action "route"
+                  :msg-id (.toString (UUID/randomUUID))
+                  :routes the-map
+                  :at     (System/currentTimeMillis)
+                  })))
+
+(defn- routes-changed
+  "The routes changed, let all the front end instances know"
+  [_ _ _ new-state]
+  (fu/run-in-pool
+    (fn []
+      ;; write the file
+      (let [file (File. ^File @storage-directory "route_map.data")]
+        (try
+          (spit file (pr-str new-state))
+          (catch Exception e (log/error e "Failed to write route map"))
+          ))
+
+      (clean-network)
+      (doseq [[k {:keys [type ]}] @the-network]
+        (when (= type "frontend")
+          (send-route-map k new-state))
+        ))))
+
 (defn ^StableStore backing-store
   "Returns the backing store object"
   []
@@ -77,24 +172,23 @@
   (if body
     (let [file (File/createTempFile "func-a-" ".tron")]
       (cio/copy body file)
-      (let [sha (fu/sha256 file)
-            sha (fu/base64encode sha)
-            {:keys [type, swagger] :as file-info} (fu/find-swagger-info file)]
+      (let [{:keys [sha type swagger host basePath file-info]} (sha-and-swagger-for-file file)]
         (if (and type file-info)
-          {:status  200
-           :headers {"Content-Type" "application/json"}
-           :body    {:accepted true
-                     :type     type
-                     :host     (:host swagger)
-                     :route    (:basePath swagger)
-                     :swagger  swagger
-                     :sha256   sha}}
+          (let [dest-file (File. ^File @storage-directory (str (System/currentTimeMillis) sha ".funcbundle"))]
+            (cio/copy file dest-file)
+            (.delete file)
+            (swap! func-bundles assoc sha {:file dest-file :swagger swagger})
+            {:status  200
+             :body    {:accepted true
+                       :type     type
+                       :host     host
+                       :route    basePath
+                       :swagger  swagger
+                       :sha256   sha}})
           {:status 400
-           :headers {"Content-Type" "application/json"}
            :body {:accepted false
                   :error "Could not determine the file type"}})))
     {:status 400
-     :headers {"Content-Type" "application/json"}
      :body {:accepted false
             :error "Must post a Func bundle file"}}
     )
@@ -103,8 +197,8 @@
 (defn- enable-func
   "Enable a Func bundle"
   [req]
+  (println "Req " (get-in req [:headers "content-type"]) " body " (fu/kebab-keywordize-keys (:json-params req)))
   {:status 200
-   :headers {"Content-Type" "application/json"}
    :body {:success false
           :action "FIXME"}
    })
@@ -113,7 +207,6 @@
   "Enable a Func bundle"
   [req]
   {:status 200
-   :headers {"Content-Type" "application/json"}
    :body {:success false
           :action "FIXME"}
    })
@@ -122,7 +215,6 @@
   "Return statistics on activity"
   []
   {:status 200
-   :headers {"Content-Type" "application/json"}
    :body {:success false
           :action "FIXME"}
    })
@@ -139,7 +231,9 @@
   "Handle http requests"
   [req]
 
-  ((wrap-json-response tron-routes) req)
+  ((-> tron-routes
+       wrap-json-response
+       (rm-json/wrap-json-params)) req)
   )
 
 (defmulti dispatch-tron-message
@@ -149,10 +243,21 @@
 
 (defmethod dispatch-tron-message "heartbeat"
   [{:keys [from]} & _]
+  (log/info (str "Heartbeat from " from))
+  (clean-network)
   (swap! the-network assoc-in [from :last-seen] (System/currentTimeMillis))
   )
 
-
+(defmethod dispatch-tron-message "awake"
+  [msg & _]
+  (log/info (str "awake from " msg))
+  (clean-network)
+  (swap! the-network assoc (:from msg) (merge msg {:last-seen (System/currentTimeMillis)}))
+  (cond
+    (= "frontend" (:type msg))
+    (send-route-map (:from msg))
+    )
+  )
 
 (defn- handle-tron-messages
   "Handle messages sent to the tron queue"
@@ -166,10 +271,12 @@
 (defn- connect-to-message-queue
   []
   (let [queue (shared-b/wire-up-queue)]
+    (println "Connected to queue " queue)
     (reset! -message-queue queue)
-    (.listenToQueue queue (or "tron") (fu/promote-to-function
-                                        (fn [msg]
-                                          (fu/run-in-pool (fn [] (handle-tron-messages msg))))))
+    (.listenToQueue queue (or "tron")
+                    (fu/promote-to-function
+                      (fn [msg]
+                        (fu/run-in-pool (fn [] (handle-tron-messages msg))))))
     )
   )
 
@@ -189,6 +296,10 @@
     '[funcatron.tron.brokers.inmemory]
     '[funcatron.tron.store.zookeeper]
     '[funcatron.tron.substrate.mesos-substrate])
+  (load-func-bundles)                                       ;; load the bundles
+  (try-to-load-route-map)
+  (add-watch route-map ::nothing routes-changed)
   (fu/run-server #'ring-handler shutdown-server)
   (connect-to-message-queue)
-  (connect-to-store))
+  ;; (connect-to-store)
+  )

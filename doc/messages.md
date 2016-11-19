@@ -78,7 +78,7 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 ### Update routing
 
 ```
-{:action "heartbeat"
+{:action "route"
  :msg-id UUID-string
  :routes [{:host hostname :path path :queue queue-name}]
  :at currentTimeMillis
@@ -92,3 +92,12 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 ## Runner to Frontend
 
 ### Result of Servicing Request
+
+```
+{:action "answer"
+ :msg-id UUID-string
+ :request-id UUID-string
+ :answer {:headers [[String, String]] :status http-status-code :body base64str}
+ :at currentTimeMillis
+ }
+```
