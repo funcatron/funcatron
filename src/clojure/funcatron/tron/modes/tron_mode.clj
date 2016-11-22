@@ -52,7 +52,6 @@
 (defn- clean-network
   "Remove everything from the network that's old"
   []
-  ()
   (let [too-old (- (System/currentTimeMillis) (* 1000 60 15))] ;; if we haven't seen a node in 15 minutes, clean it
     (swap!
       the-network
@@ -62,12 +61,16 @@
           (remove #(> too-old (:last-seen (second %))) cur))))))
 
 
+
+
 (defn- sha-and-swagger-for-file
   "Get the Sha256 and swagger information for the file"
   [file]
   (let [sha (fu/sha256 file)
         sha (fu/base64encode sha)
-        {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info} (fu/find-swagger-info file)]
+
+        {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info}
+        (fu/find-swagger-info file)]
     {:sha sha :type type :swagger swagger :host host :basePath basePath :file-info file-info}
     ))
 
@@ -131,6 +134,26 @@
   []
   @-message-queue)
 
+(defn- remove-other-instances-of-this-frontend
+  "Finds other front-end instances with the same `instance-id` and tell them to die"
+  [{:keys [from instance-id]}]
+  (let [to-kill (filter (fn [[k v]]
+                          (and (not= k from)
+                               (= instance-id (:instance-id v))))
+                        @the-network
+                        )]
+    (doseq [[k {:keys [instance-id]}] to-kill]
+      (log/info (str "Killing old id " k " with instance-id " instance-id))
+      (.sendMessage (message-queue) k
+                    {:content-type "application/json"}
+                    {:action "die"
+                     :msg-id (.toString (UUID/randomUUID))
+                     :instance-id instance-id
+                     :at     (System/currentTimeMillis)
+                     })
+      )
+    ))
+
 (defn- send-route-map
   "Sends the route map to a destination"
   ([where] (send-route-map where @route-map))
@@ -166,6 +189,13 @@
   []
   @-backing-store)
 
+(defn- no-file-with-same-sha
+  "Make sure there are no files in the storage-directory that have the same sha"
+  [sha-to-test]
+  (let [sha (URLEncoder/encode sha-to-test)
+        files (filter #(.contains ^String % sha) (.list ^File @storage-directory))]
+    (empty? files)))
+
 (defn- upload-func-bundle
   "Get a func bundle"
   [{:keys [body] :as req}]
@@ -174,8 +204,11 @@
       (cio/copy body file)
       (let [{:keys [sha type swagger host basePath file-info]} (sha-and-swagger-for-file file)]
         (if (and type file-info)
-          (let [dest-file (File. ^File @storage-directory (str (System/currentTimeMillis) sha ".funcbundle"))]
-            (cio/copy file dest-file)
+          (let [dest-file (File. ^File @storage-directory (str (System/currentTimeMillis)
+                                                               "-"
+                                                               (URLEncoder/encode sha) ".funcbundle"))]
+            (when (no-file-with-same-sha sha)
+              (cio/copy file dest-file))
             (.delete file)
             (swap! func-bundles assoc sha {:file dest-file :swagger swagger})
             {:status  200
@@ -255,7 +288,10 @@
   (swap! the-network assoc (:from msg) (merge msg {:last-seen (System/currentTimeMillis)}))
   (cond
     (= "frontend" (:type msg))
-    (send-route-map (:from msg))
+    (do
+      (send-route-map (:from msg))
+      (remove-other-instances-of-this-frontend msg)
+      )
     )
   )
 
@@ -271,7 +307,6 @@
 (defn- connect-to-message-queue
   []
   (let [queue (shared-b/wire-up-queue)]
-    (println "Connected to queue " queue)
     (reset! -message-queue queue)
     (.listenToQueue queue (or "tron")
                     (fu/promote-to-function

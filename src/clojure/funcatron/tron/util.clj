@@ -336,7 +336,6 @@
   [^File file]
   (or
     (try (let [ret (get-swagger-from-jar (JarFile. file))]
-           (println "Ret is " ret)
            {:type :jar :swagger (keywordize-keys ret)})
          (catch Exception e nil))))
 

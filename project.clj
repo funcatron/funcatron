@@ -28,8 +28,6 @@
                  [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
                  [dragonmark/util "0.1.3"]
 
-                 ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava
-                 ; [com.mesosphere.mesos.rx.java/mesos-rxjava "0.1.0"]
                  ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-protobuf-client
                  [com.mesosphere.mesos.rx.java/mesos-rxjava-protobuf-client "0.1.0"]
                  ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-client
