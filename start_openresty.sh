@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export INSTANCEID="R-${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}"
+
 if [[ "$1" == "dev" ]]; then
     sed s/#DEV#//g /usr/local/openresty/nginx/conf/nginx.conf > /tmp/nginx.conf
     cp /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf

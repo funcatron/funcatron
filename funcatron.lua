@@ -35,7 +35,9 @@ local tron_queue = os.getenv("TRON_QUEUE") or "tron"
 
 local dev_mode = os.getenv("DEV_MODE") or true
 
-ngx.log(ngx.ALERT, "Hey... this is an alert")
+local nginx_uuid = os.getenv("INSTANCEID") or "no-id"
+
+local keep_running = true
 
 function funcatron.rabbit_connection()
    local rabbit, err = rabbitmqstomp:new()
@@ -67,6 +69,11 @@ local response_handlers = {}
 -- register with the Tron and listen
 -- for messages
 local function register_and_listen()
+
+   if not keep_running then
+      return
+   end
+
    local rabbit, err = funcatron.rabbit_connection()
 
    if dev_mode then
@@ -85,12 +92,14 @@ local function register_and_listen()
    -- {:action "awake"
    --     :type "frontend"
    --     :msg-id UUID-string
+   --     :instance-id Unique-id
    --     :from UUID-String
    --     :at currentTimeMillis
    -- }
 
    local msg = cjson.encode({action="awake",
                              type="frontend",
+                             ["instance-id"]=nginx_uuid,
                              from=funcatron.instance_uuid,
                              at=(os.time() * 1000),
                              ["msg-id"]=msg_uuid})
@@ -115,7 +124,7 @@ local function register_and_listen()
                                      persistent="false",
                                      id=funcatron.instance_uuid})
 
-   while true do
+   while keep_running do
       if dev_mode then
          ngx.log(ngx.ALERT, "Dev mode: in listen loop")
       end
@@ -145,6 +154,9 @@ local function register_and_listen()
          end
       end
    end
+
+   ngx.log(ngx.ALERT, "Gracefully stopping")
+   rabbit:close()
 end
 
 -- delete elements from the array that
@@ -173,6 +185,11 @@ end
 
 response_handlers["heartbeat"] = function(msg)
    ngx.log(ngx.INFO, "Got heartbeat from " .. msg.from)
+end
+
+response_handlers["die"] = function(msg)
+   keep_running = false
+   ngx.log(ngx.ALERT, "Got the 'die' Command... winding down...")
 end
 
 response_handlers["answer"] = function(msg)
@@ -278,6 +295,10 @@ function funcatron.get_response(key, timeout)
 end
 
 local function heartbeat()
+   if not keep_running then
+      return
+   end
+
    local rabbit, err = funcatron.rabbit_connection()
 
    if dev_mode then
@@ -310,7 +331,10 @@ local function heartbeat()
 
    end
 
-   ngx.timer.at(10, heartbeat)
+   if keep_running then
+      ngx.timer.at(10, heartbeat)
+   end
+
 end
 
 -- register and start listening right away
