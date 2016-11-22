@@ -25,6 +25,7 @@ local data = ngx.req.get_body_data()
 local msg_uuid = rid
 
 local msg = cjson.encode({headers=ngx.req.get_headers(),
+                          action="service",
                           method=ngx.req.get_method(),
                           ["uri-args"]=ngx.req.get_uri_args(),
                           host=ngx.var.host,
@@ -44,6 +45,7 @@ local msg = cjson.encode({headers=ngx.req.get_headers(),
                           scheme=ngx.var.scheme,
                           uri=ngx.var.uri,
                           ["reply-to"] = msg_uuid,
+                          ["reply-queue"] = funcatron.instance_uuid,
                           ["body-base64-encoded"]=true,
                           body=ngx.encode_base64(data)})
 
@@ -88,7 +90,7 @@ end
 -- close the rabbit connection
 rabbit:close()
 
-local response, err = funcatron.get_response(msg_uuid)
+local response, err = funcatron.get_response(msg_uuid, 50)
 
 if err then
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR

@@ -42,7 +42,7 @@ local keep_running = true
 function funcatron.rabbit_connection()
    local rabbit, err = rabbitmqstomp:new()
 
-   rabbit:set_timeout(1000002)
+   rabbit:set_timeout(10000)
 
    local ok, err =
       rabbit:connect({host=bunny_host,
@@ -124,7 +124,7 @@ local function register_and_listen()
                                      persistent="false",
                                      id=funcatron.instance_uuid})
 
-   while keep_running do
+   while keep_running or (dev_mode and next(funcatron.response_table) ~= nil) do
       if dev_mode then
          ngx.log(ngx.ALERT, "Dev mode: in listen loop")
       end
@@ -180,11 +180,12 @@ funcatron.response_table = {}
 funcatron.routing_table = {}
 
 response_handlers["route"] = function(msg)
+   ngx.log(ngx.ALERT, "Deploying new route table.")
    funcatron.routing_table = msg.routes
 end
 
 response_handlers["heartbeat"] = function(msg)
-   ngx.log(ngx.INFO, "Got heartbeat from " .. msg.from)
+   ngx.log(ngx.ALERT, "Got heartbeat from " .. msg.from)
 end
 
 response_handlers["die"] = function(msg)
@@ -226,7 +227,7 @@ function funcatron.route_for(host, path)
 
    -- find the entry that matches the host and path
    for i, v in ipairs(funcatron.routing_table) do
-      if (v.host == nil or v.host == "*" or v.host == host) and
+      if (v.host == nil or v.host == "*" or v.host == host or true) and
       string_starts(path, v.path) then
          return v.queue, nil
       end
@@ -255,6 +256,8 @@ function funcatron.get_response(key, timeout)
       -- we've got a zero timeout, so don't wait,
       -- just punt
       if timeout == 0 then
+         -- remove the item from the pool
+         funcatron.response_table[key] = nil
          return nil, ("Key " .. key .. " has no answer and timeout 0")
       end
 
@@ -263,6 +266,8 @@ function funcatron.get_response(key, timeout)
          local ok, err = answer.sema:wait(timeout)
 
          if err then
+            -- remove the item from the pool
+            funcatron.response_table[key] = nil
             return nil, ("Failed wait " .. err)
          end
          -- recursively check for the answer
@@ -274,6 +279,8 @@ function funcatron.get_response(key, timeout)
       if timeout == 0 then
          return nil, ("No message with key " .. key)
       end
+
+      local start_time = os.time()
 
       -- create a wait block
       local wait_block = {}
@@ -287,7 +294,9 @@ function funcatron.get_response(key, timeout)
       -- and wait until we get an answer
       local ok, err = wait_block.sema:wait(timeout)
       if err then
-         return nil, ("Failed wait " .. err)
+         funcatron.response_table[key] = nil
+         return nil, ("Failed wait " .. err .. " duration " ..
+                         (os.time() - start_time))
       end
       -- recursively call
       return funcatron.get_response(key, 0)
