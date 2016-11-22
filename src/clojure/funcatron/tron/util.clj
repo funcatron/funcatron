@@ -22,7 +22,7 @@
            (funcatron.abstractions Router$Message)
            (java.security MessageDigest)
            (java.util.jar JarFile JarEntry)
-           (java.util.concurrent Executors ExecutorService)
+           (java.util.concurrent Executors ExecutorService ScheduledExecutorService TimeUnit)
            (java.util.function Function)
            (funcatron.helpers Tuple2 Tuple3)))
 
@@ -355,9 +355,11 @@
         reader (transit/reader in :json)]
   (transit/read reader)))
 
-(defonce ^ExecutorService ^:private thread-pool (Executors/newCachedThreadPool))
+;; FIXME -- hardcode 50 threads... enough?
+(defonce ^ScheduledExecutorService ^:private thread-pool (Executors/newScheduledThreadPool 50))
 
 (defn run-in-pool
+  "Runs a function (IFn, Callable, Runnable) in the threadpool"
   [func]
   (cond
     (instance? Runnable func)
@@ -368,6 +370,20 @@
 
     :else
     (throw (Exception. (str "The class " (.getClass ^Object func) " is neither Callable nor Runnable")))))
+
+(defn run-after
+  "Runs a function (IFn, Callable, Runnable) in the threadpool in `delay` milliseconds"
+  [func delay]
+  (cond
+    (instance? Runnable func)
+    (.schedule thread-pool ^Runnable func delay TimeUnit/MILLISECONDS)
+
+    (instance? Callable func)
+    (.schedule thread-pool ^Callable func delay TimeUnit/MILLISECONDS)
+
+    :else
+    (throw (Exception. (str "The class " (.getClass ^Object func) " is neither Callable nor Runnable"))))
+  )
 
 (defprotocol ToClojureFunc
   "Converts a Function into a Clojure Function"

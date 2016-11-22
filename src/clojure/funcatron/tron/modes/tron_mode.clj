@@ -8,7 +8,7 @@
             [funcatron.tron.store.shared :as shared-s]
             [funcatron.tron.options :as f-opts]
             [compojure.route :refer [not-found resources]]
-            )
+            [funcatron.tron.modes.common :as common :refer [storage-directory]])
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)
            (java.net URLEncoder)
@@ -37,22 +37,10 @@
          (atom {:front-ends []
                 :runners []}))
 
-(def ^:private storage-directory
-  (delay
-    (let [^String the-dir (or (-> @f-opts/command-line-options :options :bundle_store)
-                      (str (get (System/getProperties) "user.home")
-                           (get (System/getProperties) "file.separator")
-                           "funcatron_bundles"
-                           ))
-          the-dir (File. the-dir)
-          ]
-      (.mkdirs the-dir)
-      the-dir)))
-
 (defn- clean-network
   "Remove everything from the network that's old"
   []
-  (let [too-old (- (System/currentTimeMillis) (* 1000 60 15))] ;; if we haven't seen a node in 15 minutes, clean it
+  (let [too-old (- (System/currentTimeMillis) (* 1000 60 3))] ;; if we haven't seen a node in 3 minutes, clean it
     (swap!
       the-network
       (fn [cur]
@@ -63,28 +51,6 @@
 
 
 
-(defn- sha-and-swagger-for-file
-  "Get the Sha256 and swagger information for the file"
-  [file]
-  (let [sha (fu/sha256 file)
-        sha (fu/base64encode sha)
-
-        {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info}
-        (fu/find-swagger-info file)]
-    {:sha sha :type type :swagger swagger :host host :basePath basePath :file-info file-info}
-    ))
-
-(defn- load-func-bundles
-  "Reads the func bundles from the storage directory"
-  []
-  (let [dir ^File @storage-directory
-        files (filter #(and (.isFile ^File %)
-                            (.endsWith (.getName ^File %) ".funcbundle"))
-                      (.listFiles dir))]
-    (doseq [file files]
-      (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
-        (if (and type file-info)
-          (swap! func-bundles assoc sha {:file file :swagger swagger}))))))
 
 (defn- try-to-load-route-map
   "Try to load the route map"
@@ -109,11 +75,12 @@
       fu/base64encode
       URLEncoder/encode))
 
-(defn add-to-route-map
+(defn- add-to-route-map
   "Adds a route to the route table"
   [host path bundle-sha]
   (let [sha (route-to-sha host path)
         data {:host host :path path :queue sha :sha bundle-sha}]
+    ;; FIXME tell at least 1 runner to run the new code
     (swap!
       route-map
       (fn [rm]
@@ -129,6 +96,17 @@
         )))
   )
 
+(defn remove-from-route-map
+  "Removes a func bundle from the route map"
+  [host path bundle-sha]
+  ;; FIXME tell runners to stop listening to queue
+  (swap!
+    route-map
+    (fn [rm]
+      (let [rm (remove #(= (:sha %) bundle-sha) rm)]
+        (into [] rm))
+      )))
+
 (defn ^MessageBroker message-queue
   "The message queue/broker"
   []
@@ -141,7 +119,14 @@
                           (and (not= k from)
                                (= instance-id (:instance-id v))))
                         @the-network
-                        )]
+                        )
+        kill-keys (into #{} (map first to-kill))
+        ]
+
+    ;; no more messages to the instances we're removing
+    (swap! the-network
+           (fn [m]
+             (into {} (remove #(kill-keys (first %)) m))))
     (doseq [[k {:keys [instance-id]}] to-kill]
       (log/info (str "Killing old id " k " with instance-id " instance-id))
       (.sendMessage (message-queue) k
@@ -201,8 +186,9 @@
   [{:keys [body] :as req}]
   (if body
     (let [file (File/createTempFile "func-a-" ".tron")]
+      (println "Body is " body)
       (cio/copy body file)
-      (let [{:keys [sha type swagger host basePath file-info]} (sha-and-swagger-for-file file)]
+      (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
         (if (and type file-info)
           (let [dest-file (File. ^File @storage-directory (str (System/currentTimeMillis)
                                                                "-"
@@ -229,24 +215,66 @@
 
 (defn- enable-func
   "Enable a Func bundle"
-  [req]
-  (println "Req " (get-in req [:headers "content-type"]) " body " (fu/kebab-keywordize-keys (:json-params req)))
-  {:status 200
-   :body {:success false
-          :action "FIXME"}
-   })
+  [{:keys [json-params] :as req}]
+  (let [json-params (fu/keywordize-keys json-params)
+        {:keys [sha256]} json-params]
+    (println json-params)
+    (if (not (and json-params sha256))
+      ;; failed
+      {:status 400
+       :body   {:success false :error "Request must be JSON and include the 'sha256' of the Func bundle to enable"}}
+
+      ;; find the Func bundle and enable it
+      (let [{{:keys [host basePath]} :swagger :as bundle} (get @func-bundles sha256)]
+        (if (not bundle)
+          ;; couldn't find the bundle
+          {:status 404
+           :body   {:success false :error (str "Could not find Func bundle with SHA256: " sha256)}}
+
+          (do
+            (add-to-route-map host basePath sha256)
+            {:status 200
+             :body   {:success true :msg (str "Deployed Func bundle host: " host " basePath " basePath " sha256 " sha256)}})
+          ))
+      ))
+
+  )
 
 (defn- disable-func
   "Enable a Func bundle"
-  [req]
+  [{:keys [json-params] {:keys [sha256]} :json-params}]
+  (if (not (and json-params sha256))
+    ;; failed
+    {:status 400
+     :body {:success false :error "Request must be JSON and include the 'sha256' of the Func bundle to disable"}}
+
+    ;; find the Func bundle and enable it
+    (let [{{:keys [host basePath]} :swagger :as bundle} (get @func-bundles sha256)]
+      (if (not bundle)
+        ;; couldn't find the bundle
+        {:status 404
+         :body   {:success false :error (str "Could not find Func bundle with SHA256: " sha256)}}
+
+        (do
+          (remove-from-route-map host basePath sha256)
+          {:status 200
+           :body   {:success true :msg (str "Disabled Func bundle host: " host " basePath " basePath " sha256 " sha256)}})
+        ))
+    ))
+
+(defn- get-known-funcs
+  "Return all the known func bundles"
+  [& _]
   {:status 200
-   :body {:success false
-          :action "FIXME"}
-   })
+   :body {:func-bundles (map (fn [[k {{:keys [host basePath]} :swagger}]
+                                  ]
+                               {:sha256 k
+                                :host host
+                                :path basePath}) @func-bundles)}})
 
 (defn- get-stats
   "Return statistics on activity"
-  []
+  [& _]
   {:status 200
    :body {:success false
           :action "FIXME"}
@@ -257,6 +285,7 @@
            (POST "/api/v1/enable" req (enable-func req))
            (POST "/api/v1/disable" req (disable-func req))
            (GET "/api/v1/stats" [] get-stats)
+           (GET "/api/v1/known_funcs" [] get-known-funcs)
            (POST "/api/v1/add_func"
                  req (upload-func-bundle req)))
 
@@ -304,16 +333,7 @@
       (dispatch-tron-message body msg)
       (catch Exception e (log/error e (str "Failed to dispatch message: " body))))))
 
-(defn- connect-to-message-queue
-  []
-  (let [queue (shared-b/wire-up-queue)]
-    (reset! -message-queue queue)
-    (.listenToQueue queue (or "tron")
-                    (fu/promote-to-function
-                      (fn [msg]
-                        (fu/run-in-pool (fn [] (handle-tron-messages msg))))))
-    )
-  )
+
 
 (defn- connect-to-store
   "Connects to the backing store (e.g. ZookKeeper)"
@@ -321,7 +341,6 @@
   (let [store (shared-s/wire-up-store)]
     (reset! -backing-store store)
     ))
-
 
 (defn start-tron-server
   "Start the Tron mode server"
@@ -331,10 +350,12 @@
     '[funcatron.tron.brokers.inmemory]
     '[funcatron.tron.store.zookeeper]
     '[funcatron.tron.substrate.mesos-substrate])
-  (load-func-bundles)                                       ;; load the bundles
+  (common/load-func-bundles @storage-directory func-bundles)                                       ;; load the bundles
   (try-to-load-route-map)
   (add-watch route-map ::nothing routes-changed)
   (fu/run-server #'ring-handler shutdown-server)
-  (connect-to-message-queue)
+  (common/connect-to-message-queue -message-queue
+                                   (or "tron")              ;; FIXME -- compute tron queue name
+                                   #'handle-tron-messages)
   ;; (connect-to-store)
   )

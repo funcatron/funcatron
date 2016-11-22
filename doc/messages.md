@@ -55,6 +55,7 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 {:action "awake"
  :type "frontend"
  :msg-id UUID-string
+ :instance-id Unique-id
  :from UUID-String
  :at currentTimeMillis
  }
@@ -77,6 +78,9 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 
 ### Update routing
 
+Sends the routing table, in the order the routes should be consulted
+to the frontend
+
 ```
 {:action "route"
  :msg-id UUID-string
@@ -85,9 +89,55 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
  }
 ```
 
+### Die
+
+In dev mode, there may be multiple threads for the same Nginx
+instance because in dev mode, modules are all reloaded on each
+request.
+
+If the Tron receives multiple "awake" messages, it sends a "die"
+message to all Frontend instances from the same `instance-id` that
+are the most recent "awake" sender. A frontend instance
+that receives "die" should stop contacting the Tron.
+
+```
+{:action "die"
+ :msg-id UUID-string
+ :instance-id instance-id-String
+ :at     (System/currentTimeMillis)
+ }
+```
+
 ## Frontend to Runner
 
 ### Service Request
+
+```
+{:headers http-request-headers
+ :action "service"
+ :method request_method 
+ :uri-args uri-args
+ :host ngx.var.host
+ :content-type ngx.var.content_type
+ :remote-addr ngx.var.remote_addr
+ :server-protocol ngx.var.server_protocol
+ :server-port ngx.var.server_port
+ :server-addr ngx.var.server_addr
+ :remote-port ngx.var.remote_port
+ :request-uri ngx.var.request_uri
+ :request-id ngx.var.request_id
+ :args ngx.var.args
+ :remote-user ngx.var.remote_user
+ :request ngx.var.request
+ :http-referer ngx.var.http_referer
+ :http-user-agent ngx.var.http_user_agent
+ :scheme ngx.var.scheme
+ :uri ngx.var.uri
+ :reply-to the_target_id_for_answer
+ :reply-queue the_queue_to_post_answer_to
+ :body-base64-encoded true
+ :body request-body}
+```
 
 ## Runner to Frontend
 
