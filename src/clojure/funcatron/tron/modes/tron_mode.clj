@@ -157,7 +157,7 @@
   (fu/run-in-pool
     (fn []
       ;; write the file
-      (let [file (File. ^File @storage-directory "route_map.data")]
+      (let [file (File. ^File @storage-directory ^String "route_map.data")]
         (try
           (spit file (pr-str new-state))
           (catch Exception e (log/error e "Failed to write route map"))
@@ -310,17 +310,40 @@
   (swap! the-network assoc-in [from :last-seen] (System/currentTimeMillis))
   )
 
+(defn- send-func-bundles
+  "Send a list of the Func bundles to the Runner as well
+  as the host and port for this instance"
+  [target]
+  ;; FIXME send func bundle
+  )
+
+(defn- enable-all-bundles
+  "Tell the target to service all func bundles.
+  This is a HACK that needs some FIXME logic to
+  choose which runners run which bundles"
+  [target]
+  ;; FIXME tell the Func bundle to listen to all queue for all enabled bundles
+  )
+
 (defmethod dispatch-tron-message "awake"
-  [msg & _]
+  [{:keys [from type] :as msg} & _]
   (log/info (str "awake from " msg))
   (clean-network)
-  (swap! the-network assoc (:from msg) (merge msg {:last-seen (System/currentTimeMillis)}))
+  (swap! the-network assoc from
+         (merge
+           msg
+           {:last-seen (System/currentTimeMillis)}))
   (cond
-    (= "frontend" (:type msg))
+    (= "frontend" type)
     (do
-      (send-route-map (:from msg))
+      (send-route-map from)
       (remove-other-instances-of-this-frontend msg)
       )
+
+    (= "runner" type)
+    (do
+      (send-func-bundles from)
+      (enable-all-bundles from))
     )
   )
 

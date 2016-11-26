@@ -33,6 +33,8 @@
                  ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-client
                  [com.mesosphere.mesos.rx.java/mesos-rxjava-client "0.1.0"]
 
+                 [ com.spotify/dns "3.1.4"]
+
                  [org.clojure/tools.cli "0.3.5"]
                  [overtone/at-at "1.2.0"]
                  [zookeeper-clj "0.9.4"]
