@@ -233,6 +233,15 @@
     )
   )
 
+
+
+(defn ^File new-file
+  "Create a new File object."
+  [^File base ^String name]
+  (File. base name))
+
+
+
 (defn run-server
   "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler. `the-atom` is where to put the 'stop the server' function."
   [function the-atom]
@@ -373,7 +382,7 @@
 
 (defn run-after
   "Runs a function (IFn, Callable, Runnable) in the threadpool in `delay` milliseconds"
-  [func delay]
+  [func ^long delay]
   (cond
     (instance? Runnable func)
     (.schedule thread-pool ^Runnable func delay TimeUnit/MILLISECONDS)

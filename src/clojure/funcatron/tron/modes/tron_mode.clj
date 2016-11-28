@@ -4,13 +4,10 @@
             [clojure.tools.logging :as log]
             [ring.middleware.json :as rm-json :refer [wrap-json-response]]
             [compojure.core :refer [GET defroutes POST]]
-            [funcatron.tron.brokers.shared :as shared-b]
-            [funcatron.tron.store.shared :as shared-s]
-            [funcatron.tron.options :as f-opts]
             [compojure.route :refer [not-found resources]]
             [funcatron.tron.modes.common :as common :refer [storage-directory]])
   (:import (java.io File)
-           (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage StableStore)
+           (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage)
            (java.net URLEncoder)
            (java.util UUID)))
 
@@ -29,11 +26,11 @@
 
 (defonce ^:private func-bundles (atom {}))
 
-(defonce ^:private desired-state
+#_(defonce ^:private desired-state
          (atom {:front-ends 1
                 :runners 1}))
 
-(defonce ^:private actual-state
+#_(defonce ^:private actual-state
          (atom {:front-ends []
                 :runners []}))
 
@@ -51,11 +48,10 @@
 
 
 
-
 (defn- try-to-load-route-map
   "Try to load the route map"
   []
-  (let [file (File. ^File @storage-directory "route_map.data")]
+  (let [file (fu/new-file @storage-directory "route_map.data")]
     (try
       (if (.exists file)
         (let [bundles @func-bundles
@@ -98,7 +94,7 @@
 
 (defn remove-from-route-map
   "Removes a func bundle from the route map"
-  [host path bundle-sha]
+  [_ _ bundle-sha]
   ;; FIXME tell runners to stop listening to queue
   (swap!
     route-map
@@ -157,7 +153,7 @@
   (fu/run-in-pool
     (fn []
       ;; write the file
-      (let [file (File. ^File @storage-directory ^String "route_map.data")]
+      (let [file (fu/new-file @storage-directory "route_map.data")]
         (try
           (spit file (pr-str new-state))
           (catch Exception e (log/error e "Failed to write route map"))
@@ -169,7 +165,7 @@
           (send-route-map k new-state))
         ))))
 
-(defn ^StableStore backing-store
+#_(defn ^StableStore backing-store
   "Returns the backing store object"
   []
   @-backing-store)
@@ -183,16 +179,16 @@
 
 (defn- upload-func-bundle
   "Get a func bundle"
-  [{:keys [body] :as req}]
+  [{:keys [body]}]
   (if body
     (let [file (File/createTempFile "func-a-" ".tron")]
       (println "Body is " body)
       (cio/copy body file)
       (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
         (if (and type file-info)
-          (let [dest-file (File. ^File @storage-directory (str (System/currentTimeMillis)
-                                                               "-"
-                                                               (URLEncoder/encode sha) ".funcbundle"))]
+          (let [dest-file (fu/new-file @storage-directory (str (System/currentTimeMillis)
+                                                            "-"
+                                                            (URLEncoder/encode sha) ".funcbundle"))]
             (when (no-file-with-same-sha sha)
               (cio/copy file dest-file))
             (.delete file)
@@ -215,7 +211,7 @@
 
 (defn- enable-func
   "Enable a Func bundle"
-  [{:keys [json-params] :as req}]
+  [{:keys [json-params]}]
   (let [json-params (fu/keywordize-keys json-params)
         {:keys [sha256]} json-params]
     (println json-params)
@@ -313,7 +309,7 @@
 (defn- send-func-bundles
   "Send a list of the Func bundles to the Runner as well
   as the host and port for this instance"
-  [target]
+  [_ ]
   ;; FIXME send func bundle
   )
 
@@ -321,7 +317,7 @@
   "Tell the target to service all func bundles.
   This is a HACK that needs some FIXME logic to
   choose which runners run which bundles"
-  [target]
+  [_]
   ;; FIXME tell the Func bundle to listen to all queue for all enabled bundles
   )
 
@@ -358,7 +354,7 @@
 
 
 
-(defn- connect-to-store
+#_(defn- connect-to-store
   "Connects to the backing store (e.g. ZookKeeper)"
   []
   (let [store (shared-s/wire-up-store)]

@@ -35,6 +35,8 @@
 
                  [ com.spotify/dns "3.1.4"]
 
+                 [com.taoensso/timbre "4.7.4"]
+
                  [org.clojure/tools.cli "0.3.5"]
                  [overtone/at-at "1.2.0"]
                  [zookeeper-clj "0.9.4"]

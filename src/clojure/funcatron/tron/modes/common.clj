@@ -41,16 +41,20 @@
 
 
 (defn connect-to-message-queue
-  "Connect to the message queue and put the queue information in the atom in `message-queue`
-  and deal with messages via `handler`"
-  [message-queue ^String listen-to handler]
-  (let [queue (shared-b/wire-up-queue)]
-    (when message-queue
-      (reset! message-queue queue))
-    (.listenToQueue queue listen-to
-                    (fu/promote-to-function
-                      (fn [msg]
-                        (fu/run-in-pool (fn [] (handler msg))))))
+  "Connect to the message queue and deal with messages via `handler`"
+  [opts ^String listen-to handler]
+  (let [queue (shared-b/wire-up-queue opts)
+        end-func
+        (.listenToQueue
+          queue
+          listen-to
+          (fu/promote-to-function
+            (fn [msg]
+              (fu/run-in-pool (fn [] (handler msg))))))]
+
+    {::queue queue
+     ::end-func end-func}
+
     )
   )
 

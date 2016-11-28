@@ -74,6 +74,6 @@
 
 (defn ^MessageBroker wire-up-queue
   "Based on the run-time options, wire up an appropriate message queue."
-  []
-  (dispatch-wire-queue @the-opts/command-line-options)
+  ([] (wire-up-queue @the-opts/command-line-options))
+  ([opts] (dispatch-wire-queue opts))
   )

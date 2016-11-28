@@ -36,7 +36,7 @@ public interface ContainerSubstrate {
      * the implementation. This is mostly for debugging purposes
      * @return
      */
-    Object allInfo();
+    Map<Object, Object> allInfo();
 
     /**
      * Start a service

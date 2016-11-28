@@ -1,8 +1,12 @@
 (ns funcatron.tron.modes.runner-mode
   (:require [funcatron.tron.util :as fu]
             [funcatron.tron.modes.common :as common :refer [storage-directory]]
-            [clojure.tools.logging :as log])
-  (:import (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker)
+            [taoensso.timbre :as timbre
+             :refer [log  trace  debug  info  warn  error  fatal  report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]]
+            )
+  (:import (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker Lifecycle)
            (java.util UUID Date)))
 
 (set! *warn-on-reflection* true)
@@ -148,31 +152,47 @@
   )
 
 
-(defn start-runner
+(defn ^Lifecycle start-runner
   "Start the Tron mode server"
-  []
-  (require                                                  ;; load a bunch of the namespaces to register wiring
-    '[funcatron.tron.brokers.rabbitmq]
-    '[funcatron.tron.brokers.inmemory]
-    )
-  (let [message-queue (atom nil)
-        func-bundles (atom {})
-        keep-running (atom true)
-        routes (atom {})
+  (
+   [opts]
+   (require                                                 ;; load a bunch of the namespaces to register wiring
+     '[funcatron.tron.brokers.rabbitmq]
+     '[funcatron.tron.brokers.inmemory]
+     )
+   (let [
+         func-bundles (atom {})
+         keep-running (atom true)
+         routes (atom {})
 
-        my-uuid (str "RU-" (.toString (UUID/randomUUID)))
+         my-uuid (str "RU-" (.toString (UUID/randomUUID)))
 
-        state {:message-queue message-queue
-               :func-bundles  func-bundles
-               :keep-running  keep-running
-               :routes        routes
-               :my-uuid       my-uuid}
-        dispatch-func (fn [& x]
-                        (let [params (into [] x)
-                              params (conj params state)]
-                          (apply #'handle-runner-message params)))
-        ]
-    (common/load-func-bundles @storage-directory func-bundles) ;; load the bundles
-    (common/connect-to-message-queue message-queue my-uuid dispatch-func)
-    (wake-up state)
-    state))
+         state {
+                :func-bundles  func-bundles
+                :keep-running  keep-running
+                :routes        routes
+                :my-uuid       my-uuid}
+         dispatch-func (fn [& x]
+                         (let [params (into [] x)
+                               params (conj params state)]
+                           (apply #'handle-runner-message params)))
+
+         queue-info (common/connect-to-message-queue opts my-uuid dispatch-func)
+         ]
+     (common/load-func-bundles @storage-directory func-bundles) ;; load the bundles
+     (reify Lifecycle
+       (startLife [this])
+       (endLife [_]
+         (-> queue-info :common:end-func (apply []))
+         (.close ^MessageBroker (queue-info :common:queue))
+         (reset! keep-running false)
+         )
+       (allInfo [_] {::message-queue queue-info
+                     ::func-bundles  @func-bundles
+                     ::routes        @routes
+                     ::uuid          my-uuid})
+       )
+
+
+     (wake-up state)
+     state)))
