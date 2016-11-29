@@ -1,10 +1,10 @@
 (ns funcatron.tron.brokers.inmemory
   (:require [funcatron.tron.util :as f-util]
-            [funcatron.tron.brokers.shared :as shared])
+            [funcatron.tron.brokers.shared :as shared]
+            [funcatron.tron.util :as fu])
   (:import (funcatron.abstractions MessageBroker)
            (java.util.concurrent ConcurrentHashMap)
            (clojure.lang IAtom)
-           (java.util UUID)
            (funcatron.helpers Tuple2)))
 
 (set! *warn-on-reflection* true)
@@ -34,7 +34,7 @@
 
                                    (assoc m queue-name @atom-holder)))))
            (let [the-atom @atom-holder
-                 uuid (UUID/randomUUID)
+                 uuid (fu/random-uuid)
                  kill-func (fn [] (remove-watch the-atom uuid))]
              (add-watch the-atom uuid
                         (fn [k r os ns]

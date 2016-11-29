@@ -63,7 +63,7 @@
   (dorun (map (fn [^Tuple2 e] ((._2 e))) (.listeners mb)))
   )
 
-(defn listen-to-queue
+(defn ^Runnable listen-to-queue
   "A helper function that wraps a Clojure function in a Function wrapper"
   [^MessageBroker broker ^String queue func]
   (.listenToQueue broker queue (fu/to-java-function func)))

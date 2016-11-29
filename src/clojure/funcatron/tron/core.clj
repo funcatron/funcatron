@@ -1,7 +1,11 @@
 (ns funcatron.tron.core
   (:require [funcatron.tron.modes.dev-mode :as shimmy]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre
+             :refer [log  trace  debug  info  warn  error  fatal  report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]]
             [funcatron.tron.options :as the-opts]
+            [funcatron.tron.modes.runner-mode :as runny]
             [funcatron.tron.modes.tron-mode :as tronny]
             [clojure.tools.cli :as cli])
 
@@ -19,27 +23,24 @@
   "The uberjar entrypoint"
   [& args]
 
-  (log/log :info (str "Starting Funcatron. Args: " args))
+  (info (str "Starting Funcatron. Args: " args))
   (let [opts (cli/parse-opts args the-opts/cli-options)]
     (reset! the-opts/command-line-options opts)
-    (log/log :info (str "Argument options: " opts))
+    (info (str "Argument options: " opts))
     (cond
       (:errors opts)
-      (log/log :error (str (:errors opts)))
+      (error (str (:errors opts)))
 
       (-> opts :options :help)
-      (log/log :info (str "Options:\n" (:summary opts)))
+      (info (str "Options:\n" (:summary opts)))
 
       (-> opts :options :devmode)
       (shimmy/start-dev-server)
 
       (-> opts :options :tron)
-      (tronny/start-tron-server)
-      )
-    ))
+      (let [server (tronny/build-tron-from-opts opts)]
+        (.startLife server))
 
-
-
-
-
-
+      (-> opts :options :runner)
+      (let [server (runny/build-runner-from-opts opts)]
+        (.startLife server)))))

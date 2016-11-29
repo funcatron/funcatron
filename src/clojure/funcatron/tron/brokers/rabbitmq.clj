@@ -1,7 +1,10 @@
 (ns funcatron.tron.brokers.rabbitmq
   "Create a MessageBroker instance that talks to RabbitMQ"
   (:require [dragonmark.util.props :as d-props]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as timbre
+             :refer [log  trace  debug  info  warn  error  fatal  report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]]
             [langohr.core :as lc]
             [langohr.basic :as lb]
             [funcatron.tron.util :as f-util]
@@ -18,8 +21,6 @@
 
 
 (set! *warn-on-reflection* true)
-
-;; FIXME add more logging
 
 (defn- handle-rabbit-request
   "A separate function that handles the request"
@@ -39,12 +40,12 @@
             (catch Exception e
               (do
                 (.basicNack ch delivery-tag false false)
-                (log/error e "Failed to dispatch")
+                (error e "Failed to dispatch")
                 (throw e))))))
       nil
       )
     (catch Exception e
-      (log/error e "Failed to dispatch request " metadata))))
+      (error e "Failed to dispatch request " metadata))))
 
 (defn- build-rabbit-handler
   [^Function handler ^MessageBroker broker]
@@ -81,10 +82,10 @@
    (let [rabbit-props (or params {})
          rabbit-props (fix-props rabbit-props)
          listeners (ConcurrentHashMap.)]
-     (log/trace "About to open RabbitMQ Connection using " rabbit-props)
+     (trace "About to open RabbitMQ Connection using " rabbit-props)
      (try
        (let [conn (lc/connect rabbit-props)]
-         (log/trace "Openned RabbitMQ Connection")
+         (trace "Openned RabbitMQ Connection")
          (reify MessageBroker
            (queueDepth [this queue-name]
              (with-open [ch (lch/open conn)]
@@ -130,7 +131,7 @@
 
        (catch Exception e
          (do
-           (log/error e "Failed to open RabbitMQ Connection using " rabbit-props)
+           (error e "Failed to open RabbitMQ Connection using " rabbit-props)
            (throw e)))))
     ))
 
@@ -147,4 +148,3 @@
 (defmethod shared/dispatch-wire-queue :default
   [opts]
   (create-broker nil))
-

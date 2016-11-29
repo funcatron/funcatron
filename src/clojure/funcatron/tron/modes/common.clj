@@ -4,17 +4,19 @@
             [funcatron.tron.brokers.shared :as shared-b])
   (:import (java.io File)))
 
-(def storage-directory
-  (delay
-    (let [^String the-dir (or (-> @f-opts/command-line-options :options :bundle_store)
-                              (str (get (System/getProperties) "user.home")
-                                   (get (System/getProperties) "file.separator")
-                                   "funcatron_bundles"
-                                   ))
-          the-dir (File. the-dir)
-          ]
-      (.mkdirs the-dir)
-      the-dir)))
+(defn calc-storage-directory
+  "Compute the storage directory without reference to the global opts"
+  [opts]
+  (let [^String the-dir (or (-> opts :options :bundle_store)
+                            (str (get (System/getProperties) "user.home")
+                                 (get (System/getProperties) "file.separator")
+                                 "funcatron_bundles"
+                                 ))
+        the-dir (File. the-dir)
+        ]
+    (.mkdirs the-dir)
+    the-dir)
+  )
 
 (defn sha-and-swagger-for-file
   "Get the Sha256 and swagger information for the file"
@@ -29,15 +31,18 @@
 
 (defn load-func-bundles
   "Reads the func bundles from the storage directory"
-  [storage-directory func-bundles]
+  [storage-directory]
   (let [dir ^File storage-directory
         files (filter #(and (.isFile ^File %)
                             (.endsWith (.getName ^File %) ".funcbundle"))
                       (.listFiles dir))]
-    (doseq [file files]
-      (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
-        (if (and type file-info)
-          (swap! func-bundles assoc sha {:file file :swagger swagger}))))))
+    (into {}
+          (filter
+            boolean
+            (for [file files]
+              (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
+                (if (and type file-info)
+                  [sha {:file file :swagger swagger}])))))))
 
 
 (defn connect-to-message-queue

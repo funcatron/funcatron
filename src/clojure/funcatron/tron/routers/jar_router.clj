@@ -1,19 +1,23 @@
 (ns funcatron.tron.routers.jar-router
   (:require [clojure.spec :as s]
             [io.sarnowski.swagger1st.context :as s1ctx]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as timbre
+             :refer [log trace debug info warn error fatal report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]]
             [io.sarnowski.swagger1st.core :as s1st]
             [funcatron.tron.util :as f-util]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [funcatron.tron.util :as fu])
   (:import (java.util.jar JarFile JarEntry)
            (java.io File InputStream)
            (java.net URLClassLoader URL)
-           (java.util UUID Base64)
            (java.lang.reflect Method Constructor)
            (com.fasterxml.jackson.databind ObjectMapper)
            (funcatron.abstractions Router Router$Message)
-           (org.apache.commons.io IOUtils)))
+           (org.apache.commons.io IOUtils)
+           (java.util Base64)))
 
 
 (set! *warn-on-reflection* true)
@@ -41,7 +45,7 @@
   (let [file (clojure.java.io/file item)]
     {::jar         (JarFile. file)
      ::classloader (URLClassLoader. (into-array URL [(-> file .toURI .toURL)]) nil nil)
-     ::uuid        (.toString (UUID/randomUUID))
+     ::uuid        (fu/random-uuid)
      }
     ))
 

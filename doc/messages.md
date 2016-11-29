@@ -24,6 +24,20 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
  }
 ```
 
+
+
+### Died
+
+```
+{:action "died"
+ :type "runner"
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }
+```
+
+
 ### Statistics
 
 ### Ack Associate/Disassociate
@@ -56,6 +70,17 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
  :type "frontend"
  :msg-id UUID-string
  :instance-id Unique-id
+ :from UUID-String
+ :at currentTimeMillis
+ }
+```
+
+### Died
+
+```
+{:action "died"
+ :type "frontend"
+ :msg-id UUID-string
  :from UUID-String
  :at currentTimeMillis
  }

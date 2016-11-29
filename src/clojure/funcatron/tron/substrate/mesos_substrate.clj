@@ -1,7 +1,10 @@
 (ns funcatron.tron.substrate.mesos-substrate
   "Create a substrate for Mesos clusters"
   (:require [funcatron.tron.options :as f-opts]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as timbre
+             :refer [log  trace  debug  info  warn  error  fatal  report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]]
             [dragonmark.util.props :as dp]
             [funcatron.tron.substrate.shared :as shared]
             [funcatron.tron.util :as fu])
@@ -12,7 +15,6 @@
                             MesosController$EndOfSession)
            (java.net URI)
            (funcatron.helpers Tuple2 Tuple3)
-           (java.util UUID List)
            (org.apache.mesos.v1 Protos$FrameworkID)
            (java.util.concurrent.atomic AtomicBoolean)))
 
@@ -32,7 +34,7 @@
          ;; we need a stable FrameworkID
          fid (->
                (Protos$FrameworkID/newBuilder)
-               (.setValue (str "funcatron-" (-> (UUID/randomUUID) .toString)))
+               (.setValue (str "funcatron-" (fu/random-uuid)))
                .build
                )
 
@@ -119,7 +121,7 @@
                                (let [cfunc (fu/to-clj-func func)]
                                  (cfunc (Tuple3. task-id status whole-status)))
                                (catch Exception e
-                                 (log/error e (str "Failed to update status for " task-id)))))))))))))
+                                 (error e (str "Failed to update status for " task-id)))))))))))))
 
            ;; is the session over?
            (isDone [this] (.get end-it?))
@@ -131,7 +133,7 @@
            (currentDesiredTasks [this]
              (clean-state)
              (mapv
-               (fn [{:keys [^UUID id ^ContainerSubstrate$ServiceType type]}]
+               (fn [{:keys [^String id ^ContainerSubstrate$ServiceType type]}]
                  (MesosController$DesiredTask. id
                                                (.-dockerImage type)
                                                (.-memory type)
@@ -159,15 +161,15 @@
          ^Runnable
          (fn []
            (let [stream (.openStream client)]
-             (log/info "In Mesos Substrate Runner")
+             (info "In Mesos Substrate Runner")
              (reset! event-stream stream)
              (try
                (let [res (.await stream)]
-                 (log/info (str "Finished Mesos Substrate Runner: " res)))
+                 (info (str "Finished Mesos Substrate Runner: " res)))
                (catch MesosController$EndOfSession eos
-                 (log/info "Finished Mesos Substrate Runner Normally"))
+                 (info "Finished Mesos Substrate Runner Normally"))
                (catch Exception e
-                 (log/error e "Finished Mesos Substrate Runner with Error"))
+                 (error e "Finished Mesos Substrate Runner with Error"))
                )
              ))
          "Mesos Substrate Runner"))
@@ -185,7 +187,7 @@
 
        ;; start a service where type is the docker container name
        (startService [_ type monitor]
-         (let [id (UUID/randomUUID)]
+         (let [id (fu/random-uuid)]
            (when monitor
              (swap! monitors update id (fn [v] (conj v monitor))))
            (swap! desired-tasks conj {:id id :type type})

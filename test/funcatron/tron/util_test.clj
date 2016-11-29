@@ -9,14 +9,14 @@
 (set! *warn-on-reflection* true)
 
 (deftest ifn-to-func
-  (let [uuid (UUID/randomUUID)
+  (let [uuid (random-uuid)
         f (fn [_] uuid)]
     (is (= uuid (.apply (to-java-function f) nil)))
     )
   )
 
 (deftest func-to-func
-  (let [uuid (UUID/randomUUID)
+  (let [uuid (random-uuid)
         f (reify Function
             (apply [this _] uuid)
             )]
@@ -36,5 +36,3 @@
           back (fix-payload t v)]
       (is (= d back))
       )))
-
-

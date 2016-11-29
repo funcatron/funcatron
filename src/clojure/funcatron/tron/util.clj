@@ -7,9 +7,12 @@
             [cognitect.transit :as transit]
             [io.sarnowski.swagger1st.context :as s1ctx]
             [camel-snake-kebab.core :as csk]
-            [clojure.tools.logging :as log])
+            [taoensso.timbre :as timbre
+             :refer [log  trace  debug  info  warn  error  fatal  report
+                     logf tracef debugf infof warnf errorf fatalf reportf
+                     spy get-env]])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
-           (java.util Base64 Map Map$Entry List)
+           (java.util Base64 Map Map$Entry List UUID)
            (org.apache.commons.io IOUtils)
            (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream)
            (com.fasterxml.jackson.databind ObjectMapper)
@@ -242,15 +245,16 @@
 
 
 
-(defn run-server
-  "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler. `the-atom` is where to put the 'stop the server' function."
-  [function the-atom]
-  (reset! the-atom
-          (kit/run-server function {:max-body (* 256 1024 1024) ;; 256mb max size
-
-                                    :port (or
-                                            (-> @the-opts/command-line-options :options :web_port)
-                                            3000)})))
+(defn ^IFn start-http-server
+  "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler.
+  Returns the Stop Server function"
+  [opts function]
+  (kit/run-server
+    function
+    {:max-body (* 256 1024 1024) ;; 256mb max size
+     :port (or
+             (-> opts :options :web_port)
+             3000)}))
 
 (defprotocol CalcSha256
   "Calculate the SHA for something"
@@ -330,7 +334,7 @@
                                )]
                             (catch Exception e
                               (do
-                                (log/error e "Failed to get Swagger information")
+                                (error e "Failed to get Swagger information")
                                 nil)
                               )
                             )
@@ -462,3 +466,8 @@
 (extend Tuple2
   {:from-tuple (fn [^Tuple2 this] (.toList this))
    :to-tuple   (fn [tuple] tuple)})
+
+(defn ^String random-uuid
+  "Create a Random UUID string via Java's UUID class"
+  []
+  (.toString (UUID/randomUUID)))
