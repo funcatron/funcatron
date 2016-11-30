@@ -31,7 +31,7 @@ local bunny_user = os.getenv("RABBIT_USER") or "guest"
 
 local bunny_pwd = os.getenv("RABBIT_PWD") or "guest"
 
-local tron_queue = os.getenv("TRON_QUEUE") or "tron"
+local tron_queue = os.getenv("TRON_QUEUE") or "for_tron"
 
 local dev_mode = os.getenv("DEV_MODE") or true
 
