@@ -54,6 +54,16 @@
      :group-id "funcatron",
      :artifact-id "tron"}))
 
+(defn- ordered-tron-env
+  "Return the elements of the map that begin with TRON_ ordered by their number"
+  [m]
+  (->>
+    m
+    (filter (fn [[k _]] (.startsWith ^String k "TRON_")))
+    (map (fn [[^String k v]] [(-> k (.substring 5) read-string) v]))
+    (sort-by first)
+    (map second)
+    (into [])))
 
 (defn -main
   "The uberjar entrypoint"
@@ -68,7 +78,10 @@
                                                  ))]})
   (info (str "Starting Funcatron. Args: " args))
   (info (str "Version " version-info))
-  (let [opts (cli/parse-opts args the-opts/cli-options)]
+  (let [opts (merge
+               (cli/parse-opts args the-opts/cli-options)
+               (cli/parse-opts (ordered-tron-env (System/getenv)) the-opts/cli-options)
+               )]
     (reset! the-opts/command-line-options opts)
     (trace (str "Argument options: " opts))
     (cond
