@@ -126,7 +126,8 @@ local function register_and_listen()
 
    while keep_running or (dev_mode and next(funcatron.response_table) ~= nil) do
       if dev_mode then
-         ngx.log(ngx.ALERT, "Dev mode: in listen loop")
+         ngx.log(ngx.ALERT, "Dev mode: in listen loop " ..
+                    funcatron.instance_uuid)
       end
 
       local data, err = rabbit:receive()
@@ -164,14 +165,15 @@ end
 local function clean_cruft_from(ary)
    local too_old = os.time() - (15 * 60)
    local to_remove = {}
-   for k,v in ipair(ary) do
+
+   for k,v in ipairs(ary) do
       if v and v.when and type(v.when) == "number" and v.when < too_old then
          table.insert(to_remove, k)
       end
    end
 
-   for k,v in ipair(to_remove) do
-      art[k] = nil
+   for k,v in ipairs(to_remove) do
+      ary[k] = nil
    end
 end
 
@@ -184,8 +186,12 @@ response_handlers["route"] = function(msg)
    funcatron.routing_table = msg.routes
 end
 
+response_handlers["tron-info"] = function(msg)
+   -- do nothing... we don't http to TRON
+end
+
 response_handlers["heartbeat"] = function(msg)
-   ngx.log(ngx.ALERT, "Got heartbeat from " .. msg.from)
+   ngx.log(ngx.TRACE, "Got heartbeat from " .. msg.from)
 end
 
 response_handlers["die"] = function(msg)
@@ -195,7 +201,7 @@ end
 
 response_handlers["answer"] = function(msg)
    local key = msg["request-id"]
-   ngx.log(ngx.INFO, ("Got answer from " .. msg.from .. " for req " ..
+   ngx.log(ngx.INFO, ("Got answer from " .. (msg.from or "Unknown") .. " for req " ..
                          key))
    local current = funcatron.response_table[key]
    funcatron.response_table[key] = {["type"]="answer",
