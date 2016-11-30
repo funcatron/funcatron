@@ -370,8 +370,6 @@
      :bundles (bundles-from-state state)
      }))
 
-
-
 (defmethod dispatch-tron-message "awake"
   [{:keys [from type] :as msg} _ {:keys [::network] :as state}]
   (info (str "awake from " msg))
@@ -449,7 +447,7 @@
                   (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
                   (common/connect-to-message-queue
                     queue
-                    (or "tron")                             ;; FIXME -- compute tron queue name
+                    (common/tron-queue)
                     (partial handle-tron-messages state)))
 
                 (endLife [_]

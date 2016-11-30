@@ -74,3 +74,8 @@
   )
 
 
+(defn tron-queue
+  "Compute the name of the tron queue"
+  []
+  ;; FIXME compute the name of the Tron queue
+  (or "tron"))

@@ -97,7 +97,7 @@
 
   (.sendMessage
     (queue-from-state state)
-    (or "tron")                                             ;; FIXME -- tron queue name
+    (common/tron-queue)
     {:content-type "application/json"}
     {:action "heartbeat"
      :msg-id (fu/random-uuid)
@@ -210,8 +210,7 @@
   [state]
   (.sendMessage
     (queue-from-state state)
-    (or "tron")                                             ;; FIXME -- tron queue name
-
+    (common/tron-queue)
     {:content-type "application/json"}
     {:action "awake"
      :type   "runner"
@@ -227,8 +226,7 @@
   [state]
   (.sendMessage
     (queue-from-state state)
-    (or "tron")                                             ;; FIXME -- tron queue name
-
+    (common/tron-queue)
     {:content-type "application/json"}
     {:action "died"
      :msg-id (fu/random-uuid)
