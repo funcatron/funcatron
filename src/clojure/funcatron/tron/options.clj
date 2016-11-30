@@ -1,4 +1,5 @@
-(ns funcatron.tron.options)
+(ns funcatron.tron.options
+  (:import (java.net InetAddress)))
 
 
 (def cli-options
@@ -11,6 +12,16 @@
     :default 3000
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
+
+   [nil "--web_address ADDRESS" "Web Server host name"
+    :default (try
+               (->> (InetAddress/getAllByName
+                      (.getCanonicalHostName
+                        (InetAddress/getLocalHost)))
+                    (map #(.getHostAddress %))
+                    first)
+               (catch Exception _ "127.0.0.1"))]
+
 
    [nil "--shim_port PORT" "Dev Mode Shim Server Port number (default 54657)"
     :default 54657

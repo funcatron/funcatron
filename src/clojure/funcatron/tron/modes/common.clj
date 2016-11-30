@@ -4,7 +4,7 @@
             [funcatron.tron.brokers.shared :as shared-b])
   (:import (java.io File)))
 
-(defn calc-storage-directory
+(defn ^File calc-storage-directory
   "Compute the storage directory without reference to the global opts"
   [opts]
   (let [^String the-dir (or (-> opts :options :bundle_store)
@@ -26,8 +26,21 @@
 
         {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info}
         (fu/find-swagger-info file)]
-    {:sha sha :type type :swagger swagger :host host :basePath basePath :file-info file-info}
+    {:sha sha
+     :type type
+     :swagger swagger
+     :host host
+     :basePath basePath
+     :file-info file-info}
     ))
+
+
+(defn get-bundle-info
+  "Returns the sha info and the swagger info for the file if it's a valid Func Bundle"
+  [^File file]
+  (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
+    (if (and type file-info)
+      [sha {:file file :swagger swagger}])))
 
 (defn load-func-bundles
   "Reads the func bundles from the storage directory"
@@ -39,10 +52,7 @@
     (into {}
           (filter
             boolean
-            (for [file files]
-              (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
-                (if (and type file-info)
-                  [sha {:file file :swagger swagger}])))))))
+            (for [file files] (get-bundle-info file))))))
 
 
 (defn connect-to-message-queue

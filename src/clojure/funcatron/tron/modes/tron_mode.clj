@@ -32,7 +32,54 @@
           (remove #(> too-old (:last-seen (second %))) cur))))))
 
 
+(defn- my-hostname
+  "Computes the hostname and port -- FIXME this should be pluggable for Mesos deploys and such"
+  [{:keys [::opts]}]
+  {:host
+   (or
+     (-> opts :options :web_address)
+     "localhost")
+   :port
+   (or
+     (-> opts :options :web_port)
+     3000)}
+  )
 
+(defn- send-host-info
+  "Sends a message about host information... how to HTTP to Tron"
+  [dest {:keys [::queue] :as state}]
+  (.sendMessage
+    ^MessageBroker queue
+    dest
+    {:content-type "application/json"}
+    {:action      "tron-info"
+     :msg-id      (fu/random-uuid)
+     :tron-host (my-hostname state)
+     :at          (System/currentTimeMillis)
+     })
+  )
+
+(defn- enable-all-bundles
+  "Tell the target to service all func bundles.
+  This is a HACK that needs some FIXME logic to
+  choose which runners run which bundles"
+  [runner {:keys [::route-map ::queue] :as state}]
+  (let [message-queue queue]
+    (doseq [{:keys [queue host path sha]} @route-map]
+      (.sendMessage
+        ^MessageBroker message-queue
+        runner
+        {:content-type "application/json"}
+        {:action    "associate"
+         :tron-host (my-hostname state)
+         :msg-id    (fu/random-uuid)
+         :at        (System/currentTimeMillis)
+         :sha       sha
+         :queue queue
+         :host host
+         :path path})))
+
+  )
 
 (defn- try-to-load-route-map
   "Try to load the route map"
@@ -92,32 +139,30 @@
 
 (defn- remove-other-instances-of-this-frontend
   "Finds other front-end instances with the same `instance-id` and tell them to die"
-  [{:keys [from instance-id]} state]
-  (let [the-network (::network state)
-        queue (::queue state)]
-    (let [to-kill (filter (fn [[k v]]
-                            (and (not= k from)
-                                 (= instance-id (:instance-id v))))
-                          @the-network
-                          )
-          kill-keys (into #{} (map first to-kill))
-          ]
+  [{:keys [from instance-id]} {:keys [::network ::queue]}]
+  (let [to-kill (filter (fn [[k v]]
+                          (and (not= k from)
+                               (= instance-id (:instance-id v))))
+                        @network
+                        )
+        kill-keys (into #{} (map first to-kill))
+        ]
 
-      ;; no more messages to the instances we're removing
-      (swap! the-network
-             (fn [m]
-               (into {} (remove #(kill-keys (first %)) m))))
-      (doseq [[k {:keys [instance-id]}] to-kill]
-        (info (str "Killing old id " k " with instance-id " instance-id))
-        (.sendMessage
-          ^MessageBroker queue
-          k
-          {:content-type "application/json"}
-          {:action      "die"
-           :msg-id      (fu/random-uuid)
-           :instance-id instance-id
-           :at          (System/currentTimeMillis)
-           })))))
+    ;; no more messages to the instances we're removing
+    (swap! network
+           (fn [m]
+             (into {} (remove #(kill-keys (first %)) m))))
+    (doseq [[k {:keys [instance-id]}] to-kill]
+      (info (str "Killing old id " k " with instance-id " instance-id))
+      (.sendMessage
+        ^MessageBroker queue
+        k
+        {:content-type "application/json"}
+        {:action      "die"
+         :msg-id      (fu/random-uuid)
+         :instance-id instance-id
+         :at          (System/currentTimeMillis)
+         }))))
 
 (defn- send-route-map
   "Sends the route map to a destination"
@@ -144,15 +189,19 @@
           ))
 
       (clean-network state)
-      (doseq [[k {:keys [type ]}] @network]
-        (when (= type "frontend")
-          (send-route-map k state))
-        ))))
+      (doseq [[k {:keys [type]}] @network]
+        (cond
+          (= type "frontend")
+          (send-route-map k state)
+
+          (= type "runner")
+          (enable-all-bundles k state)
+          )))))
 
 #_(defn ^StableStore backing-store
-  "Returns the backing store object"
-  []
-  @-backing-store)
+    "Returns the backing store object"
+    []
+    @-backing-store)
 
 (defn- no-file-with-same-sha
   "Make sure there are no files in the storage-directory that have the same sha"
@@ -166,7 +215,6 @@
   [{:keys [body]} {:keys [::opts ::bundles] :as state}]
   (if body
     (let [file (File/createTempFile "func-a-" ".tron")]
-      (println "Body is " body)
       (cio/copy body file)
       (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
         (if (and type file-info)
@@ -179,19 +227,19 @@
               (cio/copy file dest-file))
             (.delete file)
             (swap! bundles assoc sha {:file dest-file :swagger swagger})
-            {:status  200
-             :body    {:accepted true
-                       :type     type
-                       :host     host
-                       :route    basePath
-                       :swagger  swagger
-                       :sha256   sha}})
+            {:status 200
+             :body   {:accepted true
+                      :type     type
+                      :host     host
+                      :route    basePath
+                      :swagger  swagger
+                      :sha   sha}})
           {:status 400
-           :body {:accepted false
-                  :error "Could not determine the file type"}})))
+           :body   {:accepted false
+                    :error    "Could not determine the file type"}})))
     {:status 400
-     :body {:accepted false
-            :error "Must post a Func bundle file"}}
+     :body   {:accepted false
+              :error    "Must post a Func bundle file"}}
     )
   )
 
@@ -199,24 +247,23 @@
   "Enable a Func bundle"
   [{:keys [json-params]} {:keys [::bundles ::route-map]}]
   (let [json-params (fu/keywordize-keys json-params)
-        {:keys [sha256]} json-params]
-    (println json-params)
-    (if (not (and json-params sha256))
+        {:keys [sha]} json-params]
+    (if (not (and json-params sha))
       ;; failed
       {:status 400
-       :body   {:success false :error "Request must be JSON and include the 'sha256' of the Func bundle to enable"}}
+       :body   {:success false :error "Request must be JSON and include the 'sha' of the Func bundle to enable"}}
 
       ;; find the Func bundle and enable it
-      (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha256)]
+      (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha)]
         (if (not bundle)
           ;; couldn't find the bundle
           {:status 404
-           :body   {:success false :error (str "Could not find Func bundle with SHA256: " sha256)}}
+           :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
 
           (do
-            (add-to-route-map host basePath sha256 route-map)
+            (add-to-route-map host basePath sha route-map)
             {:status 200
-             :body   {:success true :msg (str "Deployed Func bundle host: " host " basePath " basePath " sha256 " sha256)}})
+             :body   {:success true :msg (str "Deployed Func bundle host: " host " basePath " basePath " sha " sha)}})
           ))
       ))
 
@@ -224,63 +271,76 @@
 
 (defn- disable-func
   "Enable a Func bundle"
-  [{:keys [json-params] {:keys [sha256]} :json-params} {:keys [::bundles ::route-map]}]
-  (if (not (and json-params sha256))
+  [{:keys [json-params] {:keys [sha]} :json-params} {:keys [::bundles ::route-map]}]
+  (if (not (and json-params sha))
     ;; failed
     {:status 400
-     :body {:success false :error "Request must be JSON and include the 'sha256' of the Func bundle to disable"}}
+     :body   {:success false :error "Request must be JSON and include the 'sha' of the Func bundle to disable"}}
 
     ;; find the Func bundle and enable it
-    (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha256)]
+    (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha)]
       (if (not bundle)
         ;; couldn't find the bundle
         {:status 404
-         :body   {:success false :error (str "Could not find Func bundle with SHA256: " sha256)}}
+         :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
 
         (do
-          (remove-from-route-map host basePath sha256 route-map)
+          (remove-from-route-map host basePath sha route-map)
           {:status 200
-           :body   {:success true :msg (str "Disabled Func bundle host: " host " basePath " basePath " sha256 " sha256)}})
+           :body   {:success true :msg (str "Disabled Func bundle host: " host " basePath " basePath " sha " sha)}})
         ))
     ))
 
+(defn- bundles-from-state
+  "Pass in the state object and get a list of func bundles"
+  [{:keys [::bundles]}]
+  (map (fn [[k {{:keys [host basePath]} :swagger}]]
+         {:sha k
+          :host   host
+          :path   basePath})
+       @bundles))
+
 (defn- get-known-funcs
   "Return all the known func bundles"
-  [_ {:keys [::bundles]}]
+  [_ state]
   {:status 200
-   :body {:func-bundles (map (fn [[k {{:keys [host basePath]} :swagger}]
-                                  ]
-                               {:sha256 k
-                                :host host
-                                :path basePath}) @bundles)}})
+   :body   {:func-bundles (bundles-from-state state)}})
 
 (defn- get-stats
   "Return statistics on activity"
   [_ _]
   {:status 200
-   :body {:success false
-          :action "FIXME"}
+   :body   {:success false
+            :action  "FIXME"}
    })
+
+(defn- return-sha
+  "Get the Func bundle with the sha"
+  [req {:keys [::bundles]}]
+  (let [sha (-> req :params :sha)]
+    (if-let [{:keys [file]} (get @bundles sha)]
+      {:status 200
+       :body (clojure.java.io/input-stream file)}
+
+      {:status 404
+       :body (str "No func bundle with sha " sha " found")}
+      )
+    )
+  )
 
 (defn tron-routes
   "Routes for Tron"
   [state]
-  (routes
-    (POST "/api/v1/enable" req (enable-func req state))
-    (POST "/api/v1/disable" req (disable-func req state))
-    (GET "/api/v1/stats" req (get-stats req state))
-    (GET "/api/v1/known_funcs" [] get-known-funcs)
-    (POST "/api/v1/add_func"
-          req (upload-func-bundle req state))))
-
-(defn ring-handler
-  "Handle http requests"
-  [req]
-
-  ((-> tron-routes
-       wrap-json-response
-       (rm-json/wrap-json-params)) req)
-  )
+  (->   (routes
+          (POST "/api/v1/enable" req (enable-func req state))
+          (POST "/api/v1/disable" req (disable-func req state))
+          (GET "/api/v1/stats" req (get-stats req state))
+          (GET "/api/v1/known_funcs" req (get-known-funcs req state))
+          (GET "/api/v1/bundle/:sha" req (return-sha req state) )
+          (POST "/api/v1/add_func"
+                req (upload-func-bundle req state)))
+      wrap-json-response
+      (rm-json/wrap-json-params)))
 
 (defmulti dispatch-tron-message
           "Dispatch the incoming message"
@@ -289,25 +349,28 @@
 
 (defmethod dispatch-tron-message "heartbeat"
   [{:keys [from]} _ {:keys [::network] :as state}]
-  (info (str "Heartbeat from " from))
+  (trace (str "Heartbeat from " from))
   (clean-network state)
   (swap! network assoc-in [from :last-seen] (System/currentTimeMillis))
+  (send-host-info from state)
   )
 
 (defn- send-func-bundles
   "Send a list of the Func bundles to the Runner as well
   as the host and port for this instance"
-  [_ ]
-  ;; FIXME send func bundle
-  )
+  [destination {:keys [::queue] :as state}]
+  (.sendMessage
+    ^MessageBroker queue
+    destination
+    {:content-type "application/json"}
+    {:action  "all-bundles"
+     :tron-host (my-hostname state)
+     :msg-id  (fu/random-uuid)
+     :at      (System/currentTimeMillis)
+     :bundles (bundles-from-state state)
+     }))
 
-(defn- enable-all-bundles
-  "Tell the target to service all func bundles.
-  This is a HACK that needs some FIXME logic to
-  choose which runners run which bundles"
-  [_]
-  ;; FIXME tell the Func bundle to listen to all queue for all enabled bundles
-  )
+
 
 (defmethod dispatch-tron-message "awake"
   [{:keys [from type] :as msg} _ {:keys [::network] :as state}]
@@ -317,6 +380,9 @@
          (merge
            msg
            {:last-seen (System/currentTimeMillis)}))
+
+  (send-host-info from state)
+
   (cond
     (= "frontend" type)
     (do
@@ -326,9 +392,13 @@
 
     (= "runner" type)
     (do
-      (send-func-bundles from)
-      (enable-all-bundles from))
-    )
+      (send-func-bundles from state)
+      (enable-all-bundles from state))))
+
+(defmethod dispatch-tron-message "died"
+  [{:keys [from]} _ {:keys [::network]}]
+  (info (str "Got 'died' message from " from))
+  (swap! network dissoc from)
   )
 
 (defn- handle-tron-messages
@@ -337,7 +407,7 @@
   (let [body (.body msg)
         body (fu/keywordize-keys body)]
     (try
-      (dispatch-tron-message body msg)
+      (dispatch-tron-message body msg state)
       (catch Exception e (error e (str "Failed to dispatch message: " body))))))
 
 (defn- build-handler-func
@@ -359,13 +429,14 @@
         route-map (atom [])
         network (atom {})
         shutdown-http-server (atom nil)
-
-        state {::queue queue
-               ::bundles bundles
-               ::network network
-               ::opts opts
+        this (atom nil)
+        state {::queue                queue
+               ::bundles              bundles
+               ::network              network
+               ::opts                 opts
+               ::this                 this
                ::shutdown-http-server shutdown-http-server
-               ::route-map route-map}
+               ::route-map            route-map}
         ]
 
     (reset! bundles (common/load-func-bundles (common/calc-storage-directory opts))) ;; load the bundles
@@ -373,30 +444,34 @@
 
     (add-watch route-map state routes-changed)
 
-    (reify Lifecycle
-      (startLife [_]
-        (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
-        (common/connect-to-message-queue
-          queue
-          (or "tron")            ;; FIXME -- compute tron queue name
-          (partial handle-tron-messages state)))
+    (let [ret (reify Lifecycle
+                (startLife [_]
+                  (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
+                  (common/connect-to-message-queue
+                    queue
+                    (or "tron")                             ;; FIXME -- compute tron queue name
+                    (partial handle-tron-messages state)))
 
-      (endLife [_]
-        (shared-b/close-all-listeners queue)
-        (.close queue)
-        (@shutdown-http-server))
+                (endLife [_]
+                  (shared-b/close-all-listeners queue)
+                  (.close queue)
+                  (@shutdown-http-server))
 
-      (allInfo [_] {::message-queue queue
-                    ::func-bundles  @bundles
-                    ::routes        @routes
-                    ::network @network})
+                (allInfo [_] {::message-queue queue
+                              ::func-bundles  @bundles
+                              ::routes        @route-map
+                              ::this          @this
+                              ::network       @network})
+                )]
+      (reset! this ret)
+      ret
       )))
 
 (defn ^Lifecycle build-tron-from-opts
   "Builds the runner from options... and if none are passed in, use global options"
   ([] (build-tron-from-opts @opts/command-line-options))
   ([opts]
-   (require     ;; load a bunch of the namespaces to register wiring
+   (require                                                 ;; load a bunch of the namespaces to register wiring
      '[funcatron.tron.brokers.rabbitmq]
      '[funcatron.tron.brokers.inmemory]
      '[funcatron.tron.store.zookeeper]

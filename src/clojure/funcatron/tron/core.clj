@@ -1,7 +1,7 @@
 (ns funcatron.tron.core
   (:require [funcatron.tron.modes.dev-mode :as shimmy]
             [taoensso.timbre
-             :refer [log  trace  debug  info  warn  error  fatal  report
+             :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [funcatron.tron.options :as the-opts]
@@ -10,7 +10,7 @@
             [clojure.tools.cli :as cli])
 
   (:gen-class)
-  )
+  (:import (funcatron.abstractions Lifecycle)))
 
 (set! *warn-on-reflection* true)
 
@@ -44,3 +44,25 @@
       (-> opts :options :runner)
       (let [server (runny/build-runner-from-opts opts)]
         (.startLife server)))))
+
+(defn test-start-tron
+  []
+  (let [my-tron (tronny/build-tron-from-opts)]
+    (def ^Lifecycle tron my-tron)
+    (.startLife my-tron)
+    my-tron)
+
+  )
+
+(defn test-start-runner
+  []
+  (let [my-r (runny/build-runner-from-opts)]
+    (def ^Lifecycle runner my-r)
+    (.startLife my-r)
+    my-r)
+  )
+
+(defn start-both
+  []
+  (test-start-tron)
+  (test-start-runner))

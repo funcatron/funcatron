@@ -9,7 +9,48 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 
 ### Associate Queue with Func Bundle
 
+
+### Send a list of all known bundles to the Runner
+
+```$clojure
+{:action "associate"
+  :msg-id UUID-string
+  :from UUID-String
+  :at currentTimeMillis
+  :sha256 func-bundle-sha
+  :queue-name name-of-queue
+  :host the-host
+  :basePath func-bundle-basePath
+}
+
+```
+
 ### Disassociate Queue with Func Bundle
+
+### Host Information
+
+Tell the Runners where to find a Tron
+
+```$clojure
+{:action      "tron-info"
+ :msg-id      (fu/random-uuid)
+ :tron-host   {:host hostname :port port}
+ :at          (System/currentTimeMillis)
+}
+
+```
+
+### List of all Func bundles
+
+```$clojure
+{:action  "all-bundles"
+ :tron-host {:host hostname :port port}
+ :msg-id  (fu/random-uuid)
+ :at      (System/currentTimeMillis)
+ :bundles [{:sha k :host host :path basePath}]
+ }
+
+```
 
 ## Runner to Tron
 
@@ -30,7 +71,6 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 
 ```
 {:action "died"
- :type "runner"
  :msg-id UUID-string
  :from UUID-String
  :at currentTimeMillis
