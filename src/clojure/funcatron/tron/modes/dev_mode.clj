@@ -2,8 +2,7 @@
   (:gen-class)
   (:require [funcatron.tron.util :as fu]
             [cheshire.core :as json]
-            [org.httpkit.server :as kit]
-            [taoensso.timbre :as timbre
+            [taoensso.timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
@@ -12,7 +11,9 @@
             [funcatron.tron.options :as the-opts]
             [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.net ServerSocket Socket SocketException)
-           (java.io BufferedWriter OutputStreamWriter BufferedReader InputStreamReader OutputStream InputStream ByteArrayInputStream IOException)
+           (java.io BufferedWriter OutputStreamWriter BufferedReader
+                    InputStreamReader OutputStream InputStream
+                    ByteArrayInputStream IOException)
            (clojure.lang IFn)
            (java.util Base64)))
 

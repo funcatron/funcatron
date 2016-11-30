@@ -1,6 +1,6 @@
 (ns funcatron.tron.modes.common
   (:require [funcatron.tron.util :as fu]
-            [funcatron.tron.options :as f-opts]
+            [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared-b])
   (:import (java.io File)))
 
@@ -60,12 +60,11 @@
   [opts ^String listen-to handler]
   (let [queue (shared-b/wire-up-queue opts)
         end-func
-        (.listenToQueue
+        (shared-b/listen-to-queue
           queue
           listen-to
-          (fu/promote-to-function
-            (fn [msg]
-              (fu/run-in-pool (fn [] (handler msg))))))]
+          (fn [msg]
+            (fu/run-in-pool (fn [] (handler msg)))))]
 
     {::queue queue
      ::end-func end-func}
@@ -78,4 +77,6 @@
   "Compute the name of the tron queue"
   []
   ;; FIXME compute the name of the Tron queue
-  (or "tron"))
+  (or
+    (-> opts/command-line-options deref :options :tron_queue)
+    "for_tron"))

@@ -1,13 +1,11 @@
 (ns funcatron.tron.util
   "Utilities for Tron"
   (:require [cheshire.core :as json]
-            [clojure.spec :as s]
             [org.httpkit.server :as kit]
-            [funcatron.tron.options :as the-opts]
             [cognitect.transit :as transit]
             [io.sarnowski.swagger1st.context :as s1ctx]
             [camel-snake-kebab.core :as csk]
-            [taoensso.timbre :as timbre
+            [taoensso.timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]])
@@ -25,7 +23,7 @@
            (funcatron.abstractions Router$Message)
            (java.security MessageDigest)
            (java.util.jar JarFile JarEntry)
-           (java.util.concurrent Executors ExecutorService ScheduledExecutorService TimeUnit)
+           (java.util.concurrent Executors ScheduledExecutorService TimeUnit)
            (java.util.function Function)
            (funcatron.helpers Tuple2 Tuple3)))
 

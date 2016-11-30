@@ -72,6 +72,8 @@
    [nil "--devmode" "Dev Mode"]
    [nil "--runner" "Runner Mode"]
    [nil "--tron" "Manager Tron Mode"]
+
+   [nil "--dump" "Dump environment and exit"]
    #_["-v" nil "Verbosity level"
       :id :verbosity
       :default 0

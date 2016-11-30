@@ -161,15 +161,14 @@
     state
     (fn []
       (let [end-func
-            (.listenToQueue
-              ^MessageBroker message-queue queue
-              (fu/promote-to-function
-                (fn [msg]
-                  (fu/run-in-pool
-                    (fn [] (handle-http-request
-                             state
-                             sha
-                             msg))))))]
+            (shared-b/listen-to-queue
+              message-queue queue
+              (fn [msg]
+                (fu/run-in-pool
+                  (fn [] (handle-http-request
+                           state
+                           sha
+                           msg)))))]
         (swap! routes assoc queue
                {:end-func   end-func
                 :queue queue
@@ -258,12 +257,10 @@
                 ::tron-host tron-host
                 ::uuid          my-uuid}
          ]
-     (.listenToQueue
-       queue
-       my-uuid
-       (fu/promote-to-function
-         (fn [msg]
-           (fu/run-in-pool (fn [] (handle-runner-message msg state))))))
+     (shared-b/listen-to-queue
+       queue my-uuid
+       (fn [msg]
+         (fu/run-in-pool (fn [] (handle-runner-message msg state)))))
 
      (reset! func-bundles (common/load-func-bundles (common/calc-storage-directory opts))) ;; load the bundles
      (let [ret
