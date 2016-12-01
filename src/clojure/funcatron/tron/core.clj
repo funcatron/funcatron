@@ -95,6 +95,7 @@
       (do
         (info (str "Env " (System/getenv)))
         (info (str "Props " (System/getProperties)))
+        (info (str "DNS records for the RabbitMQ instance: " (fu/dns-lookup "_rabbit._rabbit-funcatron._tcp.marathon.mesos")))
         (fu/graceful-exit 0))
 
       (-> opts :options :help)
