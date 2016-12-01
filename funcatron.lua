@@ -233,7 +233,7 @@ function funcatron.route_for(host, path)
 
    -- find the entry that matches the host and path
    for i, v in ipairs(funcatron.routing_table) do
-      if (v.host == nil or v.host == "*" or v.host == host or true) and
+      if (dev_mode or v.host == nil or v.host == "*" or v.host == host) and
       string_starts(path, v.path) then
          return v.queue, nil
       end
