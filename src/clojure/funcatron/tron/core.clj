@@ -86,16 +86,21 @@
     (trace (str "Argument options: " opts))
     (cond
       (:errors opts)
-      (error (str (:errors opts)))
+      (do
+        (error (str (:errors opts)))
+        (fu/graceful-exit 0)
+        )
 
       (-> opts :options :dump)
       (do
         (info (str "Env " (System/getenv)))
         (info (str "Props " (System/getProperties)))
-        )
+        (fu/graceful-exit 0))
 
       (-> opts :options :help)
-      (info (str "Options:\n" (:summary opts)))
+      (do
+        (info (str "Options:\n" (:summary opts)))
+        (fu/graceful-exit 0))
 
       (-> opts :options :devmode)
       (shimmy/start-dev-server)

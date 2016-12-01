@@ -5,6 +5,7 @@
             [cognitect.transit :as transit]
             [io.sarnowski.swagger1st.context :as s1ctx]
             [camel-snake-kebab.core :as csk]
+            [org.httpkit.client :as http]
             [taoensso.timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -25,7 +26,8 @@
            (java.util.jar JarFile JarEntry)
            (java.util.concurrent Executors ScheduledExecutorService TimeUnit)
            (java.util.function Function)
-           (funcatron.helpers Tuple2 Tuple3)))
+           (funcatron.helpers Tuple2 Tuple3)
+           (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)))
 
 
 (set! *warn-on-reflection* true)
@@ -469,3 +471,49 @@
   "Create a Random UUID string via Java's UUID class"
   []
   (.toString (UUID/randomUUID)))
+
+(defn in-mesos?
+  "Returns true if we're running in mesos"
+  []
+  (boolean (get (System/getenv) "MARATHON_APP_ID"))
+  )
+
+(defn graceful-exit
+  "Gracefully exit the process. This means on Mesos, telling Mesos to terminate us"
+  [code]
+
+  (info (str "Graceful shutdown with code " code))2
+
+  (when-let [mesos-app (get (System/getenv) "MARATHON_APP_ID")]
+    (info "We're in Mesos-land, so tell leader.mesos:8080 to delete us")
+    @(http/delete
+      (str "http://leader.mesos:8080/v2/apps" mesos-app)))
+
+  (System/exit code)
+  )
+
+(def ^:private ^DnsSrvResolver dns-resolver
+  (delay
+    (-> (DnsSrvResolvers/newBuilder)
+        (.cachingLookups true)
+        (.dnsLookupTimeoutMillis 1000)
+        (.retentionDurationMillis 100)
+        .build)))
+
+(defn dns-lookup
+  "Look up the SRV DNS records"
+  [name]
+  (try
+    (let [ret (mapv
+                (fn [^LookupResult r] {:host     (.host r)
+                                       :port     (.port r)
+                                       :priority (.priority r)
+                                       :weight   (.weight r)
+                                       :ttl      (.ttl r)})
+                (.resolve @dns-resolver name))]
+      (info (str "DNS SRV lookup for " name " returned " ret))
+      ret
+      )
+    (catch Exception e (do (error e (str "Failed DNS lookup for " name))
+                           [])))
+  )

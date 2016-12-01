@@ -53,31 +53,46 @@
     (handle-rabbit-request handler broker ch metadata payload)
     ))
 
+(defn- compute-mesos-rabbit-props
+  "If we're running in Mesos, use DNS to look up the rabbit host and port"
+  []
+  (if (fu/in-mesos?)
+    (->
+      (fu/dns-lookup "_rabbit._rabbit-funcatron._tcp.marathon.mesos")
+      first
+      (select-keys [:host :port]))
+    {}))
+
 (defn- fix-props
-  "Override :hosts, :port, :password :username based on command line"
+  "Override :hosts, :port, :password :username based on command line
+  or if we're running inside Mesos, Mesos"
   [props]
   (let [opts (:options @opts/command-line-options)]
-    {:hosts    (let [z (or (:rabbit_host opts)
-                           (:hosts props)
-                           "localhost")]
-                 (if (string? z) [z] z)
-                 )
-     :port     (or (:rabbit_port opts)
-                   (:port props)
-                   5672)
+    (merge
+      {:hosts    (let [z (or (:rabbit_host opts)
+                             (:hosts props)
+                             "localhost")]
+                   (if (string? z) [z] z)
+                   )
+       :port     (or (:rabbit_port opts)
+                     (:port props)
+                     5672)
 
-     :username (or (:rabbit_username opts)
-                   (:username props)
-                   "guest")
+       :username (or (:rabbit_username opts)
+                     (:username props)
+                     "guest")
 
-     :password (or (:rabbit_password opts)
-                   (:password props)
-                   "guest")
-     }))
+       :password (or (:rabbit_password opts)
+                     (:password props)
+                     "guest")
+       }
+      (compute-mesos-rabbit-props)
+      )))
 
 (defn ^MessageBroker create-broker
   "Create a RabbitMQ MessageBroker instance"
-  ([] (create-broker (::rabbit-connection @d-props/info)))
+  ([] (create-broker (merge (::rabbit-connection @d-props/info)
+                            (:rabbit-connection @d-props/info))))
   ([params]
    (let [rabbit-props (or params {})
          rabbit-props (fix-props rabbit-props)

@@ -38,10 +38,21 @@
   {:host
    (or
      (-> opts :options :web_address)
+     (and
+       (get (System/getenv) "MESOS_CONTAINER_NAME")
+       (get (System/getenv) "HOST"))
+
      "localhost")
    :port
    (or
      (-> opts :options :web_port)
+     (try
+       (and
+         (get (System/getenv) "MESOS_CONTAINER_NAME")
+         (let [x (read-string (get (System/getenv) "PORT_3000"))]
+           (if (integer? x) x nil)
+           ))
+       (catch Exception _ nil))
      3000)}
   )
 

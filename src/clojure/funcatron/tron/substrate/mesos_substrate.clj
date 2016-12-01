@@ -28,7 +28,7 @@
          mesos-uri (URI. (str
                            (or
                              (:mesos_uri opts)
-                             "http://m1.dcos:5050")
+                             "http://leader.mesos:5050")
                            "/api/v1/scheduler"))
 
          ;; we need a stable FrameworkID
