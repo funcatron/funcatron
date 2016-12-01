@@ -18,18 +18,15 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
     PORT=""
 
     host () {
-        HOST=$(dig rabbit-funcatron.marathon.mesos  | \
-                      grep -v "^\;" | \
-                      grep "IN\s\+A" | \
-                      grep -o "[0-9]*\.[0-9]*\.[[0-9]*\.[0-9]*$" | \
+        HOST=$(dig +short rabbit-funcatron.marathon.mesos  |
                       sed -n 1p)
     }
 
     port () {
-        PORT=$(dig _stomp._rabbit-funcatron._tcp.marathon.mesos SRV | \
-                      grep -v "^\;" | grep -e "IN\s\+SRV" | \
-                      grep -o "[0-9]* *[^ ]*$" | \
-                      grep -o "^[0-9]*" | sed -n 1p)
+        PORT=$(dig +short _stomp._rabbit-funcatron._tcp.marathon.mesos SRV | \
+                      sed -n 1p | \
+                      grep -o '[0-9]* *[^ ]*$' | \
+                      grep -o '^[0-9]*')
     }
 
     while [[ -z "$PORT" || -z "$HOST" ]] ; do
