@@ -53,14 +53,29 @@
     (handle-rabbit-request handler broker ch metadata payload)
     ))
 
+(def ^:private delay-once (delay
+                            (Thread/sleep 2000)
+                            42))
+
 (defn- compute-mesos-rabbit-props
   "If we're running in Mesos, use DNS to look up the rabbit host and port"
   []
   (if (fu/in-mesos?)
-    (->
-      (fu/dns-lookup "_rabbit._rabbit-funcatron._tcp.marathon.mesos")
-      first
-      (select-keys [:host :port]))
+    (do
+      (loop [cnt 0]
+        (let [ret
+              (->
+                (fu/dns-lookup "_rabbit._rabbit-funcatron._tcp.marathon.mesos")
+                first
+                )]
+          ;; try 8 times to find the RabbitMQ server with some backoff
+          (if ret
+            {:hosts [(:host ret)] :port (:port ret)}
+            (if (< cnt 8)
+              (do (Thread/sleep (* 1000 (inc cnt)))
+                  (recur (inc cnt)))
+              nil))
+          )))
     {}))
 
 (defn- fix-props
