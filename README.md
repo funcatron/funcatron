@@ -3,6 +3,8 @@
 Sample [Funcatron](https://funcatron.org) projects in Java,
 Scala, Clojure, and Kotlin.
 
+The Clojure and Kotlin examples are coming (soon)...
+
 Serverless on Your Cluster:
 
 * Define Endpoints in Swagger
