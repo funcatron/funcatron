@@ -55,7 +55,7 @@
             (for [file files] (get-bundle-info file))))))
 
 
-(defn connect-to-message-queue
+#_(defn connect-to-message-queue
   "Connect to the message queue and deal with messages via `handler`"
   [opts ^String listen-to handler]
   (let [queue (shared-b/wire-up-queue opts)

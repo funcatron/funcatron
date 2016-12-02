@@ -413,12 +413,14 @@
 (defn- handle-tron-messages
   "Handle messages sent to the tron queue"
   [state ^MessageBroker$ReceivedMessage msg]
-  (let [body (.body msg)
-        body (fu/keywordize-keys body)]
-    (try
-      (info (str "Got message. Action " (:action body) " from " (:from body)))
-      (dispatch-tron-message body msg state)
-      (catch Exception e (error e (str "Failed to dispatch message: " body))))))
+  (fu/run-in-pool
+    (fn []
+      (let [body (.body msg)
+            body (fu/keywordize-keys body)]
+        (try
+          (info (str "Got message. Action " (:action body) " from " (:from body)))
+          (dispatch-tron-message body msg state)
+          (catch Exception e (error e (str "Failed to dispatch message: " body))))))))
 
 (defn- build-handler-func
   [state]
@@ -458,10 +460,11 @@
                 (startLife [_]
                   (info (str "Starting Tron lifecycle"))
                   (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
-                  (common/connect-to-message-queue
+                  (shared-b/listen-to-queue
                     queue
                     (common/tron-queue)
-                    (partial handle-tron-messages state)))
+                    (partial handle-tron-messages state))
+                    )
 
                 (endLife [_]
                   (info (str "Ending Tron Lifecycle"))
