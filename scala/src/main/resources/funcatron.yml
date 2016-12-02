@@ -8,7 +8,6 @@ info:
     url: https://funcatron.org
   license:
     name: Apache 2.0
-host: *
 basePath: /sample/scala
 schemes:
   - http
@@ -111,4 +110,3 @@ definitions:
     required:
       - name
       - age
-
