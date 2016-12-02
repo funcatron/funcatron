@@ -62,6 +62,7 @@
   []
   (if (fu/in-mesos?)
     (do
+      (info "Running in Mesos... looking up RabbitMQ DNS info")
       (loop [cnt 0]
         (let [ret
               (->
@@ -112,10 +113,10 @@
    (let [rabbit-props (or params {})
          rabbit-props (fix-props rabbit-props)
          listeners (ConcurrentHashMap.)]
-     (trace "About to open RabbitMQ Connection using " rabbit-props)
+     (info "About to open RabbitMQ Connection using " rabbit-props)
      (try
        (let [conn (lc/connect rabbit-props)]
-         (trace "Openned RabbitMQ Connection")
+         (info "Openned RabbitMQ Connection")
          (reify MessageBroker
            (queueDepth [this queue-name]
              (with-open [ch (lch/open conn)]

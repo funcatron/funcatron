@@ -416,6 +416,7 @@
   (let [body (.body msg)
         body (fu/keywordize-keys body)]
     (try
+      (info (str "Got message. Action " (:action body) " from " (:from body)))
       (dispatch-tron-message body msg state)
       (catch Exception e (error e (str "Failed to dispatch message: " body))))))
 
@@ -455,6 +456,7 @@
 
     (let [ret (reify Lifecycle
                 (startLife [_]
+                  (info (str "Starting Tron lifecycle"))
                   (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
                   (common/connect-to-message-queue
                     queue
@@ -462,6 +464,7 @@
                     (partial handle-tron-messages state)))
 
                 (endLife [_]
+                  (info (str "Ending Tron Lifecycle"))
                   (shared-b/close-all-listeners queue)
                   (.close queue)
                   (@shutdown-http-server))

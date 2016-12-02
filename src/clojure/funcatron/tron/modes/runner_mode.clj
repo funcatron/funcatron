@@ -207,6 +207,7 @@
 (defn- wake-up
   "Tell the Tron we're awake and ready for routes and such"
   [state]
+  (info (str "Waking running " (::uuid state)))
   (.sendMessage
     (queue-from-state state)
     (common/tron-queue)
@@ -257,15 +258,16 @@
                 ::tron-host tron-host
                 ::uuid          my-uuid}
          ]
-     (shared-b/listen-to-queue
-       queue my-uuid
-       (fn [msg]
-         (fu/run-in-pool (fn [] (handle-runner-message msg state)))))
+
 
      (reset! func-bundles (common/load-func-bundles (common/calc-storage-directory opts))) ;; load the bundles
      (let [ret
            (reify Lifecycle
              (startLife [_]
+               (shared-b/listen-to-queue
+                 queue my-uuid
+                 (fn [msg]
+                   (fu/run-in-pool (fn [] (handle-runner-message msg state)))))
                (wake-up state))
 
              (endLife [_]

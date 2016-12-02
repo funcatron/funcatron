@@ -27,7 +27,9 @@
            (java.util.concurrent Executors ScheduledExecutorService TimeUnit)
            (java.util.function Function)
            (funcatron.helpers Tuple2 Tuple3)
-           (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)))
+           (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)
+           (java.lang.management ManagementFactory ThreadMXBean RuntimeMXBean )
+           (com.sun.management OperatingSystemMXBean)))
 
 
 (set! *warn-on-reflection* true)
@@ -492,28 +494,48 @@
   (System/exit code)
   )
 
-(def ^:private ^DnsSrvResolver dns-resolver
-  (delay
-    (-> (DnsSrvResolvers/newBuilder)
-        (.cachingLookups true)
-        (.dnsLookupTimeoutMillis 1000)
-        (.retentionDurationMillis 100)
-        .build)))
+(defn ^:private ^DnsSrvResolver dns-resolver
+  "Create a DNS resolver"
+  []
+  (-> (DnsSrvResolvers/newBuilder)
+      (.cachingLookups true)
+      (.dnsLookupTimeoutMillis 1000)
+      (.retentionDurationMillis 100)
+      .build))
 
 (defn dns-lookup
   "Look up the SRV DNS records"
   [name]
   (try
-    (let [ret (mapv
-                (fn [^LookupResult r] {:host     (.host r)
-                                       :port     (.port r)
-                                       :priority (.priority r)
-                                       :weight   (.weight r)
-                                       :ttl      (.ttl r)})
-                (.resolve @dns-resolver name))]
-      (info (str "DNS SRV lookup for " name " returned " ret))
-      ret
-      )
-    (catch Exception e (do (error e (str "Failed DNS lookup for " name))
-                           [])))
-  )
+    (mapv
+      (fn [^LookupResult r]
+        {:host     (.host r)
+         :port     (.port r)
+         :priority (.priority r)
+         :weight   (.weight r)
+         :ttl      (.ttl r)})
+      (.resolve (dns-resolver) name))
+    (catch Exception e
+      (do (error e (str "Failed DNS lookup for " name))
+          []))))
+
+(def ^:private ^ThreadMXBean thread-mbx (ManagementFactory/getThreadMXBean))
+
+(defn time-execution
+  "Takes a function. Runs the function and returns the functions return value along with timing information."
+  [f]
+  (let [current-cpu-time (.getCurrentThreadCpuTime thread-mbx)
+        current-user-time (System/nanoTime)
+        ret
+        (try
+          {:value (f)}
+          (catch Exception e {:exception e}))
+        cpu (- (.getCurrentThreadCpuTime thread-mbx) current-cpu-time)
+        clock (- (System/nanoTime) current-user-time)
+        ]
+    (merge ret
+           {:thread-cpu-nano   cpu
+            :thread-clock-nano clock
+            :thread-cpu-sec    (/ cpu 1000000000.0)
+            :thread-clock-sec  (/ clock 1000000000.0)
+            })))
