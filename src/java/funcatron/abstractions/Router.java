@@ -57,7 +57,11 @@ public interface Router extends Function<MessageBroker.ReceivedMessage, Void> {
          * @return the method header
          */
         default String method() {
-            return (String)  metadata().get("x-method");
+            String m = (String) metadata().get("x-method");
+            if (null == m) {
+                m = "get";
+            }
+            return m.toLowerCase();
         }
 
         /**

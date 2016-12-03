@@ -71,17 +71,25 @@
     (assoc jar-info ::swagger swagger)
     ))
 
+(defn- do-wrap-response
+  "Split out so we can modify it"
+  [handler req]
+  (let [resp (handler req)]
+    (cond
+      (::raw resp)
+      (dissoc resp ::raw)
+
+      :else {:status 200
+
+             :headers {"Content-Type" "application/json"}
+             :body resp})
+    ))
+
 (defn wrap-response
   "A ring handler that wraps the response with appropriate stuff"
   [handler]
   (fn [req]
-    (let [resp (handler req)]
-      (cond
-        :else {:status 200
-
-               :headers {"Content-Type" "application/json"}
-               :body resp})
-      )
+    (do-wrap-response handler req)
     )
   )
 
@@ -92,6 +100,54 @@
     (with-meta ret {::swagger (:definition context)})
     )
   )
+
+(defn- exception-to-string
+  "converts an Exception into a String"
+  [^Throwable e]
+
+
+  (str (.getMessage e) "\n"
+       (clojure.string/join "\n" (map (fn [^StackTraceElement ste] (.toString ste)) (.getStackTrace e))))
+
+  )
+
+(defn- handle-actual-request
+  ""
+  [^Class clz ^Constructor constructor ^Method apply-method logger
+   ^Class meta-clz
+   req]
+  (let [req-s (f-util/stringify-keys req)
+        _ (info (str "Req-s " req-s))
+        the-array (let [a ^"[Ljava.lang.Object;" (make-array Object 2)]
+                    (aset a 0 req-s)
+                    (aset a 1 logger)
+                    a
+                    )
+        context (.newInstance constructor the-array)
+        func-obj (.newInstance clz)
+        res (try
+              (.invoke apply-method func-obj
+                       (into-array Object [req-s context]))
+              (catch Exception e {::exception e})
+              )
+        ]
+
+    (info "Res is " res)
+
+    (cond
+      (and (map? res) (::exception res))
+      {:status 500 :body (exception-to-string (::exception res)) ::raw true}
+
+      (and res (.isInstance meta-clz res))
+      {:status 500 :body "FIXME -- deal with metaresponse" ::raw true}
+
+      :else
+      (try (.writeValueAsString (ObjectMapper.) res)
+           (catch Exception e {:status 500 ::raw true :body (exception-to-string e)}))
+      )
+
+
+    ))
 
 (defn- resolve-stuff
   "Given a ::jar-info and a "
@@ -107,27 +163,10 @@
 
           logger (.invoke new-logger-meth nil (into-array Object [op-id]))
           ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
+          meta-clz (.loadClass ^ClassLoader classloader "funcatron.intf.MetaResponse")
           ^Constructor constructor (first (.getConstructors ctx-clz))]
 
-      (fn [req]
-        (let [req-s (f-util/stringify-keys req)
-              the-array (let [a ^"[Ljava.lang.Object;" (make-array Object 2)]
-                          (aset a 0 req-s)
-                          (aset a 1 logger)
-                          a
-                          )
-              context (.newInstance constructor the-array)
-              func-obj (.newInstance clz)
-              ]
-
-          (.writeValueAsString (ObjectMapper.)
-                               (.invoke apply-method func-obj
-                                        (into-array Object [req-s context])))
-          )
-        )
-      )
-
-    )
+      (fn [req] (handle-actual-request clz constructor apply-method logger meta-clz req))))
 
 (defn make-app
     [the-jar]
@@ -146,6 +185,8 @@
   [^Router$Message message the-app reply?]
   (let [ring-req (f-util/make-ring-request message)
         resp (the-app ring-req)]
+
+    (info "Resp is " resp)
 
     (when (and reply? (.replyTo message))
       (let [body (:body resp)
@@ -177,8 +218,3 @@
          (route-to-jar message the-app reply?))))))
 
 
-(defn qq
-  []
-  (->  "resources/test.jar"
-       jar-info-from-file
-       update-jar-info-with-swagger))

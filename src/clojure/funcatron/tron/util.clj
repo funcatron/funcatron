@@ -350,9 +350,12 @@
   "Tries to figure out the file type and then comb through it to figure out the Swagger file and the file type"
   [^File file]
   (or
-    (try (let [ret (get-swagger-from-jar (JarFile. file))]
-           {:type :jar :swagger (keywordize-keys ret)})
-         (catch Exception e nil))))
+    (try
+      (let [ret (get-swagger-from-jar (JarFile. file))]
+        (if ret
+          {:type :jar :swagger (keywordize-keys ret)}
+          (.delete file)))
+      (catch Exception e nil))))
 
 
 (defn ^"[B" transit-encode
@@ -539,3 +542,57 @@
             :thread-cpu-sec    (/ cpu 1000000000.0)
             :thread-clock-sec  (/ clock 1000000000.0)
             })))
+
+(defn tron-mode?
+  "Calculates if we're in Tron mode from options"
+  [opts]
+  (boolean (-> opts :options :tron)))
+
+(defn dev-mode?
+  "Calculates if we're in Dev mode from options"
+  [opts]
+  (boolean (-> opts :options :devmode)))
+
+(defn runner-mode?
+  "Calculates if we're in Dev mode from options"
+  [opts]
+  (boolean (-> opts :options :runner)))
+
+(defn compute-host-and-port
+  "Computes the hostname and port -- FIXME this should be pluggable for Mesos deploys and such"
+  [opts]
+  (let [port (if (runner-mode? opts) 4000 3000)]
+    {:host
+     (or
+       (-> opts :options :web_address)
+       (and
+         (get (System/getenv) "MESOS_CONTAINER_NAME")
+         (get (System/getenv) "HOST"))
+
+       "localhost")
+     :port
+     (or
+       (-> opts :options :web_port)
+       (try
+         (and
+           (get (System/getenv) "MESOS_CONTAINER_NAME")
+           (let [x (read-string (get (System/getenv) (str "PORT_" port)))]
+             (if (integer? x) x nil)
+             ))
+         (catch Exception _ nil))
+       port)})
+  )
+
+(defn square-numbers
+  "Takes a map. For each key that has a value that's a number, create key-sq with the squared number.
+  For non-number values, drop them"
+  [m]
+  (into {}
+        (mapcat
+          (fn [[k v]]
+            (if (number? v)
+              (let [the-ns (if (keyword? k) (namespace k) nil)
+                    kwd (fn [x] (keyword the-ns x))]
+                [[k v] [(-> k name (str "-sq") kwd) (* v v)]])
+              nil))
+          m)))

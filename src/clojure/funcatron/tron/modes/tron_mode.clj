@@ -31,42 +31,17 @@
           {}
           (remove #(> too-old (:last-seen (second %))) cur))))))
 
-
-(defn- my-hostname
-  "Computes the hostname and port -- FIXME this should be pluggable for Mesos deploys and such"
-  [{:keys [::opts]}]
-  {:host
-   (or
-     (-> opts :options :web_address)
-     (and
-       (get (System/getenv) "MESOS_CONTAINER_NAME")
-       (get (System/getenv) "HOST"))
-
-     "localhost")
-   :port
-   (or
-     (-> opts :options :web_port)
-     (try
-       (and
-         (get (System/getenv) "MESOS_CONTAINER_NAME")
-         (let [x (read-string (get (System/getenv) "PORT_3000"))]
-           (if (integer? x) x nil)
-           ))
-       (catch Exception _ nil))
-     3000)}
-  )
-
 (defn- send-host-info
   "Sends a message about host information... how to HTTP to Tron"
-  [dest {:keys [::queue] :as state}]
+  [dest {:keys [::queue ::opts] :as state}]
   (.sendMessage
     ^MessageBroker queue
     dest
     {:content-type "application/json"}
-    {:action      "tron-info"
-     :msg-id      (fu/random-uuid)
-     :tron-host (my-hostname state)
-     :at          (System/currentTimeMillis)
+    {:action    "tron-info"
+     :msg-id    (fu/random-uuid)
+     :tron-host (fu/compute-host-and-port opts)
+     :at        (System/currentTimeMillis)
      })
   )
 
@@ -74,7 +49,7 @@
   "Tell the target to service all func bundles.
   This is a HACK that needs some FIXME logic to
   choose which runners run which bundles"
-  [runner {:keys [::route-map ::queue] :as state}]
+  [runner {:keys [::route-map ::queue ::opts] :as state}]
   (let [message-queue queue]
     (doseq [{:keys [queue host path sha]} @route-map]
       (.sendMessage
@@ -82,13 +57,13 @@
         runner
         {:content-type "application/json"}
         {:action    "associate"
-         :tron-host (my-hostname state)
+         :tron-host (fu/compute-host-and-port opts)
          :msg-id    (fu/random-uuid)
          :at        (System/currentTimeMillis)
          :sha       sha
-         :queue queue
-         :host host
-         :path path})))
+         :queue     queue
+         :host      host
+         :path      path})))
 
   )
 
@@ -108,13 +83,18 @@
           (error e "Failed to load route map")
           [])))))
 
+(defn- clean-queue-name
+  "Take a base-64 encoded sha and turn it into a valid RabbitMQ name"
+  [^String s]
+  (clojure.string/join (take 16 (filter #(Character/isJavaLetterOrDigit %) s))))
+
 (defn route-to-sha
   "Get a SHA for the route"
   [host path]
   (-> (str host ";" path)
       fu/sha256
       fu/base64encode
-      URLEncoder/encode))
+      clean-queue-name))
 
 (defn- add-to-route-map
   "Adds a route to the route table"
@@ -183,7 +163,7 @@
      {:content-type "application/json"}
      {:action "route"
       :msg-id (fu/random-uuid)
-      :routes @route-map
+      :routes (or @route-map [])
       :at     (System/currentTimeMillis)
       })))
 
@@ -244,7 +224,7 @@
                       :host     host
                       :route    basePath
                       :swagger  swagger
-                      :sha   sha}})
+                      :sha      sha}})
           {:status 400
            :body   {:accepted false
                     :error    "Could not determine the file type"}})))
@@ -306,9 +286,9 @@
   "Pass in the state object and get a list of func bundles"
   [{:keys [::bundles]}]
   (map (fn [[k {{:keys [host basePath]} :swagger}]]
-         {:sha k
-          :host   host
-          :path   basePath})
+         {:sha  k
+          :host host
+          :path basePath})
        @bundles))
 
 (defn- get-known-funcs
@@ -331,10 +311,10 @@
   (let [sha (-> req :params :sha)]
     (if-let [{:keys [file]} (get @bundles sha)]
       {:status 200
-       :body (clojure.java.io/input-stream file)}
+       :body   (clojure.java.io/input-stream file)}
 
       {:status 404
-       :body (str "No func bundle with sha " sha " found")}
+       :body   (str "No func bundle with sha " sha " found")}
       )
     )
   )
@@ -342,14 +322,14 @@
 (defn tron-routes
   "Routes for Tron"
   [state]
-  (->   (routes
-          (POST "/api/v1/enable" req (enable-func req state))
-          (POST "/api/v1/disable" req (disable-func req state))
-          (GET "/api/v1/stats" req (get-stats req state))
-          (GET "/api/v1/known_funcs" req (get-known-funcs req state))
-          (GET "/api/v1/bundle/:sha" req (return-sha req state) )
-          (POST "/api/v1/add_func"
-                req (upload-func-bundle req state)))
+  (-> (routes
+        (POST "/api/v1/enable" req (enable-func req state))
+        (POST "/api/v1/disable" req (disable-func req state))
+        (GET "/api/v1/stats" req (get-stats req state))
+        (GET "/api/v1/known_funcs" req (get-known-funcs req state))
+        (GET "/api/v1/bundle/:sha" req (return-sha req state))
+        (POST "/api/v1/add_func"
+              req (upload-func-bundle req state)))
       wrap-json-response
       (rm-json/wrap-json-params)))
 
@@ -369,16 +349,16 @@
 (defn- send-func-bundles
   "Send a list of the Func bundles to the Runner as well
   as the host and port for this instance"
-  [destination {:keys [::queue] :as state}]
+  [destination {:keys [::queue ::opts] :as state}]
   (.sendMessage
     ^MessageBroker queue
     destination
     {:content-type "application/json"}
-    {:action  "all-bundles"
-     :tron-host (my-hostname state)
-     :msg-id  (fu/random-uuid)
-     :at      (System/currentTimeMillis)
-     :bundles (bundles-from-state state)
+    {:action    "all-bundles"
+     :tron-host (fu/compute-host-and-port opts)
+     :msg-id    (fu/random-uuid)
+     :at        (System/currentTimeMillis)
+     :bundles   (bundles-from-state state)
      }))
 
 (defmethod dispatch-tron-message "awake"
@@ -418,7 +398,7 @@
       (let [body (.body msg)
             body (fu/keywordize-keys body)]
         (try
-          (info (str "Got message. Action " (:action body) " from " (:from body)))
+          (trace (str "Got message. Action " (:action body) " from " (:from body)))
           (dispatch-tron-message body msg state)
           (catch Exception e (error e (str "Failed to dispatch message: " body))))))))
 
@@ -451,20 +431,46 @@
                ::route-map            route-map}
         ]
 
-    (reset! bundles (common/load-func-bundles (common/calc-storage-directory opts))) ;; load the bundles
-    (reset! route-map (try-to-load-route-map opts @bundles))
 
     (add-watch route-map state routes-changed)
 
     (let [ret (reify Lifecycle
                 (startLife [_]
                   (info (str "Starting Tron lifecycle"))
+
+                  (reset! bundles (common/load-func-bundles (common/calc-storage-directory opts))) ;; load the bundles
+
+                  (info (str "Loaded bundles... " (count @bundles)))
+
+                  (reset! route-map (try-to-load-route-map opts @bundles))
+
+
+                  (let [{:keys [host port]} (fu/compute-host-and-port opts)]
+                    (info (str "Tron running at host " host " and port " port))
+
+                    (info (str "Upload a Func Bundle: wget -O - --post-file=THE_UBERJAR http://" host ":" port "/api/v1/add_func\n"))
+
+                    (info (str "List known Func Bundles: curl http://"
+                               host
+                               ":"
+                               port
+                               "/api/v1/known_funcs"))
+
+                    (info (str "Enable a Func Bundle: curl -H \"Content-Type: application/json\" -d '{\"sha\":\"THE-SHA-HERE\"}' -X POST http://"
+                               host
+                               ":"
+                               port
+                               "/api/v1/enable"))
+
+
+                    )
+
                   (reset! shutdown-http-server (fu/start-http-server opts (build-handler-func state)))
                   (shared-b/listen-to-queue
                     queue
                     (common/tron-queue)
                     (partial handle-tron-messages state))
-                    )
+                  )
 
                 (endLife [_]
                   (info (str "Ending Tron Lifecycle"))

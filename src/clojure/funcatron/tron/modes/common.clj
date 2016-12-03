@@ -26,21 +26,22 @@
 
         {:keys [type, swagger] {:keys [host, basePath]} :swagger :as file-info}
         (fu/find-swagger-info file)]
-    {:sha sha
-     :type type
-     :swagger swagger
-     :host host
-     :basePath basePath
-     :file-info file-info}
+    (when file-info
+      {:sha       sha
+       :type      type
+       :swagger   swagger
+       :host      host
+       :basePath  basePath
+       :file-info file-info})
     ))
 
 
 (defn get-bundle-info
   "Returns the sha info and the swagger info for the file if it's a valid Func Bundle"
   [^File file]
-  (let [{:keys [sha type swagger file-info]} (sha-and-swagger-for-file file)]
-    (if (and type file-info)
-      [sha {:file file :swagger swagger}])))
+  (let [{:keys [sha type swagger file-info] :as info} (sha-and-swagger-for-file file)]
+    (if (and type file-info (:basePath swagger))
+      [sha {:file file :swagger swagger :info info}])))
 
 (defn load-func-bundles
   "Reads the func bundles from the storage directory"
@@ -53,25 +54,6 @@
           (filter
             boolean
             (for [file files] (get-bundle-info file))))))
-
-
-#_(defn connect-to-message-queue
-  "Connect to the message queue and deal with messages via `handler`"
-  [opts ^String listen-to handler]
-  (let [queue (shared-b/wire-up-queue opts)
-        end-func
-        (shared-b/listen-to-queue
-          queue
-          listen-to
-          (fn [msg]
-            (fu/run-in-pool (fn [] (handler msg)))))]
-
-    {::queue queue
-     ::end-func end-func}
-
-    )
-  )
-
 
 (defn tron-queue
   "Compute the name of the tron queue"

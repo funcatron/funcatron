@@ -103,14 +103,17 @@
         (info (str "Options:\n" (:summary opts)))
         (fu/graceful-exit 0))
 
-      (-> opts :options :devmode)
+      (fu/dev-mode? opts)
       (shimmy/start-dev-server)
 
-      (-> opts :options :tron)
-      (let [server (tronny/build-tron-from-opts opts)]
-        (.startLife server))
+      (fu/tron-mode? opts)
+      (do
+        (info "Starting Tron mode")
+        (info "")
+        (let [server (tronny/build-tron-from-opts opts)]
+          (.startLife server)))
 
-      (-> opts :options :runner)
+      (fu/runner-mode? opts)
       (let [server (runny/build-runner-from-opts opts)]
         (.startLife server)))))
 

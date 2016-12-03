@@ -8,9 +8,9 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [funcatron.tron.options :as opts]
+            [funcatron.tron.routers.jar-router :as jarjar]
             [clojure.java.io :as cio])
-  (:import (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker Lifecycle)
-           (java.util Date)
+  (:import (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker Lifecycle Router)
            (java.net URLEncoder)
            (java.io File)))
 
@@ -24,88 +24,88 @@
 (defn- handle-http-request
   "Take an HTTP request from a frontend, run it through
   the Java function, and package the response..."
-  [state sha ^MessageBroker$ReceivedMessage msg]
+  [{:keys [::stats]} sha ^Router router ^MessageBroker$ReceivedMessage msg]
 
-  (let [msg-body (-> msg .body fu/kebab-keywordize-keys)]
+  (println "\n\nGot an HTTP request\n\n")
 
-    ;; FIXME yeah... this is a hack... we need to run the request like in dev_mode
-    (let [queue (queue-from-state state)]
-      (.sendMessage
-        queue
-        (:reply-queue msg-body)
-        {:content-type "application/json"}
-        {:action     "answer"
-         :msg-id     (fu/random-uuid)
-         :request-id (:reply-to msg-body)
-         :answer     {:headers
-                              [["Content-Type" "text/html"]]
-                      :status 200
-                      :body
-                              (fu/base64encode (str "<html><head><title>" sha " </title></head>
-                <body>
-                Hello World... sha " sha " at " (Date.)
-                                                    "
+  (let [router-msg (.brokerMessageToRouterMessage router msg)
+        res
+        (fu/time-execution
+          (.routeMessage router router-msg))
+        res (dissoc res :value :exception)
+        res (fu/square-numbers res)
+        res (assoc res :cnt 1)
+        ]
 
-                  </body>
-                  </html>"))}
-         :at         (System/currentTimeMillis)
-         }
-
-        )))
-  )
+    (swap! stats (fn [m]
+                   (->
+                     m
+                     (update sha merge-with + res)
+                     (update {:sha sha
+                              :uri (.uri router-msg)
+                              :method (.method router-msg)}
+                             merge-with + res))))))
 
 (defn- load-sha-and-then
   "If the SHA of the func bundle is not known, get it from the Tron and then execute the function"
   [sha {:keys [::func-bundles ::keep-running ::tron-host ::opts] :as state} the-func]
-  (let [do-run (fn [] (when @keep-running (the-func)))]
-    (if (contains? @func-bundles sha)
+  (let [do-run (fn [the-file] (when @keep-running (the-func the-file)))]
+    (if-let [{:keys [file]} (get @func-bundles sha)]
       ;; okay, we've got the sha already, so just do what we've gotta do
-      (do-run)
+      (do
+        (do-run file))
 
       ;; whoops... we've gotta ask the Tron for the func bundle
-      (http/get
+      (do
+        (http/get
 
-        ;; get the bundle
-        (str "http://" (:host tron-host)
-                     ":" (:port tron-host)
-                     "/api/v1/bundle/"
-                     (URLEncoder/encode sha))
-        ;; as a stream
-        {:as :stream}
+          ;; get the bundle
+          (str "http://" (:host @tron-host)
+               ":" (:port @tron-host)
+               "/api/v1/bundle/"
+               (URLEncoder/encode sha))
+          ;; as a stream
+          {:as :stream}
 
-        ;; the async call-back
-        (fn [{:keys [status body error]}]
-          (if (or error (not (= 200 status)))
-            ;; something went wrong...
-            (error (str "Failed to load func bundle with sha " sha "error " error " status " status))
+          ;; the async call-back
+          (fn [{:keys [status body error]}]
+            (if (or error (not (= 200 status)))
+              ;; something went wrong...
+              (error (str "Failed to load func bundle with sha " sha "error " error " status " status))
 
-            ;; save the bundle, update the table, and then execute the functions
-            (try
-              (let [dir (common/calc-storage-directory opts)
-                    file (File. dir (str (System/currentTimeMillis)
-                                         "-"
-                                         (URLEncoder/encode sha) ".funcbundle"))]
-                (cio/copy body file)
-                (when-let [[sha info] (common/get-bundle-info file)]
-                  (swap! func-bundles assoc sha info)
-                  (do-run)))
-              (catch Exception e (error e (str "Failed to load func bundle with sha " sha))))))))))
+              ;; save the bundle, update the table, and then execute the functions
+              (try
+                (let [dir (common/calc-storage-directory opts)
+                      file (File. dir (str (System/currentTimeMillis)
+                                           "-"
+                                           (URLEncoder/encode sha) ".funcbundle"))]
+                  (cio/copy body file)
+                  (when-let [[sha info] (common/get-bundle-info file)]
+                    (swap! func-bundles assoc sha info)
+                    (do-run file)))
+                (catch Exception e (error e (str "Failed to load func bundle with sha " sha)))))))))))
 
 (defn- send-ping
   "Sends a ping to the Tron"
-  [state]
+  [{:keys [::stats] :as state}]
 
-  (.sendMessage
-    (queue-from-state state)
-    (common/tron-queue)
-    {:content-type "application/json"}
-    {:action "heartbeat"
-     :msg-id (fu/random-uuid)
-     :from   (::uuid state)
-     :type   "runner"
-     :routes (map (fn [[_ v]] (dissoc v :end-func)) (-> state ::routes deref))
-     :at     (System/currentTimeMillis)
-     }))
+
+
+  (let [cur-stats @stats]
+    (reset! stats {})
+
+    (.sendMessage
+      (queue-from-state state)
+      (common/tron-queue)
+      {:content-type "application/json"}
+      {:action "heartbeat"
+       :msg-id (fu/random-uuid)
+       :from   (::uuid state)
+       :type   "runner"
+       :stats  cur-stats
+       :routes (map (fn [[_ v]] (dissoc v :end-func :router)) (-> state ::routes deref))
+       :at     (System/currentTimeMillis)
+       })))
 
 (defmulti dispatch-runner-message
           "Dispatch the incoming message"
@@ -130,7 +130,7 @@
             (load-sha-and-then
               sha
               state
-              identity))))))
+              (fn [& _])))))))
   )
 
 (defmethod dispatch-runner-message "die"
@@ -159,22 +159,25 @@
   (load-sha-and-then
     sha
     state
-    (fn []
-      (let [end-func
+    (fn [file]
+      (let [router (jarjar/build-router file true)
+            end-func
             (shared-b/listen-to-queue
               message-queue queue
               (fn [msg]
                 (fu/run-in-pool
                   (fn [] (handle-http-request
                            state
-                           sha
+                           queue
+                           router
                            msg)))))]
         (swap! routes assoc queue
-               {:end-func   end-func
-                :queue queue
-                :host       host
-                :path   path
-                :sha     sha})
+               {:end-func end-func
+                :queue    queue
+                :host     host
+                :router   router
+                :path     path
+                :sha      sha})
         (fu/run-in-pool (fn [] (send-ping state)))
         ))))
 
@@ -246,7 +249,7 @@
          routes (atom {})
          tron-host (atom nil)
          this (atom nil)
-
+         stats (atom {})
          my-uuid (str "RU-" (fu/random-uuid))
 
          state {
@@ -255,7 +258,8 @@
                 ::keep-running  keep-running
                 ::routes        routes
                 ::this          this
-                ::tron-host tron-host
+                ::stats         stats
+                ::tron-host     tron-host
                 ::uuid          my-uuid}
          ]
 
@@ -280,8 +284,9 @@
              (allInfo [_] {::message-queue queue
                            ::func-bundles  @func-bundles
                            ::routes        @routes
-                           ::tron-host @tron-host
+                           ::tron-host     @tron-host
                            ::this          @this
+                           ::stats @stats
                            ::uuid          my-uuid})
              )]
        (reset! this ret)
