@@ -1,8 +1,7 @@
 package funcatron.intf;
 
-import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
+import java.util.logging.Logger;
 
 /**
  * The context of a Function Application

@@ -2,15 +2,15 @@ package funcatron.intf;
 
 import funcatron.intf.impl.ContextImpl;
 import org.junit.Test;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
 
 public class FuncTest {
-    Func<Map, Map> theFunc = new Func<Map, Map>() {
+    Func<Map> theFunc = new Func<Map>() {
 
         /**
          * For each incoming request, a new `Func` instance is created and the `apply`
@@ -35,7 +35,7 @@ public class FuncTest {
          * @return
          */
         @Override
-        public Map apply(Map req, Context context) {
+        public Object apply(Map req, Context context) {
             Map myMap = new HashMap(req);
             myMap.put("Name", context.getRequestParams().get("query").get("name"));
             return myMap;
@@ -65,7 +65,7 @@ public class FuncTest {
     }
 
     private Context newContext() {
-        return new ContextImpl(buildContextMap(), LoggerFactory.getLogger("test"));
+        return new ContextImpl(buildContextMap(), Logger.getLogger("test"));
     }
 
     @Test
@@ -74,7 +74,7 @@ public class FuncTest {
             put("snark", 33);
         }};
 
-        Map toTest = theFunc.apply(in, newContext());
+        Map toTest = (Map) theFunc.apply(in, newContext());
 
         assertEquals(toTest, new HashMap(in) {{
             put("Name", "Archer");

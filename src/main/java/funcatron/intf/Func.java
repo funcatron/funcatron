@@ -3,7 +3,7 @@ package funcatron.intf;
 /**
  * Implement this Interface for a Funcatron Endpoint.
  */
-public interface Func<Request, Response> {
+public interface Func<Request> {
     /**
      * For each incoming request, a new `Func` instance is created and the `apply`
      * method is invoked.
@@ -20,6 +20,7 @@ public interface Func<Request, Response> {
      * Regardless of the declared return type, here's the translation:
      * byte[] or String -- passed back
      * Node or Document -- considered XML, serialized to bytes accordingly
+     * Map or anything that's not listed -- JSON serialize
      * MetaResponse -- the contents of this object will determine the response
      *
      * @param req the incoming request. `null` if the request is a GET or DELETE
@@ -27,5 +28,5 @@ public interface Func<Request, Response> {
      * @param context
      * @return
      */
-    Response apply(Request req, Context context);
+    Object apply(Request req, Context context);
 }

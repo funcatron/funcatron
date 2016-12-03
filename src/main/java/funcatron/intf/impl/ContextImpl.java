@@ -1,9 +1,9 @@
 package funcatron.intf.impl;
 
 import funcatron.intf.Context;
-import org.slf4j.Logger;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * An implementation of Context so the Context Object associated with the classloader can be loaded
@@ -86,5 +86,13 @@ public class ContextImpl implements Context {
     @Override
     public String getMethod() {
         return (String) data.get("method");
+    }
+
+    /**
+     * Return version information so the Runner can do the right thing
+     * @return version information so the Runner can do the right thing
+     */
+    public static String getVersion() {
+        return "1";
     }
 }
