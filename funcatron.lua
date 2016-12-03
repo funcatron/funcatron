@@ -182,8 +182,8 @@ funcatron.response_table = {}
 funcatron.routing_table = {}
 
 response_handlers["route"] = function(msg)
-   ngx.log(ngx.ALERT, "Deploying new route table.")
-   funcatron.routing_table = msg.routes
+   ngx.log(ngx.ALERT, "Deploying new route table... " .. cjson.encode(msg))
+   funcatron.routing_table = msg.routes or {}
 end
 
 response_handlers["tron-info"] = function(msg)

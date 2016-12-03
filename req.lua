@@ -78,6 +78,8 @@ if err then
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
+ngx.log(ngx.ALERT, "Sending to queue " .. target_queue)
+
 local ok, err = rabbit:send(msg, headers)
 
 if err then
