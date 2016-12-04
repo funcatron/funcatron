@@ -11,7 +11,7 @@ import java.util.Random;
 /**
  * Returns a simple Map
  */
-public class SimpleGet implements Func<Object, Map<String, Object>> {
+public class SimpleGet implements Func<Object> {
 
     public Map<String, Object> apply(Object o, Context c) {
 
@@ -19,7 +19,7 @@ public class SimpleGet implements Func<Object, Map<String, Object>> {
         Map<String, Object> ret = new HashMap<>();
 
         // get the optional num param
-        Object num = c.getRequestParams().get("params").get("num");
+        Object num = c.getMergedParams().get("num");
 
         // if we've got one, put it in the 'num-param' field
         if (null != num) {
@@ -27,7 +27,7 @@ public class SimpleGet implements Func<Object, Map<String, Object>> {
         }
 
         // populate a bunch of other values
-        ret.put("query-params", c.getRequestParams().get("query"));
+        ret.put("query-params", c.getRequestInfo().get("query-params"));
         ret.put("time", (new Date()).toString());
         ret.put("bools",true);
         ret.put("numero", (new Random()).nextDouble());

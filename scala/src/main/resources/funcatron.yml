@@ -87,10 +87,27 @@ paths:
           type: integer
           format: int64
       responses:
-        "204":
+        "200":
           description: thing deleted
           schema:
             $ref: '#/definitions/Data'
+    get:
+      description: trigger and error
+      operationId: funcatron.scala_sample.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: some random number
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: thing deleted
+          schema:
+            $ref: '#/definitions/Data'
+        default:
+           description: Error
 definitions:
   Simple:
     required:

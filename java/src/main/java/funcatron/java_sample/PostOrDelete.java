@@ -1,19 +1,22 @@
 package funcatron.java_sample;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import funcatron.intf.Context;
 import funcatron.intf.Func;
 import funcatron.intf.MetaResponse;
 
-import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * A class that handles POST or DELETE
  */
-public class PostOrDelete implements Func<Data, Object> {
+public class PostOrDelete implements Func<Data> {
+
+    private static final ObjectMapper jackson = new ObjectMapper();
+
     @Override
     public Object apply(Data data, Context context) {
         Number cnt = (Number) context.getRequestParams().get("path").get("cnt");
@@ -34,26 +37,26 @@ public class PostOrDelete implements Func<Data, Object> {
                     return 400;
                 }
 
-                @Override
-                public Map<String, String> getHeaders() {
-                    return new HashMap<>();
-                }
-
-                @Override
-                public boolean isLargeBody() {
-                    return false;
-                }
+                public String getContentType() {return "text/plain";}
 
                 @Override
                 public byte[] getBody() {
                     return ("Expecting a POST or DELETE, but got " + context.getMethod()).getBytes();
                 }
-
-                @Override
-                public void writeBody(OutputStream outputStream) {
-
-                }
             };
         }
+    }
+
+    /**
+     * A function that will take the JSON data in a Map and convert it
+     * into a Request object. This is a good place to set up a Jackson
+     * parser with custom Jackson stuff rather than relying on the bare
+     * bones Jackson parser in the Runner.
+     *
+     * @return a customer JSON to Object parser or null if Funcatron should use the default Jackson implementation
+     */
+   @Override
+    public Function<Map<String, Object>, Data> jsonDecoder() {
+       return m -> jackson.convertValue(m, Data.class);
     }
 }
