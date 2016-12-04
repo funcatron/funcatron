@@ -59,6 +59,7 @@ local headers =
       ["x-server-addr"]=ngx.var.server_addr,
       ["x-request-uri"]=ngx.var.request_uri,
       ["x-scheme"]=ngx.var.scheme,
+      ["x-reply-queue"] = funcatron.instance_uuid,
       ["x-uri-args"]=ngx.var.args,
       ["x-request-id"]=ngx.var.request_id}
 
