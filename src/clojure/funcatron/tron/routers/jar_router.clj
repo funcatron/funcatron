@@ -10,14 +10,16 @@
             [io.sarnowski.swagger1st.util.security :as s1stsec]
             [cheshire.core :as json]
             [funcatron.tron.util :as fu])
-  (:import (java.util.jar JarFile JarEntry)
-           (java.io File InputStream)
+  (:import (java.util.jar JarFile)
+           (java.io File InputStream ByteArrayOutputStream ByteArrayInputStream)
            (java.net URLClassLoader URL)
-           (java.lang.reflect Method Constructor)
-           (com.fasterxml.jackson.databind ObjectMapper)
+           (java.lang.reflect Method Constructor InvocationTargetException AnnotatedType ParameterizedType)
            (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)
-           (java.util Base64)))
+           (java.util Base64 Map$Entry)
+           (java.util.logging Logger)
+           (org.w3c.dom Node)
+           (java.util.function Function)))
 
 
 (set! *warn-on-reflection* true)
@@ -71,19 +73,57 @@
     (assoc jar-info ::swagger swagger)
     ))
 
+(defn- ^String exception-to-string
+  "converts an Exception into a String"
+  [^Throwable e]
+
+  (if (and
+        (instance? InvocationTargetException e)
+        (.getCause e)
+        )
+    (exception-to-string (.getCause e))
+
+    (let [all-frames (.getStackTrace e)
+          [yes maybe] (split-with
+                        (fn [^StackTraceElement ste] (not= "jar_router.clj" (.getFileName ste)))
+                        all-frames)
+          to-show (concat yes (take 7 maybe))
+          ]
+      (str (.toString e) "\n"
+           (clojure.string/join "\n" (map
+                                       (fn [^StackTraceElement ste] (.toString ste))
+                                       to-show
+                                       )))))
+
+  )
+
 (defn- do-wrap-response
   "Split out so we can modify it"
   [handler req]
-  (let [resp (handler req)]
-    (cond
-      (::raw resp)
-      (dissoc resp ::raw)
 
-      :else {:status 200
+  (let [resp (try
+               (handler req)
+               (catch Exception e {:status 500
+                                   ::raw true
+                                   :body (exception-to-string e)
+                                   :headers {"content-type" "text/plain"}})
+               )
+        fixed (cond
+                (::raw resp)
+                (dissoc resp ::raw)
 
-             :headers {"Content-Type" "application/json"}
-             :body resp})
-    ))
+                :else {:status 200
+
+                       :headers {"Content-Type" "application/json"}
+                       :body resp})
+
+        ;; sneak byte array past the output formatters
+        fixed (if (instance? (Class/forName "[B") (:body fixed))
+                (assoc fixed ::byte-body (:body fixed))
+                fixed
+                )
+        ]
+    fixed))
 
 (defn wrap-response
   "A ring handler that wraps the response with appropriate stuff"
@@ -101,72 +141,147 @@
     )
   )
 
-(defn- exception-to-string
-  "converts an Exception into a String"
-  [^Throwable e]
 
 
-  (str (.getMessage e) "\n"
-       (clojure.string/join "\n" (map (fn [^StackTraceElement ste] (.toString ste)) (.getStackTrace e))))
+(defn- coerse-body-to
+  "Convert the body to the type"
+  [{:keys [body] :as req} ^Class clz inst ^Method get-decoder-method]
 
+  ;; FIXME deal with XML nodes
+  (cond
+    (nil? body)
+    body
+
+    (-> req :parameters :body)
+    (let [m (-> req :parameters :body first second fu/stringify-keys)]
+      (if-let [^Function decoder (.invoke get-decoder-method inst (make-array Class 0))]
+        (.apply decoder m)
+        (.convertValue fu/jackson-json m clz)))
+
+    :else
+    (let [
+          ^InputStream in
+          (cond
+            (instance? InputStream body)
+            body
+
+            (string? body)
+            (ByteArrayInputStream. (.getBytes ^String body "UTF-8"))
+
+            (instance? (Class/forName "[B") body)
+            (ByteArrayInputStream. ^"[B" body)
+
+            :else nil
+            )
+          ]
+      (if in (.readValue fu/jackson-json in clz) nil)
+      ))
   )
 
+(defn- or-empty-map
+  [v]
+  (or v {}))
+
 (defn- handle-actual-request
-  ""
-  [^Class clz ^Constructor constructor ^Method apply-method logger
+  "Handle the request. Split into its own function so we can modify behavior in the REPL"
+  [^Class clz ^Constructor constructor
+   ^Method apply-method
+   ^Method get-encoder-method
+   ^Method get-decoder-method
+   ^Class data-class
+   logger
    ^Class meta-clz
    req]
-  (let [req-s (f-util/stringify-keys req)
-        _ (info (str "Req-s " req-s))
-        the-array (let [a ^"[Ljava.lang.Object;" (make-array Object 2)]
-                    (aset a 0 req-s)
-                    (aset a 1 logger)
-                    a
-                    )
-        context (.newInstance constructor the-array)
+
+  (let [
+        req-s (let [body (:body req)]
+                (assoc
+                  (f-util/stringify-keys
+                    (-> req
+                        (dissoc :body)
+                        (update-in [:parameters :query] or-empty-map)
+                        (update-in [:parameters :body] or-empty-map)
+                        (update-in [:parameters :path] or-empty-map)
+                        ))
+                  "body"
+                  body))
+        context (.newInstance constructor (into-array Object [req-s logger]))
         func-obj (.newInstance clz)
+        param (coerse-body-to req
+                              data-class
+                              func-obj
+                              get-decoder-method
+                              )
         res (try
               (.invoke apply-method func-obj
-                       (into-array Object [req-s context]))
+                       (into-array Object [param context]))
               (catch Exception e {::exception e})
               )
         ]
 
-    (info "Res is " res)
-
     (cond
       (and (map? res) (::exception res))
-      {:status 500 :body (exception-to-string (::exception res)) ::raw true}
+      {:status 500 :headers {"content-type" "text/plain"}
+       :body (exception-to-string (::exception res)) ::raw true}
 
       (and res (.isInstance meta-clz res))
-      {:status 500 :body "FIXME -- deal with metaresponse" ::raw true}
+      (do
+        (let [^Iterable it res
+              res-as-map (into {} (map
+                                    (fn [^Map$Entry me] [(.getKey me) (.getValue me)])
+                                    (-> it .iterator iterator-seq)))
+
+              ]
+          {:status  (get res-as-map "responseCode")
+           :headers (merge (into {} (get res-as-map "headers"))
+                           {"content-type" (get res-as-map "contentType")})
+           :body    (get res-as-map "body")
+           ::raw    true}))
+
+      (instance? Node res)
+      {:status  200
+       :headers {"content-type" "text/xml"}
+       ::raw    true
+       :body    (fu/xml-to-utf-byte-array res)}
 
       :else
-      (try (.writeValueAsString (ObjectMapper.) res)
-           (catch Exception e {:status 500 ::raw true :body (exception-to-string e)}))
-      )
-
-
-    ))
+      (if-let [^Function encoder (.invoke get-encoder-method func-obj (object-array 0))]
+        (.apply encoder res)
+        (try
+          (.writeValueAsString fu/jackson-json res)
+          (catch Exception e {:status  500
+                              ::raw    true
+                              :headers {"content-type" "text/plain"}
+                              :body    (exception-to-string e)}))))))
 
 (defn- resolve-stuff
   "Given a ::jar-info and a "
-    [{:keys [::classloader]} req]
+    [{:keys [::classloader ::swagger]} req]
 
     (let [^String op-id (get req "operationId")
           clz (.loadClass ^ClassLoader classloader op-id)
-          ^Method apply-method (->> (.getMethods clz)
-                                    (filter #(= "apply" (.getName ^Method %)))
-                                    first)
-          lf-clz (.loadClass ^ClassLoader classloader "org.slf4j.LoggerFactory")
-          new-logger-meth (.getMethod lf-clz "getLogger" (into-array Class [String]))
-
-          logger (.invoke new-logger-meth nil (into-array Object [op-id]))
+          data-class (->>
+                       (.getAnnotatedInterfaces clz)
+                       (map #(.getType ^AnnotatedType %))
+                       (filter #(instance? ParameterizedType %))
+                       (filter #(.startsWith (.getTypeName ^ParameterizedType %) "funcatron.intf.Func<"))
+                       (mapcat #(.getActualTypeArguments ^ParameterizedType %))
+                       (filter #(instance? Class %))
+                       first)
+          ^Method apply-method (.getMethod clz "apply" (into-array Class [data-class
+                                                                          (.loadClass ^ClassLoader classloader
+                                                                                      "funcatron.intf.Context")]))
+          ^Method get-encoder-method (.getMethod clz "jsonEncoder" (make-array Class 0))
+          ^Method get-decoder-method (.getMethod clz "jsonDecoder" (make-array Class 0))
+          logger (Logger/getLogger (str "Funcatron " (:host swagger) "/" (:basePath swagger) ))
           ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
           meta-clz (.loadClass ^ClassLoader classloader "funcatron.intf.MetaResponse")
           ^Constructor constructor (first (.getConstructors ctx-clz))]
 
-      (fn [req] (handle-actual-request clz constructor apply-method logger meta-clz req))))
+      (fn [req] (handle-actual-request clz constructor apply-method
+                                       get-encoder-method get-decoder-method
+                                       data-class
+                                       logger meta-clz req))))
 
 (defn make-app
     [the-jar]
@@ -186,23 +301,45 @@
   (let [ring-req (f-util/make-ring-request message)
         resp (the-app ring-req)]
 
-    (info "Resp is " resp)
-
     (when (and reply? (.replyTo message))
-      (let [body (:body resp)
-            body (cond
-                   (instance? String body)
-                   (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
+      (let [resp (assoc resp :body (or (::byte-body resp) (:body resp)))
+            resp (dissoc resp ::byte-body)
+            body (:body resp)
+            resp
+            (try
+              (assoc resp
+                :body (cond
+                        (instance? String body)
+                        (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
 
-                   (instance? InputStream body)
-                   (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
+                        (instance? (Class/forName "[B") body)
+                        (String. (.encode (Base64/getEncoder) ^"[B" body) "UTF-8")
 
-                   :else
-                   (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
-                   )]
-        (.sendMessage (.messageBroker (.underlyingMessage message)) (.replyTo message) {}
-                      (.getBytes (json/generate-string (assoc resp :body body)) "UTF-8"))
-        ))
+
+                        (instance? InputStream body)
+                        (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
+
+                        :else
+                        (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
+                        ))
+              (catch Exception e {:status  500
+                                  :headers {"content-type" "text/plain"}
+                                  :body    (.encodeToString (Base64/getEncoder)
+                                                            (.getBytes
+                                                              (exception-to-string e)
+                                                              "UTF-8"))})
+              )]
+
+        (.sendMessage
+          (.messageBroker (.underlyingMessage message))
+          (.replyQueue message)
+          {:content-type "application/json"}
+          {:action     "answer"
+           :msg-id     (fu/random-uuid)
+           :request-id (.replyTo message)
+           :answer     resp
+           :at         (System/currentTimeMillis)
+           })))
 
     resp
     ))

@@ -448,15 +448,15 @@
                   (let [{:keys [host port]} (fu/compute-host-and-port opts)]
                     (info (str "Tron running at host " host " and port " port))
 
-                    (info (str "Upload a Func Bundle: wget -O - --post-file=THE_UBERJAR http://" host ":" port "/api/v1/add_func\n"))
+                    (info (str "Upload a Func Bundle: wget -q -O - --post-file=THE_UBERJAR http://" host ":" port "/api/v1/add_func\n"))
 
-                    (info (str "List known Func Bundles: curl http://"
+                    (info (str "List known Func Bundles: curl -v http://"
                                host
                                ":"
                                port
                                "/api/v1/known_funcs"))
 
-                    (info (str "Enable a Func Bundle: curl -H \"Content-Type: application/json\" -d '{\"sha\":\"THE-SHA-HERE\"}' -X POST http://"
+                    (info (str "Enable a Func Bundle: curl -v -H \"Content-Type: application/json\" -d '{\"sha\":\"THE-SHA-HERE\"}' -X POST http://"
                                host
                                ":"
                                port

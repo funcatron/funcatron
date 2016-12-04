@@ -7,15 +7,15 @@
                  [org.clojure/clojure "1.9.0-alpha14"]
                  [cheshire "5.6.3"]
                  ;; https://mvnrepository.com/artifact/io.sarnowski/swagger1st
-                 [io.sarnowski/swagger1st "0.21.0"]
+                 [org.zalando/swagger1st "0.24.0"]
                  [org.unix4j/unix4j-command "0.3"]
-                 [clj-logging-config/clj-logging-config "1.9.12"]
-                 [org.slf4j/slf4j-api "1.7.13"]
-                 [org.slf4j/jul-to-slf4j "1.7.13"]
-                 [org.slf4j/jcl-over-slf4j "1.7.13"]
-                 [org.apache.logging.log4j/log4j-api "2.4.1"]
-                 [org.apache.logging.log4j/log4j-core "2.4.1"]
-                 [org.apache.logging.log4j/log4j-slf4j-impl "2.4.1"]
+                 ;;[clj-logging-config/clj-logging-config "1.9.12"]
+                 ;;[org.slf4j/slf4j-api "1.7.13"]
+                 ;;[org.slf4j/jul-to-slf4j "1.7.13"]
+                 ;;[org.slf4j/jcl-over-slf4j "1.7.13"]
+                 ;;[org.apache.logging.log4j/log4j-api "2.4.1"]
+                 ;;[org.apache.logging.log4j/log4j-core "2.4.1"]
+                 ;;[org.apache.logging.log4j/log4j-slf4j-impl "2.4.1"]
                  ;; https://mvnrepository.com/artifact/commons-io/commons-io
                  [commons-io/commons-io "2.5"]
 
@@ -25,7 +25,13 @@
                  [http-kit "2.2.0"]
 
                  [ring "1.5.0"]
-                 [com.fasterxml.jackson.core/jackson-databind "2.6.3"]
+                 [com.fasterxml.jackson.core/jackson-databind "2.8.5"]
+                 [com.fasterxml.jackson.module/jackson-module-parameter-names "2.8.5"]
+                 [com.fasterxml.jackson.datatype/jackson-datatype-jdk8 "2.8.5"]
+                 [com.fasterxml.jackson.datatype/jackson-datatype-jsr310 "2.8.5"]
+
+
+
                  [dragonmark/util "0.1.3"]
 
                  ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-protobuf-client

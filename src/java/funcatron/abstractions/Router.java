@@ -34,6 +34,12 @@ public interface Router extends Function<MessageBroker.ReceivedMessage, Void> {
             return (String)  metadata().get("x-host");
         }
 
+        /**
+         * Get the name of the reply queue to send the message to
+         * @return the reply queue
+         */
+        default String replyQueue() {return (String) metadata().get("x-reply-queue");}
+
 
         /**
          * The uri header

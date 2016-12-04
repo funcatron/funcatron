@@ -26,8 +26,6 @@
   the Java function, and package the response..."
   [{:keys [::stats]} sha ^Router router ^MessageBroker$ReceivedMessage msg]
 
-  (println "\n\nGot an HTTP request\n\n")
-
   (let [router-msg (.brokerMessageToRouterMessage router msg)
         res
         (fu/time-execution
@@ -49,6 +47,7 @@
 (defn- load-sha-and-then
   "If the SHA of the func bundle is not known, get it from the Tron and then execute the function"
   [sha {:keys [::func-bundles ::keep-running ::tron-host ::opts] :as state} the-func]
+
   (let [do-run (fn [the-file] (when @keep-running (the-func the-file)))]
     (if-let [{:keys [file]} (get @func-bundles sha)]
       ;; okay, we've got the sha already, so just do what we've gotta do
@@ -83,7 +82,8 @@
                   (when-let [[sha info] (common/get-bundle-info file)]
                     (swap! func-bundles assoc sha info)
                     (do-run file)))
-                (catch Exception e (error e (str "Failed to load func bundle with sha " sha)))))))))))
+                (catch Exception e
+                  (error e (str "Failed to load func bundle with sha " sha)))))))))))
 
 (defn- send-ping
   "Sends a ping to the Tron"

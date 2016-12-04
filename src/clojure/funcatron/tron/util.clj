@@ -13,7 +13,7 @@
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID)
            (org.apache.commons.io IOUtils)
-           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream)
+           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream OutputStreamWriter)
            (com.fasterxml.jackson.databind ObjectMapper)
            (javax.xml.parsers DocumentBuilderFactory)
            (org.w3c.dom Node)
@@ -28,11 +28,22 @@
            (java.util.function Function)
            (funcatron.helpers Tuple2 Tuple3)
            (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)
-           (java.lang.management ManagementFactory ThreadMXBean RuntimeMXBean )
-           (com.sun.management OperatingSystemMXBean)))
+           (java.lang.management ManagementFactory ThreadMXBean RuntimeMXBean)
+           (com.fasterxml.jackson.module.paramnames ParameterNamesModule)
+           (com.fasterxml.jackson.datatype.jdk8 Jdk8Module)
+           (com.fasterxml.jackson.datatype.jsr310 JavaTimeModule)))
 
 
 (set! *warn-on-reflection* true)
+
+(def ^ObjectMapper jackson-json
+  "The Jackson JSON ObjectMapper"
+  (->
+    (.findAndRegisterModules (ObjectMapper.))
+    (.registerModule (ParameterNamesModule.))
+    (.registerModule (Jdk8Module.))
+    (.registerModule (JavaTimeModule.))
+    ))
 
 (defn walk
   "Walk Clojure data structures and 'do the right thing'"
@@ -142,10 +153,7 @@
 
 (defmethod fix-payload "application/json"
   [content-type ^"[B" bytes]
-  (let [jackson (ObjectMapper.)
-        info1 (keywordize-keys (.readValue jackson bytes Map))
-        ]
-    info1))
+  (keywordize-keys (.readValue jackson-json bytes Map)))
 
 (defmethod fix-payload "text/plain"
   [content-type ^"[B" bytes]
@@ -212,7 +220,7 @@
 (defn make-ring-request
   "Takes normalized request and turns it into a Ring style request"
   [^Router$Message req]
-  (let [headers (keywordize-keys (get (.body req) "headers"))
+  (let [headers (get (.body req) "headers")
         body (get (.body req) "body")
         body (cond
                (nil? body) nil
@@ -221,6 +229,7 @@
 
                :else nil
                )
+
         ret {:server-port    (.port req)
              :server-name    (.host req)
              :remote-addr    (.remoteAddr req)
@@ -596,3 +605,17 @@
                 [[k v] [(-> k name (str "-sq") kwd) (* v v)]])
               nil))
           m)))
+
+(defn ^"[B" xml-to-utf-byte-array
+  "Take XML and convert it into UTF-8 encoded byte array"
+  [^Node node]
+  (let [dom-source (DOMSource. node)
+        bos (ByteArrayOutputStream.)
+        out (OutputStreamWriter. bos)
+        transformer (-> (TransformerFactory/newInstance) .newTransformer)]
+    (.setOutputProperty transformer OutputKeys/INDENT "yes")
+    (.setOutputProperty transformer OutputKeys/ENCODING "UTF-8")
+    (.transform transformer dom-source (StreamResult. out))
+    (.close out)
+    (.toByteArray bos)))
+
