@@ -1,5 +1,10 @@
 package funcatron.intf;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 /**
  * Implement this Interface for a Funcatron Endpoint.
  */
@@ -29,4 +34,28 @@ public interface Func<Request> {
      * @return
      */
     Object apply(Request req, Context context);
+
+    /**
+     * A function that will take the JSON data in a Map and convert it
+     * into a Request object. This is a good place to set up a Jackson
+     * parser with custom Jackson stuff rather than relying on the bare
+     * bones Jackson parser in the Runner.
+     *
+     * @return a customer JSON to Object parser or null if Funcatron should use the default Jackson implementation
+     */
+    default Function<Map<String, Object>, Request> jsonDecoder() {
+        return null;
+    }
+
+
+    /**
+     * A customer object serializer that will take a return value and JSON serialize it as a byte array. This is
+     * a good place use a custom Jackson serializer. If null is returned, then use the default Funcatron Jackson
+     * implementation
+     *
+     * @return The object to JSON serializer or null if there's no customer serializer
+     */
+    default Function<Object, byte[]> jsonEncoder() {
+        return null;
+    }
 }

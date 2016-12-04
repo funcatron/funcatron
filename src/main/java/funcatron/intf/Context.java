@@ -36,6 +36,30 @@ public interface Context {
     Map<String, Map<String, Object>> getRequestParams();
 
     /**
+     * Get the Swagger-coerced query parameters
+     * @return the swagger-coerced query params
+     */
+    Map<String, Object> getQueryParams();
+
+    /**
+     * Get the Swagger-coerced path parameters
+     * @return the Swagger-coerced path parameters
+     */
+    Map<String, Object> getPathParams();
+
+    /**
+     * Get the Swagger-coerced body parameters
+     * @return the Swagger-coerced body parameters
+     */
+    Map<String, Object> getBodyParams();
+
+    /**
+     * The merged path and query params
+     * @return the merged path and query params
+     */
+    Map<String, Object> getMergedParams();
+
+    /**
      * The request scheme (e.g., http, https)
      *
      * @return the request scheme

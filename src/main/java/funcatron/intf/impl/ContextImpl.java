@@ -2,6 +2,7 @@ package funcatron.intf.impl;
 
 import funcatron.intf.Context;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -58,6 +59,66 @@ public class ContextImpl implements Context {
         return (Map<String, Map<String, Object>>) data.get("parameters");
     }
 
+
+    /**
+     * Get the Swagger-coerced path parameters
+     *
+     * @return the Swagger-coerced path parameters
+     */
+    @Override
+    public Map<String, Object> getPathParams() {
+        Map<String, Map<String, Object>> parameters = (Map<String, Map<String, Object>>) data.get("parameters");
+        if (null == parameters) parameters = new HashMap<>();
+        Map<String, Object> ret = parameters.get("path");
+        if (null == ret) ret = new HashMap<>();
+        return ret;
+    }
+
+    /**
+     * Get the Swagger-coerced body parameters
+     *
+     * @return the Swagger-coerced body parameters
+     */
+    @Override
+    public Map<String, Object> getBodyParams() {
+        Map<String, Map<String, Object>> parameters = (Map<String, Map<String, Object>>) data.get("parameters");
+        if (null == parameters) parameters = new HashMap<>();
+        Map<String, Object> ret = parameters.get("body");
+        if (null == ret) ret = new HashMap<>();
+        return ret;
+    }
+
+    /**
+     * The merged path and query params
+     *
+     * @return the merged path and query params
+     */
+    @Override
+    public Map<String, Object> getMergedParams() {
+        Map<String, Object> path = getPathParams();
+        Map<String, Object> query = getQueryParams();
+        HashMap<String, Object> ret = new HashMap<>();
+
+        path.forEach((k,v) -> ret.put(k,v));
+        query.forEach((k,v) -> ret.put(k,v));
+
+        return ret;
+    }
+
+    /**
+     * Get the Swagger-coerced query parameters
+     * @return the swagger-coerced query params
+     */
+    @Override
+    public Map<String, Object> getQueryParams() {
+        Map<String, Map<String, Object>> parameters = (Map<String, Map<String, Object>>) data.get("parameters");
+        if (null == parameters) parameters = new HashMap<>();
+        Map<String, Object> ret = parameters.get("query");
+        if (null == ret) ret = new HashMap<>();
+        return ret;
+    }
+
+
     /**
      * The request scheme (e.g., http, https)
      *
@@ -85,7 +146,7 @@ public class ContextImpl implements Context {
      */
     @Override
     public String getMethod() {
-        return (String) data.get("method");
+        return (String) data.get("request-method");
     }
 
     /**
