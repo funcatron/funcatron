@@ -1,6 +1,8 @@
 package funcatron.intf;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -79,5 +81,39 @@ public interface Context {
      * @return the method
      */
     String getMethod();
+
+
+    /**
+     * The name of the services available via this context
+     * @return the name of the services available
+     */
+    Set<String> services();
+
+    /**
+     * Get the service for the given name
+     * @param name the name of the service
+     * @return If the service exists, return
+     */
+    Optional<ServiceVendor<?>> serviceForName(String name);
+
+    default <T> Optional<ServiceVendor<T>> serviceForName(String name, Class<T> clz) {
+        return this.serviceForName(name).filter(a -> a.ofType(clz)).map(a -> (ServiceVendor<T>) a);
+    }
+
+    /**
+     * Vend the named item for the type. E.g., `vendForName("database", java.sql.Connection.class)`
+     * @param name the name of the item to be vended
+     * @param clz the class of the item the class of the vended item
+     * @param <T> the type that denotes the class
+     * @return the Optional item
+     * @throws Exception if there's a problem vending the item
+     */
+    <T> Optional<T> vendForName(String name, Class<T> clz) throws Exception;
+
+    /**
+     * Get the properties for this context
+     * @return properties for this context
+     */
+    Map<String, Object> properties();
 
 }

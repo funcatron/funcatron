@@ -1,22 +1,67 @@
 package funcatron.intf.impl;
 
+import funcatron.intf.Accumulator;
 import funcatron.intf.Context;
+import funcatron.intf.ServiceVendor;
+import funcatron.intf.ServiceVendorBuilder;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * An implementation of Context so the Context Object associated with the classloader can be loaded
  */
-public class ContextImpl implements Context {
+public class ContextImpl implements Context, Accumulator {
 
     private final Map<String, Object> data;
     private final Logger logger;
+    private final CopyOnWriteArrayList<ReleasePair<?>> toTerminate = new CopyOnWriteArrayList<>();
+
+    private static final ConcurrentHashMap<String, ServiceVendor<?>> services = new ConcurrentHashMap<>();
 
     public ContextImpl(Map<String, Object> data, Logger logger) {
         this.data = data;
         this.logger = logger;
+    }
+
+    private static Map<String, Object> props = new HashMap<>();
+
+    public static void initContext(Map<String, Object> props, ClassLoader loader, Logger logger) throws Exception {
+        ContextImpl.props = props;
+        ServiceLoader<ServiceVendorBuilder> builders =
+        ServiceLoader.load(ServiceVendorBuilder.class, loader);
+
+        HashMap<String, ServiceVendorBuilder> builderMap = new HashMap<>();
+
+        builders.forEach(a -> builderMap.put(a.forType(), a));
+
+        ServiceVendorBuilder db = new JDBCServiceVendorBuilder();
+
+        builderMap.put(db.forType(), db);
+
+        props.forEach((k, v) -> {if (v instanceof Map) {
+            Map<String, Object> m = (Map<String, Object>) v;
+            Object o = m.get("type");
+            if (null != o) {
+                ServiceVendorBuilder b = builderMap.get(o);
+                if (null != b) {
+                    b.buildVendor(k, m, logger).map(vendor -> services.put(k, vendor));
+                }
+          }
+        }});
+    }
+
+    private static class ReleasePair<T> {
+        final T item;
+        final ServiceVendor<T> vendor;
+
+        ReleasePair(T item, ServiceVendor<T> vendor) {
+            this.item = item;
+            this.vendor = vendor;
+        }
     }
 
     /**
@@ -155,5 +200,69 @@ public class ContextImpl implements Context {
      */
     public static String getVersion() {
         return "1";
+    }
+
+    @Override
+    public <T> void accumulate(T item, ServiceVendor<T> vendor) {
+        toTerminate.add(new ReleasePair(item, vendor));
+    }
+
+    public void finished(boolean success) {
+        toTerminate.forEach(a -> {
+            // cast to something to avoid type error
+            ReleasePair<Object> b = (ReleasePair<Object>) a;
+            try {
+                b.vendor.release(b.item, success);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Exception releasing " + a.item, e);
+            }
+            }
+        );
+    }
+
+    /**
+     * The name of the services available via this context
+     *
+     * @return the name of the services available
+     */
+    @Override
+    public Set<String> services() {
+        return services.keySet();
+    }
+
+    /**
+     * Get the service for the given name
+     *
+     * @param name the name of the service
+     * @return If the service exists, return
+     */
+    @Override
+    public Optional<ServiceVendor<?>> serviceForName(String name) {
+        return Optional.of(services.get(name));
+    }
+
+    /**
+     * Vend the named item for the type. E.g., `vendForName("database", java.sql.Connection.class)`
+     *
+     * @param name the name of the item to be vended
+     * @param clz  the class of the item the class of the vended item
+     * @return the Optional item
+     * @throws Exception if there's a problem vending the item
+     */
+    @Override
+    public <T> Optional<T> vendForName(String name, Class<T> clz) throws Exception {
+        Optional<ServiceVendor<T>> ov = serviceForName(name, clz);
+        if (ov.isPresent()) return Optional.of(ov.get().vend(this));
+        return Optional.empty();
+    }
+
+    /**
+     * Get the properties for this context
+     *
+     * @return properties for this context
+     */
+    @Override
+    public Map<String, Object> properties() {
+        return props;
     }
 }
