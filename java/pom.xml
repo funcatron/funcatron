@@ -21,6 +21,57 @@
             </plugin>
 
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.1</version>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <executable>git</executable>
+                    <arguments>
+                        <argument>log</argument>
+                        <argument>--pretty=format:%H</argument>
+                        <argument>-n1</argument>
+                    </arguments>
+                    <outputFile>target/classes/gitsha.txt</outputFile>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>com.github.koraktor</groupId>
+                <artifactId>mavanagaiata</artifactId>
+                <version>0.3.1</version>
+                <executions>
+                    <execution>
+                        <id>git-commit</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>commit</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.3.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Implementation-Version>${mvngit.commit.id}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.0.0</version>
 

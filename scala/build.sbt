@@ -1,3 +1,5 @@
+import uk.gov.hmrc.gitstamp.GitStampPlugin._
+
 name := "scala_sample"
 
 version := "1.0"
@@ -12,3 +14,5 @@ libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.
 
 // https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-scala_2.11
 libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.8.4"
+
+Seq( gitStampSettings: _* )
