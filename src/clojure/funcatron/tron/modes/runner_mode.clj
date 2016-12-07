@@ -151,16 +151,17 @@
   (swap! (-> state ::routes) dissoc queue-name)
   )
 
-(defmethod dispatch-runner-message "associate"
-  [{:keys [sha queue host path]} _ {:keys [::message-queue ::routes] :as state}]
-  (when-let [info (get @routes queue)]
-    (stop-listening-to state queue info))
+(defmethod dispatch-runner-message "enable"
+  [{:keys [sha]} _ {:keys [::message-queue ::routes] :as state}]
 
-  (load-sha-and-then
+
+  #_(load-sha-and-then                                      ;; FIXME
     sha
     state
     (fn [file]
-      (let [router (jarjar/build-router file true)
+      (let [router (jarjar/build-router file properies true)
+            ;(when-let [info (get @routes queue)]
+            ;  (stop-listening-to state queue info))
             end-func
             (shared-b/listen-to-queue
               message-queue queue
@@ -181,6 +182,36 @@
         (fu/run-in-pool (fn [] (send-ping state)))
         ))))
 
+(defmethod dispatch-runner-message "disable"
+  [{:keys [sha]} _ {:keys [::message-queue ::routes] :as state}]
+
+
+  #_(load-sha-and-then                                      ;; FIXME
+    sha
+    state
+    (fn [file]
+      (let [router (jarjar/build-router file properies true)
+            ;(when-let [info (get @routes queue)]
+            ;  (stop-listening-to state queue info))
+            end-func
+            (shared-b/listen-to-queue
+              message-queue queue
+              (fn [msg]
+                (fu/run-in-pool
+                  (fn [] (handle-http-request
+                           state
+                           queue
+                           router
+                           msg)))))]
+        (swap! routes assoc queue
+               {:end-func end-func
+                :queue    queue
+                :host     host
+                :router   router
+                :path     path
+                :sha      sha})
+        (fu/run-in-pool (fn [] (send-ping state)))
+        ))))
 
 (defn- handle-runner-message
   "Handle messages sent to the tron queue"

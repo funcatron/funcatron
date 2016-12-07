@@ -1,8 +1,5 @@
 package funcatron.abstractions;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.function.Function;
@@ -12,10 +9,7 @@ import java.util.function.Function;
 /**
  * The thing that routes a message
  */
-public interface Router extends Function<MessageBroker.ReceivedMessage, Void> {
-
-    static Logger logger = LoggerFactory.getLogger(Router.class);
-
+public interface Router {
 
     interface Message {
         /**
@@ -160,17 +154,34 @@ public interface Router extends Function<MessageBroker.ReceivedMessage, Void> {
      */
     Object routeMessage(Message message) throws IOException;
 
-    /**
-     *
-     * @param message
-     */
-    default Void apply(MessageBroker.ReceivedMessage message) {
-        try {
-            routeMessage(brokerMessageToRouterMessage(message));
-        } catch (IOException e) {
-            logger.error("Failed to route the message", e);
-        }
 
-        return null;
-    }
+    /**
+     * Release any resources that the Router has... for example, any database pool connections
+     */
+    void endLife();
+
+    /**
+     * Get the host that this Router is listening for
+     * @return the name of the host. May be null
+     */
+    String host();
+
+    /**
+     * Get the base path for this Router
+     * @return the base path for the router
+     */
+    String basePath();
+
+    /**
+     * Return the name of the queue that is associated with the host/path combination
+     * @return the name of the queue associated with the host/path combination
+     */
+    String nameOfListenQueue();
+
+    /**
+     * Get the swagger for this Router
+     * @return the Swagger information for the router
+     */
+    Map<String, Object> swagger();
+
 }

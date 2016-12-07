@@ -58,7 +58,8 @@
 (defn tron-queue
   "Compute the name of the tron queue"
   []
-  ;; FIXME compute the name of the Tron queue
+
   (or
     (-> opts/command-line-options deref :options :tron_queue)
     "for_tron"))
+

@@ -16,7 +16,7 @@
            (java.lang.reflect Method Constructor InvocationTargetException AnnotatedType ParameterizedType)
            (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)
-           (java.util Base64 Map$Entry)
+           (java.util Base64 Map$Entry Map)
            (java.util.logging Logger)
            (org.w3c.dom Node)
            (java.util.function Function)))
@@ -344,14 +344,42 @@
     resp
     ))
 
+(defn- initialize-context
+  "Okay... given a JAR and a classloader and such, we initialize the ContextImpl object.
+  Return the context version and a function that releases the Context's resources"
+  [{:keys [::classloader]} properties]
+  (let [classloader ^ClassLoader classloader
+        context-impl-clz (.loadClass classloader "funcatron.intf.impl.ContextImpl")
+        version (try
+                  (let [meth (.getMethod context-impl-clz "getVersion" (make-array Class 0))]
+                    (.invoke meth nil (make-array Object 0))
+                    )
+                  (catch Exception e (do (error e "Couldn't get version")
+                                         "?")))
+        end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
+        init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
+
+    (.invoke init-method nil (into-array Object [properties classloader (fu/logger-for {})]))
+
+    [version (fn [] (.invoke end-life-method nil (make-array Object 0)))]
+    )
+  )
+
 (defn ^Router build-router
   "Take a JAR file (as a File or String) and create a Router"
-  ([file] (build-router file true))
-  ([file reply?]
+  ([file properties] (build-router file properties true))
+  ([file properties reply?]
    (let [the-jar (-> file jar-info-from-file update-jar-info-with-swagger)
+         swagger (::swagger the-jar)
+         [_ end-func] (initialize-context the-jar properties)
          the-app (make-app the-jar)]
      (reify Router
-       (routeMessage [this message]
+       (host [_] (:host swagger))
+       (basePath [_] (:basePath swagger))
+       (swagger [_] (fu/stringify-keys swagger))
+       (nameOfListenQueue [_] (fu/route-to-sha (:host swagger) (:basePath swagger)))
+       (endLife [_] (end-func))
+       (routeMessage [_ message]
          (route-to-jar message the-app reply?))))))
 
 

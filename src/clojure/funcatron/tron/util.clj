@@ -6,8 +6,8 @@
             [io.sarnowski.swagger1st.context :as s1ctx]
             [camel-snake-kebab.core :as csk]
             [org.httpkit.client :as http]
-            [taoensso.timbre
-             :refer [log  trace  debug  info  warn  error  fatal  report
+            [taoensso.timbre :as timbre
+             :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
@@ -26,12 +26,13 @@
            (java.util.jar JarFile JarEntry)
            (java.util.concurrent Executors ScheduledExecutorService TimeUnit)
            (java.util.function Function)
-           (funcatron.helpers Tuple2 Tuple3)
+           (funcatron.helpers Tuple2 Tuple3 LoggerBridge LoggerBridge$ActualLogger)
            (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)
            (java.lang.management ManagementFactory ThreadMXBean RuntimeMXBean)
            (com.fasterxml.jackson.module.paramnames ParameterNamesModule)
            (com.fasterxml.jackson.datatype.jdk8 Jdk8Module)
-           (com.fasterxml.jackson.datatype.jsr310 JavaTimeModule)))
+           (com.fasterxml.jackson.datatype.jsr310 JavaTimeModule)
+           (java.util.logging Logger LogRecord Level)))
 
 
 (set! *warn-on-reflection* true)
@@ -262,10 +263,10 @@
   [opts function]
   (kit/run-server
     function
-    {:max-body (* 256 1024 1024) ;; 256mb max size
-     :port (or
-             (-> opts :options :web_port)
-             3000)}))
+    {:max-body (* 256 1024 1024)                            ;; 256mb max size
+     :port     (or
+                 (-> opts :options :web_port)
+                 3000)}))
 
 (defprotocol CalcSha256
   "Calculate the SHA for something"
@@ -328,7 +329,7 @@
 
 (def ^:private file-type-mapping
   {"yaml" :yaml
-   "yml" :yaml
+   "yml"  :yaml
    "json" :json})
 
 (defn get-swagger-from-jar
@@ -380,7 +381,7 @@
   [^"[B" bytes]
   (let [in (ByteArrayInputStream. bytes)
         reader (transit/reader in :json)]
-  (transit/read reader)))
+    (transit/read reader)))
 
 ;; FIXME -- hardcode 50 threads... enough?
 (defonce ^ScheduledExecutorService ^:private thread-pool (Executors/newScheduledThreadPool 50))
@@ -496,12 +497,12 @@
   "Gracefully exit the process. This means on Mesos, telling Mesos to terminate us"
   [code]
 
-  (info (str "Graceful shutdown with code " code))2
+  (info (str "Graceful shutdown with code " code)) 2
 
   (when-let [mesos-app (get (System/getenv) "MARATHON_APP_ID")]
     (info "We're in Mesos-land, so tell leader.mesos:8080 to delete us")
     @(http/delete
-      (str "http://leader.mesos:8080/v2/apps" mesos-app)))
+       (str "http://leader.mesos:8080/v2/apps" mesos-app)))
 
   (System/exit code)
   )
@@ -619,3 +620,51 @@
     (.close out)
     (.toByteArray bos)))
 
+(defn- clean-queue-name
+  "Take a base-64 encoded sha and turn it into a valid RabbitMQ name"
+  [^String s]
+  (clojure.string/join (take 16 (filter #(Character/isJavaLetterOrDigit %) s))))
+
+(defn route-to-sha
+  "Get a SHA for the route"
+  [host path]
+  (-> (str host ";" path)
+      sha256
+      base64encode
+      clean-queue-name))
+
+(def log-level-mapping
+  {Level/SEVERE  :error
+   Level/WARNING :warn
+   Level/INFO    :info
+   Level/CONFIG  :debug
+   Level/FINE    :debug
+   Level/FINER   :trace
+   Level/FINEST  :trace})
+
+(defn- do-logging-via-timbre
+  "Log the data via timbre"
+  [props ^LogRecord record]
+  (let [level (log-level-mapping (.getLevel record))
+        config timbre/*config*]
+
+    (when
+      (timbre/may-log? level "funcatron" config)
+
+      (timbre/-log! config level (.getSourceClassName record)
+                    (.getSourceMethodName record)
+                    "" :p (.getThrown record)
+                    (delay (into [(.getMessage record)] (.getParameters record))) nil))
+    ;(timbre/log! level :p [] {:?ns-str (or (:?ns-str props))})
+    ))
+
+(defn ^Logger logger-for
+  "Create a java.util.Logger instance that actually sends log events to Timbre"
+  [log-props]
+  (LoggerBridge.
+    (reify LoggerBridge$ActualLogger
+      (isLoggable [_ lvl]
+        (let [level (log-level-mapping lvl)]
+          (timbre/may-log? level "funcatron" timbre/*config*)))
+      (^void log [_ ^LogRecord record]
+        (do-logging-via-timbre log-props record)))))

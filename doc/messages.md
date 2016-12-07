@@ -10,22 +10,32 @@ The message bus may be on RabbitMQ, Kafka, Redis, etc.
 ### Associate Queue with Func Bundle
 
 
-### Send a list of all known bundles to the Runner
-
 ```$clojure
-{:action "associate"
+{:action "enable"
   :msg-id UUID-string
   :from UUID-String
+  :tron-host (fu/compute-host-and-port opts)
   :at currentTimeMillis
-  :sha256 func-bundle-sha
-  :queue-name name-of-queue
-  :host the-host
-  :basePath func-bundle-basePath
+  :props map-of-properties
+  :sha func-bundle-sha
 }
-
 ```
 
+### Send a list of all known bundles to the Runner
+
+
+
 ### Disassociate Queue with Func Bundle
+
+```$clojure
+{:action "disable"
+  :msg-id UUID-string
+  :from UUID-String
+  :tron-host (fu/compute-host-and-port opts)
+  :at currentTimeMillis
+  :sha func-bundle-sha
+}
+```
 
 ### Host Information
 

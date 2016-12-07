@@ -13,7 +13,8 @@
             [funcatron.tron.options :as opts])
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage Lifecycle)
-           (java.net URLEncoder)))
+           (java.net URLEncoder)
+           (com.fasterxml.jackson.databind ObjectMapper)))
 
 
 (set! *warn-on-reflection* true)
@@ -45,28 +46,6 @@
      })
   )
 
-(defn- enable-all-bundles
-  "Tell the target to service all func bundles.
-  This is a HACK that needs some FIXME logic to
-  choose which runners run which bundles"
-  [runner {:keys [::route-map ::queue ::opts] :as state}]
-  (let [message-queue queue]
-    (doseq [{:keys [queue host path sha]} @route-map]
-      (.sendMessage
-        ^MessageBroker message-queue
-        runner
-        {:content-type "application/json"}
-        {:action    "associate"
-         :tron-host (fu/compute-host-and-port opts)
-         :msg-id    (fu/random-uuid)
-         :at        (System/currentTimeMillis)
-         :sha       sha
-         :queue     queue
-         :host      host
-         :path      path})))
-
-  )
-
 (defn- try-to-load-route-map
   "Try to load the route map"
   [opts bundles]
@@ -83,25 +62,41 @@
           (error e "Failed to load route map")
           [])))))
 
-(defn- clean-queue-name
-  "Take a base-64 encoded sha and turn it into a valid RabbitMQ name"
-  [^String s]
-  (clojure.string/join (take 16 (filter #(Character/isJavaLetterOrDigit %) s))))
 
-(defn route-to-sha
-  "Get a SHA for the route"
-  [host path]
-  (-> (str host ";" path)
-      fu/sha256
-      fu/base64encode
-      clean-queue-name))
+(defn- alter-listening
+  "Tell the runner to either listen to the bundle or sto stop listening"
+  [sha {:keys [from]} {:keys [::queue ::opts]} action]
+
+  (let [message-queue queue]
+    (.sendMessage
+      ^MessageBroker message-queue
+      from
+      {:content-type "application/json"}
+      {:action    action
+       :tron-host (fu/compute-host-and-port opts)
+       :msg-id    (fu/random-uuid)
+       :at        (System/currentTimeMillis)
+       :sha       sha})))
+
+
+(defn- tell-runners-to-alter-listening
+  "Tell all the runners to stop listening to a sha"
+  [sha {:keys [::network] :as state} action]
+
+  (clean-network state)
+  (doseq [[k {:keys [type]}] @network]
+    (cond
+      (= type "runner")
+      (fu/run-in-pool (fn [] (alter-listening sha k state action)))
+      ))
+  )
 
 (defn- add-to-route-map
   "Adds a route to the route table"
-  [host path bundle-sha route-map-atom]
-  (let [sha (route-to-sha host path)
-        data {:host host :path path :queue sha :sha bundle-sha}]
-    ;; FIXME tell at least 1 runner to run the new code
+  [host path bundle-sha properties route-map-atom state]
+  (let [sha (fu/route-to-sha host path)
+        data {:host host :path path :queue sha :sha bundle-sha :props properties}]
+    (tell-runners-to-alter-listening bundle-sha state "enable")
     (swap!
       route-map-atom
       (fn [rm]
@@ -114,13 +109,15 @@
                      )
                    rm)]
           (into [] rm))
-        )))
-  )
+        ))))
+
 
 (defn- remove-from-route-map
   "Removes a func bundle from the route map"
-  [_ _ bundle-sha route-map-atom]
-  ;; FIXME tell runners to stop listening to queue
+  [_ _ bundle-sha route-map-atom state]
+
+  (tell-runners-to-alter-listening bundle-sha state "disable")
+
   (swap!
     route-map-atom
     (fn [rm]
@@ -185,8 +182,6 @@
           (= type "frontend")
           (send-route-map k state)
 
-          (= type "runner")
-          (enable-all-bundles k state)
           )))))
 
 #_(defn ^StableStore backing-store
@@ -236,9 +231,9 @@
 
 (defn- enable-func
   "Enable a Func bundle"
-  [{:keys [json-params]} {:keys [::bundles ::route-map]}]
+  [{:keys [json-params]} {:keys [::bundles ::route-map] :as state}]
   (let [json-params (fu/keywordize-keys json-params)
-        {:keys [sha]} json-params]
+        {:keys [sha props]} json-params]
     (if (not (and json-params sha))
       ;; failed
       {:status 400
@@ -252,7 +247,7 @@
            :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
 
           (do
-            (add-to-route-map host basePath sha route-map)
+            (add-to-route-map host basePath sha props route-map state)
             {:status 200
              :body   {:success true :msg (str "Deployed Func bundle host: " host " basePath " basePath " sha " sha)}})
           ))
@@ -261,8 +256,8 @@
   )
 
 (defn- disable-func
-  "Enable a Func bundle"
-  [{:keys [json-params] {:keys [sha]} :json-params} {:keys [::bundles ::route-map]}]
+  "Disable a Func bundle"
+  [{:keys [json-params] {:keys [sha]} :json-params} {:keys [::bundles ::route-map] :as state}]
   (if (not (and json-params sha))
     ;; failed
     {:status 400
@@ -276,7 +271,7 @@
          :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
 
         (do
-          (remove-from-route-map host basePath sha route-map)
+          (remove-from-route-map host basePath sha route-map state)
           {:status 200
            :body   {:success true :msg (str "Disabled Func bundle host: " host " basePath " basePath " sha " sha)}})
         ))
@@ -381,8 +376,7 @@
 
     (= "runner" type)
     (do
-      (send-func-bundles from state)
-      (enable-all-bundles from state))))
+      (send-func-bundles from state))))
 
 (defmethod dispatch-tron-message "died"
   [{:keys [from]} _ {:keys [::network]}]
@@ -431,6 +425,7 @@
                ::route-map            route-map}
         ]
 
+    (.findAndRegisterModules (ObjectMapper.))
 
     (add-watch route-map state routes-changed)
 
@@ -456,7 +451,7 @@
                                port
                                "/api/v1/known_funcs"))
 
-                    (info (str "Enable a Func Bundle: curl -v -H \"Content-Type: application/json\" -d '{\"sha\":\"THE-SHA-HERE\"}' -X POST http://"
+                    (info (str "Enable a Func Bundle: curl -v -H \"Content-Type: application/json\" -d '{\"sha\":\"THE-SHA-HERE\", \"props\": {\"key\": \"value\"}}' -X POST http://"
                                host
                                ":"
                                port
