@@ -54,6 +54,13 @@ public class ContextImpl implements Context, Accumulator {
         }});
     }
 
+    /**
+     * Release all the resources held by the context
+     */
+    public static void endLife() {
+        services.entrySet().forEach(a -> a.getValue().endLife());
+    }
+
     private static class ReleasePair<T> {
         final T item;
         final ServiceVendor<T> vendor;
