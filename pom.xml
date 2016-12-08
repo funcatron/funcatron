@@ -21,6 +21,54 @@
         </plugin>
 
         <plugin>
+            <groupId>org.codehaus.gmaven</groupId>
+            <artifactId>gmaven-plugin</artifactId>
+            <version>1.5</version>
+            <executions>
+                <execution>
+                    <phase>validate</phase>
+                    <goals>
+                        <goal>execute</goal>
+                    </goals>
+                    <configuration>
+                        <providerSelection>2.0</providerSelection>
+                        <properties>
+                            <script>git rev-parse HEAD</script>
+                        </properties>
+                        <source>
+                            def command = project.properties.script
+                            def process = command.execute()
+                            process.waitFor()
+
+                            def describe = process.in.text.trim()
+
+                            project.properties.setProperty('gitVersion',describe)
+                        </source>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+
+
+
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>2.1</version>
+            <configuration>
+                <archive>
+                    <manifest>
+                        <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                    </manifest>
+                    <manifestEntries>
+                        <GitHeadRev>${gitVersion}</GitHeadRev>
+                    </manifestEntries>
+                </archive>
+            </configuration>
+        </plugin>
+
+
+        <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
             <version>3.0.1</version>
