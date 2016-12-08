@@ -11,9 +11,9 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
-           (java.util Base64 Map Map$Entry List UUID)
+           (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
-           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream OutputStreamWriter)
+           (java.io InputStream ByteArrayInputStream ByteArrayOutputStream File FileInputStream OutputStreamWriter StringReader)
            (com.fasterxml.jackson.databind ObjectMapper)
            (javax.xml.parsers DocumentBuilderFactory)
            (org.w3c.dom Node)
@@ -248,6 +248,10 @@
     )
   )
 
+(defn some-when
+  "Return the element if the element passed to the function returns true"
+  [element function]
+  (if (function element) element nil))
 
 
 (defn ^File new-file
@@ -633,6 +637,71 @@
       base64encode
       clean-queue-name))
 
+
+(defn string-to-properties
+  "Read a String as Java properties format and then kebab-keywordize it"
+  [s]
+  (let [p (Properties.)
+        sr (StringReader. s)]
+    (.load p sr)
+    (kebab-keywordize-keys p)))
+
+(defn ^String file-from-classloader
+  "Given a classloader and a filename, return the String contents of the file, if available"
+  [^ClassLoader cl ^String name]
+  (some-> cl
+          (.getResource name)
+          slurp)
+  )
+
+(defn manifest-from-classloader
+  "Pass in a classloader and get the Manifest out"
+  [^ClassLoader cl]
+  (or
+    (some->
+      (file-from-classloader cl "META-INF/MANIFEST.MF")
+      string-to-properties)
+    {}
+    ))
+
+(defn git-sha-txt
+  "Given a classloader, try to slurp the gitsha.txt file and return its contents"
+  [^ClassLoader cl]
+  (some->
+    (file-from-classloader cl "gitsha.txt")
+    clojure.string/split-lines
+    first
+    clojure.string/trim
+    ))
+
+(defn first-matching-key
+  "Given a map, find the first matching key in the collection"
+  [m & potential]
+  (when (map? m)
+    (loop [x potential]
+      (let [[f & r] x]
+        (cond
+          (contains? m f)
+          (get m f)
+
+          (not (empty? r))
+          (recur r))))))
+
+(defn git-sha-from-classloader
+  "Try a bunch of strategies to get the git sha from the classloader"
+  [^ClassLoader cl]
+  (or
+    (git-sha-txt cl)
+    (some-> (manifest-from-classloader cl)
+            (first-matching-key :git-head-rev :git-describe)))
+  )
+
+(defn version-info-from-classloader
+  "Pass in a classloader and get various version information into a map"
+  [^ClassLoader cl]
+  (let [sha (some->> (git-sha-from-classloader cl) (assoc {} :sha))]
+    (merge sha)))
+
 (def log-level-mapping
   {Level/SEVERE  :error
    Level/WARNING :warn
@@ -642,29 +711,63 @@
    Level/FINER   :trace
    Level/FINEST  :trace})
 
+(defn- build-line-number-from
+  "Take a map of properties about the execution environment and build
+  the Java Logger's 'line number' which will be various SHA information."
+  [props]
+  (clojure.string/join
+    (or (:line-sep props) "&")
+    (remove
+      nil?
+      [(some->> (:sha props)
+               (str "SHA:"))
+
+       (some->> (:reply-to props)
+                (str "REQ:"))
+
+       (some->> (:line-extra props)
+                (str "XTR:"))
+       ])))
+
+(defn- hostname-from-props
+  "Compute the hostname from properties"
+  [props]
+  (str (some->
+         (:host props)
+         (str ":"))
+       (or (:basePath props)
+           "funcatron"))
+  )
+
 (defn- do-logging-via-timbre
   "Log the data via timbre"
-  [props ^LogRecord record]
-  (let [level (log-level-mapping (.getLevel record))
-        config timbre/*config*]
-
+  [name config props ^LogRecord record]
+  (let [level (log-level-mapping (.getLevel record))]
     (when
-      (timbre/may-log? level "funcatron" config)
+      (timbre/may-log? level name config)
 
       (timbre/-log! config level (.getSourceClassName record)
                     (.getSourceMethodName record)
-                    "" :p (.getThrown record)
+                    (build-line-number-from props) :p (.getThrown record)
                     (delay (into [(.getMessage record)] (.getParameters record))) nil))
-    ;(timbre/log! level :p [] {:?ns-str (or (:?ns-str props))})
+
     ))
 
 (defn ^Logger logger-for
-  "Create a java.util.Logger instance that actually sends log events to Timbre"
+  "Create a java.util.Logger instance that actually sends log events to Timbre.
+  Properties we care about :queue, :host, :basePath, :sha, :reply-to, :host-extra, :line-extra, :line-sep"
   [log-props]
-  (LoggerBridge.
-    (reify LoggerBridge$ActualLogger
-      (isLoggable [_ lvl]
-        (let [level (log-level-mapping lvl)]
-          (timbre/may-log? level "funcatron" timbre/*config*)))
-      (^void log [_ ^LogRecord record]
-        (do-logging-via-timbre log-props record)))))
+  (let [name  (or (:queue log-props) "funcatron")
+        d-hostname (delay (str (hostname-from-props log-props) (:host-extra log-props)))
+
+        t-config (-> timbre/*config*
+                     (assoc :middleware [(fn [d]
+                                           (merge d {:hostname_
+                                                     d-hostname}))]))]
+    (LoggerBridge.
+      (reify LoggerBridge$ActualLogger
+        (isLoggable [_ lvl]
+          (let [level (log-level-mapping lvl)]
+            (timbre/may-log? level name t-config)))
+        (^void log [_ ^LogRecord record]
+          (do-logging-via-timbre name t-config log-props record))))))

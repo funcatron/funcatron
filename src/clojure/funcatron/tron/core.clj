@@ -45,8 +45,7 @@
        :artifact-id "tron"}
       (catch Exception e (do
                            (info e "Failed to load local properties")
-                           nil))
-      )
+                           nil)))
 
     ;; no idea
     {:version "UNKNOWN",
@@ -70,12 +69,16 @@
   [& args]
 
 
-  (timbre/merge-config! {:middleware [(fn [d]  (let [hn (:hostname_ d)]
-                                                 (merge d {:hostname_ (delay (str @hn " # "
-                                                                                  (:version version-info)
-                                                                                  "-"
-                                                                                  (:revision version-info)))})
-                                                 ))]})
+  (timbre/merge-config!
+    {:middleware
+     [(fn [d]  (let [hn (:hostname_ d)]
+                 (merge d {:hostname_
+                           (delay
+                             (str @hn " # "
+                                  (:version version-info)
+                                  "-"
+                                  (:revision version-info)))})))]})
+
   (info (str "Starting Funcatron. Args: " args))
   (info (str "Version " version-info))
   (let [opts (merge

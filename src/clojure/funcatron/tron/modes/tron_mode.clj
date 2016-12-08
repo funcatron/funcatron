@@ -10,6 +10,7 @@
             [compojure.route :refer [not-found resources]]
             [funcatron.tron.modes.common :as common]
             [funcatron.tron.brokers.shared :as shared-b]
+            [funcatron.tron.routers.jar-router :as jarjar]
             [funcatron.tron.options :as opts])
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage Lifecycle)
@@ -202,27 +203,35 @@
   (if body
     (let [file (File/createTempFile "func-a-" ".tron")]
       (cio/copy body file)
-      (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
-        (if (and type file-info)
-          (let [dest-file (fu/new-file
-                            (common/calc-storage-directory opts)
-                            (str (System/currentTimeMillis)
-                                 "-"
-                                 (URLEncoder/encode sha) ".funcbundle"))]
-            (when (no-file-with-same-sha sha state)
-              (cio/copy file dest-file))
-            (.delete file)
-            (swap! bundles assoc sha {:file dest-file :swagger swagger})
-            {:status 200
-             :body   {:accepted true
-                      :type     type
-                      :host     host
-                      :route    basePath
-                      :swagger  swagger
-                      :sha      sha}})
-          {:status 400
-           :body   {:accepted false
-                    :error    "Could not determine the file type"}})))
+      (try
+        ;; load the file and make sure it's a valid func bundle
+        (let [thing (jarjar/build-router file {})]
+          (.endLife thing))
+        (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
+          (if (and type file-info)
+            (let [dest-file (fu/new-file
+                              (common/calc-storage-directory opts)
+                              (str (System/currentTimeMillis)
+                                   "-"
+                                   (URLEncoder/encode sha) ".funcbundle"))]
+              (when (no-file-with-same-sha sha state)
+                (cio/copy file dest-file))
+              (.delete file)
+              (swap! bundles assoc sha {:file dest-file :swagger swagger})
+              {:status 200
+               :body   {:accepted true
+                        :type     type
+                        :host     host
+                        :route    basePath
+                        :swagger  swagger
+                        :sha      sha}})
+            {:status 400
+             :body   {:accepted false
+                      :error    "Could not determine the file type"}})))
+      (catch Exception e {:status 400
+                          :body {:accepted false
+                                 :error (.toString e)}})
+      )
     {:status 400
      :body   {:accepted false
               :error    "Must post a Func bundle file"}}

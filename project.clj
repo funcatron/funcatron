@@ -56,6 +56,8 @@
 
                  [com.novemberain/langohr "3.6.1"]]
 
+  :manifest {"GitHeadRev" ~(fn [x] (some-> (clojure.java.shell/sh "git" "rev-parse" "HEAD") :out .trim))}
+
   :profiles {:dev     {:dependencies [;;ring/ring-mock "0.3.0"]
                                       ;; [ring/ring-core "1.4.0"]
                                       [ring/ring-devel "1.5.0"]

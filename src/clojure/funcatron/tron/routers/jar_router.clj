@@ -1,7 +1,7 @@
 (ns funcatron.tron.routers.jar-router
   (:require [clojure.spec :as s]
-            [io.sarnowski.swagger1st.context :as s1ctx]
-            [taoensso.timbre :as timbre
+    ;; [io.sarnowski.swagger1st.context :as s1ctx]
+            [taoensso.timbre
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
@@ -11,7 +11,7 @@
             [cheshire.core :as json]
             [funcatron.tron.util :as fu])
   (:import (java.util.jar JarFile)
-           (java.io File InputStream ByteArrayOutputStream ByteArrayInputStream)
+           (java.io File InputStream ByteArrayInputStream)
            (java.net URLClassLoader URL)
            (java.lang.reflect Method Constructor InvocationTargetException AnnotatedType ParameterizedType)
            (funcatron.abstractions Router Router$Message)
@@ -50,7 +50,6 @@
      ::uuid        (fu/random-uuid)
      }
     ))
-
 
 (s/fdef get-swagger
         :args (s/cat :jar-info ::jar-info)
@@ -184,16 +183,16 @@
 
 (defn- handle-actual-request
   "Handle the request. Split into its own function so we can modify behavior in the REPL"
-  [^Class clz ^Constructor constructor
+  [^Class clz
+   ^Constructor constructor
    ^Method apply-method
    ^Method get-encoder-method
    ^Method get-decoder-method
    ^Class data-class
-   logger
    ^Class meta-clz
    req]
 
-  (let [
+  (let [logger (fu/logger-for (or (::log-props req) {}))
         req-s (let [body (:body req)]
                 (assoc
                   (f-util/stringify-keys
@@ -205,7 +204,8 @@
                         ))
                   "body"
                   body))
-        context (.newInstance constructor (into-array Object [req-s logger]))
+        context (.newInstance constructor (into-array Object [req-s
+                                                              logger]))
         func-obj (.newInstance clz)
         param (coerse-body-to req
                               data-class
@@ -256,7 +256,7 @@
 
 (defn- resolve-stuff
   "Given a ::jar-info and a "
-    [{:keys [::classloader ::swagger]} req]
+    [{:keys [::classloader]} req]
 
     (let [^String op-id (get req "operationId")
           clz (.loadClass ^ClassLoader classloader op-id)
@@ -273,15 +273,15 @@
                                                                                       "funcatron.intf.Context")]))
           ^Method get-encoder-method (.getMethod clz "jsonEncoder" (make-array Class 0))
           ^Method get-decoder-method (.getMethod clz "jsonDecoder" (make-array Class 0))
-          logger (Logger/getLogger (str "Funcatron " (:host swagger) "/" (:basePath swagger) ))
           ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
           meta-clz (.loadClass ^ClassLoader classloader "funcatron.intf.MetaResponse")
           ^Constructor constructor (first (.getConstructors ctx-clz))]
 
-      (fn [req] (handle-actual-request clz constructor apply-method
-                                       get-encoder-method get-decoder-method
-                                       data-class
-                                       logger meta-clz req))))
+      (fn [req] (handle-actual-request
+                  clz constructor apply-method
+                  get-encoder-method get-decoder-method
+                  data-class
+                  meta-clz req))))
 
 (defn make-app
     [the-jar]
@@ -297,9 +297,13 @@
 
 (defn- route-to-jar
   "Routes the message to the JAR file"
-  [^Router$Message message the-app reply?]
+  [^Router$Message message the-app log-props reply?]
   (let [ring-req (f-util/make-ring-request message)
-        resp (the-app ring-req)]
+        resp (the-app (assoc
+                        ring-req
+                        ::log-props
+                        (assoc log-props :reply-to (.replyTo message))
+                        ))]
 
     (when (and reply? (.replyTo message))
       (let [resp (assoc resp :body (or (::byte-body resp) (:body resp)))
@@ -347,7 +351,7 @@
 (defn- initialize-context
   "Okay... given a JAR and a classloader and such, we initialize the ContextImpl object.
   Return the context version and a function that releases the Context's resources"
-  [{:keys [::classloader]} properties]
+  [{:keys [::classloader]} properties log-props]
   (let [classloader ^ClassLoader classloader
         context-impl-clz (.loadClass classloader "funcatron.intf.impl.ContextImpl")
         version (try
@@ -359,7 +363,7 @@
         end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
         init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
 
-    (.invoke init-method nil (into-array Object [properties classloader (fu/logger-for {})]))
+    (.invoke init-method nil (into-array Object [properties classloader (fu/logger-for log-props)]))
 
     [version (fn [] (.invoke end-life-method nil (make-array Object 0)))]
     )
@@ -369,17 +373,29 @@
   "Take a JAR file (as a File or String) and create a Router"
   ([file properties] (build-router file properties true))
   ([file properties reply?]
-   (let [the-jar (-> file jar-info-from-file update-jar-info-with-swagger)
-         swagger (::swagger the-jar)
-         [_ end-func] (initialize-context the-jar properties)
+   (let [{:keys [::swagger ::classloader] :as the-jar}
+         (-> file jar-info-from-file update-jar-info-with-swagger)
+
+         {:keys [host basePath]} swagger
+
+         queue-name (fu/route-to-sha (:host swagger) (:basePath swagger))
+
+         log-props (merge (fu/version-info-from-classloader classloader)
+                          {:queue queue-name,
+                           :host host,
+                           :basePath basePath}
+                          (fu/some-when (:$log-props properties) map?))
+
+         [_ end-func] (initialize-context the-jar properties log-props)
+
          the-app (make-app the-jar)]
      (reify Router
-       (host [_] (:host swagger))
-       (basePath [_] (:basePath swagger))
+       (host [_] host)
+       (basePath [_] basePath)
        (swagger [_] (fu/stringify-keys swagger))
-       (nameOfListenQueue [_] (fu/route-to-sha (:host swagger) (:basePath swagger)))
+       (nameOfListenQueue [_] queue-name)
        (endLife [_] (end-func))
        (routeMessage [_ message]
-         (route-to-jar message the-app reply?))))))
+         (route-to-jar message the-app log-props reply?))))))
 
 
