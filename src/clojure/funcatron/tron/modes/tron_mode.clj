@@ -227,10 +227,10 @@
                         :sha      sha}})
             {:status 400
              :body   {:accepted false
-                      :error    "Could not determine the file type"}})))
-      (catch Exception e {:status 400
-                          :body {:accepted false
-                                 :error (.toString e)}})
+                      :error    "Could not determine the file type"}}))
+        (catch Exception e {:status 400
+                            :body   {:accepted false
+                                     :error    (.toString e)}}))
       )
     {:status 400
      :body   {:accepted false
