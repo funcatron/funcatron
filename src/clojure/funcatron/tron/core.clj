@@ -81,10 +81,12 @@
 
   (info (str "Starting Funcatron. Args: " args))
   (info (str "Version " version-info))
+  (info (str "Env Vars" (System/getenv)))
   (let [opts (merge
                (cli/parse-opts args the-opts/cli-options)
                (cli/parse-opts (ordered-tron-env (System/getenv)) the-opts/cli-options)
                )]
+    (info "Computed command line options: " opts)
     (reset! the-opts/command-line-options opts)
     (trace (str "Argument options: " opts))
     (cond
