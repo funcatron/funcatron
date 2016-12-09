@@ -80,6 +80,15 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <GitHeadRev>${gitVersion}</GitHeadRev>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
 
                 <executions>
