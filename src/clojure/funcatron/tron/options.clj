@@ -9,12 +9,13 @@
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
    [nil "--web_port PORT" "Web Server Port number (default 3000)"
-    :default 3000
+    ;; :default 3000
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
-   [nil "--web_address ADDRESS" "Web Server host name"
-    :default (try
+   [nil "--web_host ADDRESS" "Web Server host name"
+    ;; :default
+    #_(try
                (->> (InetAddress/getAllByName
                       (.getCanonicalHostName
                         (InetAddress/getLocalHost)))

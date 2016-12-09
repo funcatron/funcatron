@@ -259,7 +259,10 @@
   [^File base ^String name]
   (File. base name))
 
-
+(defn runner-mode?
+  "Calculates if we're in Dev mode from options"
+  [opts]
+  (boolean (-> opts :options :runner)))
 
 (defn ^IFn start-http-server
   "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler.
@@ -270,7 +273,7 @@
     {:max-body (* 256 1024 1024)                            ;; 256mb max size
      :port     (or
                  (-> opts :options :web_port)
-                 3000)}))
+                 (if (runner-mode? opts) 4000 3000))}))
 
 (defprotocol CalcSha256
   "Calculate the SHA for something"
@@ -567,10 +570,6 @@
   [opts]
   (boolean (-> opts :options :devmode)))
 
-(defn runner-mode?
-  "Calculates if we're in Dev mode from options"
-  [opts]
-  (boolean (-> opts :options :runner)))
 
 (defn compute-host-and-port
   "Computes the hostname and port -- FIXME this should be pluggable for Mesos deploys and such"
@@ -578,15 +577,15 @@
   (let [port (if (runner-mode? opts) 4000 3000)]
     {:host
      (or
-       (-> opts :options :web_address)
        (and
          (get (System/getenv) "MESOS_CONTAINER_NAME")
          (get (System/getenv) "HOST"))
 
+       (-> opts :options :web_host)
+
        "localhost")
      :port
      (or
-       (-> opts :options :web_port)
        (try
          (and
            (get (System/getenv) "MESOS_CONTAINER_NAME")
@@ -594,6 +593,9 @@
              (if (integer? x) x nil)
              ))
          (catch Exception _ nil))
+
+       (-> opts :options :web_port)
+
        port)})
   )
 
