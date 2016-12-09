@@ -29,7 +29,8 @@ public class ContextImpl implements Context, Accumulator {
 
     private static Map<String, Object> props = new HashMap<>();
 
-    public static void initContext(Map<String, Object> props, ClassLoader loader, Logger logger) throws Exception {
+    public static void initContext(Map<String, Object> props, ClassLoader loader,final  Logger logger) throws Exception {
+        logger.log(Level.INFO, "Setting up context with props ", props);
         ContextImpl.props = props;
         ServiceLoader<ServiceVendorBuilder> builders =
         ServiceLoader.load(ServiceVendorBuilder.class, loader);
@@ -42,13 +43,17 @@ public class ContextImpl implements Context, Accumulator {
 
         builderMap.put(db.forType(), db);
 
-        props.forEach((k, v) -> {if (v instanceof Map) {
-            Map<String, Object> m = (Map<String, Object>) v;
+        props.forEach((k, v) -> {if (null != k && k instanceof String && null != v && v instanceof Map) {
+            Map m = (Map) v;
             Object o = m.get("type");
-            if (null != o) {
+            if (null != o && o instanceof String) {
+                logger.log(Level.INFO, "Looking for builder for type: ", o);
                 ServiceVendorBuilder b = builderMap.get(o);
                 if (null != b) {
-                    b.buildVendor(k, m, logger).map(vendor -> services.put(k, vendor));
+                    logger.log(Level.INFO, "Building with props ", m);
+                    Optional<ServiceVendor<?>> opt = b.buildVendor(k, m, logger);
+                    opt.map(vendor -> services.put(k, vendor));
+
                 }
           }
         }});
