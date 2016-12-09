@@ -372,7 +372,7 @@
      }))
 
 (defmethod dispatch-tron-message "awake"
-  [{:keys [from type] :as msg} _ {:keys [::network] :as state}]
+  [{:keys [from type host_info] :as msg} _ {:keys [::network] :as state}]
   (info (str "awake from " msg))
   (clean-network state)
   (swap! network assoc from
@@ -387,6 +387,9 @@
     (do
       (send-route-map from state)
       (remove-other-instances-of-this-frontend msg state)
+      (when-let [{:keys [host port]} host_info]
+        (when (and (not-empty host) (not-empty port))
+          (info (str "Frontend at http://" host ":" port))))
       )
 
     (= "runner" type)
