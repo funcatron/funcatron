@@ -14,36 +14,32 @@ fi
 if [ ! -z "$MESOS_TASK_ID" ]; then
     echo "It's a Meso substrate, so discover _stomp._rabbit-funcatron._tcp.marathon.mesos" 1>&2
 
-    HOST=""
-    PORT=""
+    RHOST=""
+    RPORT=""
 
     host () {
-        HOST=$(dig +short rabbit-funcatron.marathon.mesos  |
-                      sed -n 1p)
+        RHOST=$(dig +short rabbit-funcatron.marathon.mesos  |
+                       sed -n 1p)
     }
 
     port () {
-        PORT=$(dig +short _stomp._rabbit-funcatron._tcp.marathon.mesos SRV | \
-                      sed -n 1p | \
-                      grep -o '[0-9]* *[^ ]*$' | \
-                      grep -o '^[0-9]*')
+        RPORT=$(dig +short _stomp._rabbit-funcatron._tcp.marathon.mesos SRV | \
+                       sed -n 1p | \
+                       grep -o '[0-9]* *[^ ]*$' | \
+                       grep -o '^[0-9]*')
     }
 
-    while [[ -z "$PORT" || -z "$HOST" ]] ; do
-        echo "In host/port loop: Host: $HOST, Port: $PORT" 1>&2
+    while [[ -z "$RPORT" || -z "$RHOST" ]] ; do
+        echo "In host/port loop: Host: $RHOST, Port: $RPORT" 1>&2
         sleep 1
         host
         port
     done
 
-    export RABBIT_HOST=$HOST
-    export RABBIT_PORT=$PORT
+    export RABBIT_HOST=$RHOST
+    export RABBIT_PORT=$RPORT
 
     echo "Discovered the port... starting OpenResty" 1>&2
-    #while [ true ] ; do
-    #    echo "Hello Marathon $HOST $PORT" >&2
-    #    sleep 5
-    #done
 else
     echo "Not in an orchestration env... that we know of..." 1>&2
 fi
