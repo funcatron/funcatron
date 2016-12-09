@@ -3,7 +3,7 @@
             [funcatron.tron.modes.common :as common]
             [funcatron.tron.brokers.shared :as shared-b]
             [org.httpkit.client :as http]
-            [taoensso.timbre
+            [taoensso.timbre :as timbre
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
@@ -83,7 +83,7 @@
                     (swap! func-bundles assoc sha info)
                     (do-run file)))
                 (catch Exception e
-                  (error e (str "Failed to load func bundle with sha " sha)))))))))))
+                  (timbre/error e (str "Failed to load func bundle with sha " sha)))))))))))
 
 (defn- send-ping
   "Sends a ping to the Tron"
@@ -146,22 +146,25 @@
 
 (defn- stop-listening-to
   "Stops listening to a particular queue"
-  [state queue-name {:keys [end-func]}]
+  [state queue-name {:keys [end-func ^Router router]}]
+
   (.run ^Runnable end-func)
+  (.endLife router)
   (swap! (-> state ::routes) dissoc queue-name)
   )
 
 (defmethod dispatch-runner-message "enable"
-  [{:keys [sha]} _ {:keys [::message-queue ::routes] :as state}]
+  [{:keys [sha props host basePath]} _ {:keys [::message-queue ::routes] :as state}]
 
 
-  #_(load-sha-and-then                                      ;; FIXME
+  (load-sha-and-then
     sha
     state
     (fn [file]
-      (let [router (jarjar/build-router file properies true)
-            ;(when-let [info (get @routes queue)]
-            ;  (stop-listening-to state queue info))
+      (let [router (jarjar/build-router file props true)
+            queue (fu/route-to-sha host basePath)
+            _ (when-let [info (get @routes queue)]
+                (stop-listening-to state queue info))
             end-func
             (shared-b/listen-to-queue
               message-queue queue
@@ -177,41 +180,19 @@
                 :queue    queue
                 :host     host
                 :router   router
-                :path     path
+                :path     basePath
                 :sha      sha})
         (fu/run-in-pool (fn [] (send-ping state)))
         ))))
 
 (defmethod dispatch-runner-message "disable"
-  [{:keys [sha]} _ {:keys [::message-queue ::routes] :as state}]
+  [{:keys [host basePath]} _ {:keys [::message-queue ::routes] :as state}]
 
+  (let [queue (fu/route-to-sha host basePath)]
+    (when-let [info (get @routes queue)]
+      (stop-listening-to state queue info)))
 
-  #_(load-sha-and-then                                      ;; FIXME
-    sha
-    state
-    (fn [file]
-      (let [router (jarjar/build-router file properies true)
-            ;(when-let [info (get @routes queue)]
-            ;  (stop-listening-to state queue info))
-            end-func
-            (shared-b/listen-to-queue
-              message-queue queue
-              (fn [msg]
-                (fu/run-in-pool
-                  (fn [] (handle-http-request
-                           state
-                           queue
-                           router
-                           msg)))))]
-        (swap! routes assoc queue
-               {:end-func end-func
-                :queue    queue
-                :host     host
-                :router   router
-                :path     path
-                :sha      sha})
-        (fu/run-in-pool (fn [] (send-ping state)))
-        ))))
+  (fu/run-in-pool (fn [] (send-ping state))))
 
 (defn- handle-runner-message
   "Handle messages sent to the tron queue"

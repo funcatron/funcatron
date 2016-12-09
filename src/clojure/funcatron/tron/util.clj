@@ -699,7 +699,7 @@
 (defn version-info-from-classloader
   "Pass in a classloader and get various version information into a map"
   [^ClassLoader cl]
-  (let [sha (some->> (git-sha-from-classloader cl) (assoc {} :sha))]
+  (let [sha (some->> (git-sha-from-classloader cl) (assoc {} :git-sha))]
     (merge sha)))
 
 (def log-level-mapping
@@ -719,8 +719,9 @@
     (or (:line-sep props) "&")
     (remove
       nil?
-      [(some->> (:sha props)
-               (str "SHA:"))
+      [(some->> (or (:git-sha props)
+                    (:sha props))
+                (str "GIT:"))
 
        (some->> (:reply-to props)
                 (str "REQ:"))
@@ -732,11 +733,13 @@
 (defn- hostname-from-props
   "Compute the hostname from properties"
   [props]
+
   (str (some->
          (:host props)
          (str ":"))
        (or (:basePath props)
-           "funcatron"))
+           "funcatron")
+       )
   )
 
 (defn- do-logging-via-timbre

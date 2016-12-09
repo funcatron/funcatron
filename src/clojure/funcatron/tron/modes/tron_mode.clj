@@ -66,7 +66,7 @@
 
 (defn- alter-listening
   "Tell the runner to either listen to the bundle or sto stop listening"
-  [sha {:keys [from]} {:keys [::queue ::opts]} action]
+  [host path sha properties from {:keys [::queue ::opts]} action]
 
   (let [message-queue queue]
     (.sendMessage
@@ -77,18 +77,23 @@
        :tron-host (fu/compute-host-and-port opts)
        :msg-id    (fu/random-uuid)
        :at        (System/currentTimeMillis)
+       :host      host
+       :basePath  path
+       :props     properties
        :sha       sha})))
 
 
 (defn- tell-runners-to-alter-listening
   "Tell all the runners to stop listening to a sha"
-  [sha {:keys [::network] :as state} action]
+  [host path sha properties {:keys [::network] :as state} action]
 
   (clean-network state)
   (doseq [[k {:keys [type]}] @network]
     (cond
       (= type "runner")
-      (fu/run-in-pool (fn [] (alter-listening sha k state action)))
+      (do
+        (info (str "Alter " k))
+        (fu/run-in-pool (fn [] (alter-listening host path sha properties k state action))))
       ))
   )
 
@@ -97,7 +102,7 @@
   [host path bundle-sha properties route-map-atom state]
   (let [sha (fu/route-to-sha host path)
         data {:host host :path path :queue sha :sha bundle-sha :props properties}]
-    (tell-runners-to-alter-listening bundle-sha state "enable")
+    (tell-runners-to-alter-listening host path bundle-sha properties state "enable")
     (swap!
       route-map-atom
       (fn [rm]
@@ -115,9 +120,9 @@
 
 (defn- remove-from-route-map
   "Removes a func bundle from the route map"
-  [_ _ bundle-sha route-map-atom state]
+  [host path bundle-sha route-map-atom state]
 
-  (tell-runners-to-alter-listening bundle-sha state "disable")
+  (tell-runners-to-alter-listening host path bundle-sha {} state "disable")
 
   (swap!
     route-map-atom
@@ -266,25 +271,26 @@
 
 (defn- disable-func
   "Disable a Func bundle"
-  [{:keys [json-params] {:keys [sha]} :json-params} {:keys [::bundles ::route-map] :as state}]
-  (if (not (and json-params sha))
-    ;; failed
-    {:status 400
-     :body   {:success false :error "Request must be JSON and include the 'sha' of the Func bundle to disable"}}
+  [{:keys [json-params]} {:keys [::bundles ::route-map] :as state}]
+  (let [json-params (fu/keywordize-keys json-params)
+        {:keys [sha]} json-params]
+    (if (not (and json-params sha))
+      ;; failed
+      {:status 400
+       :body   {:success false :error "Request must be JSON and include the 'sha' of the Func bundle to disable"}}
 
-    ;; find the Func bundle and enable it
-    (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha)]
-      (if (not bundle)
-        ;; couldn't find the bundle
-        {:status 404
-         :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
+      ;; find the Func bundle and enable it
+      (let [{{:keys [host basePath]} :swagger :as bundle} (get @bundles sha)]
+        (if (not bundle)
+          ;; couldn't find the bundle
+          {:status 404
+           :body   {:success false :error (str "Could not find Func bundle with SHA: " sha)}}
 
-        (do
-          (remove-from-route-map host basePath sha route-map state)
-          {:status 200
-           :body   {:success true :msg (str "Disabled Func bundle host: " host " basePath " basePath " sha " sha)}})
-        ))
-    ))
+          (do
+            (remove-from-route-map host basePath sha route-map state)
+            {:status 200
+             :body   {:success true :msg (str "Deployed Func bundle host: " host " basePath " basePath " sha " sha)}})
+          )))))
 
 (defn- bundles-from-state
   "Pass in the state object and get a list of func bundles"
@@ -465,7 +471,6 @@
                                ":"
                                port
                                "/api/v1/enable"))
-
 
                     )
 

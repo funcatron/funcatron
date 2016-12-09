@@ -362,8 +362,7 @@
                                          "?")))
         end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
         init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
-
-    (.invoke init-method nil (into-array Object [properties classloader (fu/logger-for log-props)]))
+    (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys properties) classloader (fu/logger-for log-props)]))
 
     [version (fn [] (.invoke end-life-method nil (make-array Object 0)))]
     )
@@ -376,6 +375,7 @@
    (let [{:keys [::swagger ::classloader] :as the-jar}
          (-> file jar-info-from-file update-jar-info-with-swagger)
 
+         swagger (fu/keywordize-keys swagger)
          {:keys [host basePath]} swagger
 
          queue-name (fu/route-to-sha (:host swagger) (:basePath swagger))
