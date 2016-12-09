@@ -22,6 +22,10 @@ funcatron.random = random
 
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 
+local http_port = os.getenv("PORT_80") or "80"
+
+local http_host = os.getenv("HOST") or "localhost"
+
 local bunny_host = os.getenv("RABBIT_HOST") or
    os.getenv("FUNC_RABBIT_PORT_61613_TCP_ADDR")
 
@@ -102,6 +106,7 @@ local function register_and_listen()
                              ["instance-id"]=nginx_uuid,
                              from=funcatron.instance_uuid,
                              at=(os.time() * 1000),
+                             host_info={host=http_host, port=http_port},
                              ["msg-id"]=msg_uuid})
 
    local headers = {["x-type"] = "awake",
@@ -332,6 +337,7 @@ local function heartbeat()
       local msg = cjson.encode({action="heartbeat",
                                 from=funcatron.instance_uuid,
                                 at=(os.time() * 1000),
+                                host_info={host=http_host, port=http_port},
                                 ["msg-id"]=msg_uuid})
 
       local headers = {["x-type"] = "heartbeat",
