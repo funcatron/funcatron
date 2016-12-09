@@ -2,42 +2,42 @@ package funcatron.scala_sample
 
 import java.io.OutputStream
 import java.util.function.Function
+import java.util.logging.Level
 
 import funcatron.intf.{Context, Func, MetaResponse}
-import java.util.{Date, Random, HashMap => JHash, List => JList, Map => JMap}
+import java.util.{Date, Random, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
-import scala.collection.JavaConversions._
-import scala.beans.BeanProperty
+import scala.reflect.ClassTag
+
 /**
   * Returns a simple Map
   */
-class SimpleGet extends Func[Any] {
-  def apply(o: Any, c: Context) = {
-    // create the return value
-    val ret = new JHash[String, Any]
+class SimpleGet extends Func[AnyRef] with DecoderOMatic[AnyRef] {
+  def apply(o: AnyRef, c: Context): AnyRef = {
+    c.getLogger.log(Level.INFO, "In Scala 'SimpleGet... yay!")
 
     // get the optional num param
     val num = c.getMergedParams.get("num")
 
     // if we've got one, put it in the 'num-param' field
-    if (null != num) ret.put("num-param", num)
+    val base = if (null != num) Map(("num-param", num)) else Map()
 
-    // populate a bunch of other values
-    ret.put("query-params", c.getRequestInfo.get("query-params"))
-    ret.put("time", (new Date).toString)
-    ret.put("bools", true)
-    ret.put("numero", (new Random).nextDouble)
-    // return the map which will be turned into a JSON blob
-    ret
+    base ++ List(("query-params", c.getRequestInfo.get("query-params")),
+      ("time", (new Date).toString),
+      ("bools", true),
+      ("numero", (new Random).nextDouble))
+    
   }
+
+  protected def ct: Class[AnyRef] = classOf[AnyRef]
 }
 
 case class Data(name: String,age: Int)
 
-object Jackson {
+object DecoderOMatic {
   val jackson: ObjectMapper = {
     val mapper = new ObjectMapper()
     mapper.registerModule(DefaultScalaModule)
@@ -46,12 +46,34 @@ object Jackson {
 }
 
 /**
+  * Encode/decode the Scala types correctly
+  */
+trait DecoderOMatic[T] {
+
+  protected def ct: Class[T]
+
+  def jsonDecoder(): Function[JMap[String, AnyRef], T] = {
+    new Function[JMap[String, AnyRef], T] {
+      def apply(t: JMap[String, AnyRef]): T = DecoderOMatic.jackson.convertValue(t, ct)
+    }
+  }
+
+  def jsonEncoder(): Function[Object, Array[Byte]] =
+    new Function[Object, Array[Byte]] {
+      def apply(o: Object) = DecoderOMatic.jackson.writer().writeValueAsBytes(o)
+    }
+
+}
+
+/**
   * A class that handles POST or DELETE
   */
-class PostOrDelete extends Func[Data] {
+class PostOrDelete extends Func[Data] with DecoderOMatic[Data] {
   def apply(data: Data, context: Context) = {
     val cnt = context.getRequestParams.get("path").get("cnt").asInstanceOf[Number]
 
+    context.getLogger.log(Level.INFO, "Our function and data: ",
+      Array(context.getMethod, data).asInstanceOf[Array[Object]])
 
     if ("delete" == context.getMethod) new Data("Deleted " + cnt.longValue, cnt.intValue)
     else if ("post" == context.getMethod) {
@@ -70,15 +92,5 @@ class PostOrDelete extends Func[Data] {
     }
   }
 
-  def jsonDecoder(): Function[JMap[String, AnyRef], Data] = {
-    new Function[JMap[String, AnyRef], Data] {
-      def apply(t: JMap[String, AnyRef]): Data = Jackson.jackson.convertValue(t, classOf[Data])
-    }
-  }
-
-  def jsonEncoder(): Function[Object, Array[Byte]] =
-    new Function[Object, Array[Byte]] {
-      def apply(o: Object) = Jackson.jackson.writer().writeValueAsBytes(o)
-    }
-
+  protected def ct: Class[Data] = classOf[Data]
 }
