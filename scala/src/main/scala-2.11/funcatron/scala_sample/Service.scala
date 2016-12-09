@@ -70,25 +70,26 @@ trait DecoderOMatic[T] {
   */
 class PostOrDelete extends Func[Data] with DecoderOMatic[Data] {
   def apply(data: Data, context: Context) = {
-    val cnt = context.getRequestParams.get("path").get("cnt").asInstanceOf[Number]
+    // we're guaranteed the 'cnt' path variable by the Swagger definition
+    val cnt = context.getPathParams.get("cnt").asInstanceOf[Number]
 
-    context.getLogger.log(Level.INFO, "Our function and data: ",
-      Array(context.getMethod, data).asInstanceOf[Array[Object]])
+    context.getMethod match {
+      case "delete" =>
+        new Data("Deleted " + cnt.longValue, cnt.intValue)
 
-    if ("delete" == context.getMethod) new Data("Deleted " + cnt.longValue, cnt.intValue)
-    else if ("post" == context.getMethod) {
+      case "post" =>
+        (1 to cnt.intValue()).
+          map(i => new Data(data.name + i, data.age + i)).
+          toList
 
-      (1 to cnt.intValue()).
-        map(i => new Data(data.name + i, data.age + i)).
-        toList
+      case _ =>
+        new MetaResponse() {
+          def getResponseCode = 400
 
-    }
-    else new MetaResponse() {
-      def getResponseCode = 400
+          override def getContentType = "text/plain"
 
-      override def getContentType = "text/plain"
-
-      def getBody = ("Expecting a POST or DELETE, but got " + context.getMethod).getBytes("UTF-8")
+          def getBody = ("Expecting a POST or DELETE, but got " + context.getMethod).getBytes("UTF-8")
+        }
     }
   }
 
