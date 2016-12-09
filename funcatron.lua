@@ -238,7 +238,8 @@ function funcatron.route_for(host, path)
 
    -- find the entry that matches the host and path
    for i, v in ipairs(funcatron.routing_table) do
-      if (dev_mode or (not v.host) or v.host == "*" or v.host == host) and
+      if (dev_mode or  v.host == cjson.null or
+             v.host == "*" or v.host == host) and
       string_starts(path, v.path) then
          return v.queue, nil
       end
