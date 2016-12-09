@@ -1,7 +1,6 @@
 (ns funcatron.tron.brokers.rabbitmq
   "Create a MessageBroker instance that talks to RabbitMQ"
-  (:require [dragonmark.util.props :as d-props]
-            [taoensso.timbre :as timbre
+  (:require [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
@@ -107,8 +106,7 @@
 
 (defn ^MessageBroker create-broker
   "Create a RabbitMQ MessageBroker instance"
-  ([] (create-broker (merge (::rabbit-connection @d-props/info)
-                            (:rabbit-connection @d-props/info))))
+  ([] (create-broker {}))
   ([params]
    (let [rabbit-props (or params {})
          rabbit-props (fix-props rabbit-props)

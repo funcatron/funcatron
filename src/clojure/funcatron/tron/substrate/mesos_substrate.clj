@@ -5,7 +5,6 @@
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
-            [dragonmark.util.props :as dp]
             [funcatron.tron.substrate.shared :as shared]
             [funcatron.tron.util :as fu])
   (:import (funcatron.abstractions ContainerSubstrate ContainerSubstrate$TaskState ContainerSubstrate$ServiceType)
@@ -21,7 +20,7 @@
 
 (defn ^ContainerSubstrate create-substrate
   "Creates a ContainerSubstrate instance connected to the Mesos cluster"
-  ([] (create-substrate (merge @dp/info (:options @f-opts/command-line-options))))
+  ([] (create-substrate (:options @f-opts/command-line-options)))
 
   ([opts]
    (let [;; compute the Mesos URI
