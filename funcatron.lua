@@ -33,7 +33,7 @@ local bunny_pwd = os.getenv("RABBIT_PWD") or "guest"
 
 local tron_queue = os.getenv("TRON_QUEUE") or "for_tron"
 
-local dev_mode = os.getenv("DEV_MODE") or true
+local dev_mode = os.getenv("DEV_MODE")
 
 local nginx_uuid = os.getenv("INSTANCEID") or "no-id"
 
