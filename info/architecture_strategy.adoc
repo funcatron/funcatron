@@ -1,0 +1,63 @@
+= Funcatron Architecture and Strategy
+
+This document describes the https://funcatron.org[Funcatron]
+architecture and development strategy.
+
+Funcatron is a http://martinfowler.com/bliki/Serverless.html[Serverless]
+framework.
+It's dead simple: associate a "function" with an event.
+Each time the event happens, the function is applied and the
+function's return value is returned to the event source.
+An event can be an HTTP(S) request, something on an event queue, whatever.
+
+Functions are ephemeral. They exist for the duration of the function call.
+Once the function returns a value, all of its state and scope and
+everything else about it is assumed to go away.
+
+Scaling this kind of architecture is simple: the more frequently a function
+gets applied, the more compute resources are allocated to support the function.
+
+Funcatron, where possible, abstracts away "switched" connections
+into events. What does this mean?
+
+Think of https://en.wikipedia.org/wiki/Internet_protocol_suite[TCP/IP].
+To a developer, data in and out of a TCP/IP socket appears
+to be a switched connection to the machine on the other side.
+But, the protocol is implemented as a series of packets that
+may not be reliably delivered.
+
+Funcatron uses a message queue, where possible, to transmit
+requests. Each request is stateless in that it may be serviced
+by a different system than the previous request. All state
+associated with request (https://lift.la/blog/lift-state-and-scaling[there's
+always state]) is pushed to databases and caches outside of
+the address space where the code that's handling the
+request lives.
+
+There are numerous
+
+
+
+
+
+[plantuml]
+----
+
+  browser  -> openresty: HTTP Reqest
+  openresty -> openresty: Consult Route Table
+  openresty -> "message queue": Packaged HTTP request
+  "message queue" -> Runner
+  Runner -> Runner: Func application
+  "message queue" <-- Runner: HTTP response
+  openresty <-- "message queue": HTTP response
+  browser <-- openresty: HTTP response
+
+----
+
+[plantuml]
+----
+  openresty -> message_queue: Awake
+  message_queue -> Tron: Awake
+  message_queue <-- Tron: Route Table
+  openresty <-- message_queue: Route Table
+----
