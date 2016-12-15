@@ -29,12 +29,14 @@ may not be reliably delivered.
 Funcatron uses a message queue, where possible, to transmit
 requests. Each request is stateless in that it may be serviced
 by a different system than the previous request. All state
-associated with request (https://lift.la/blog/lift-state-and-scaling[there's
-always state]) is pushed to databases and caches outside of
+associated with request is pushed to databases and caches outside of
 the address space where the code that's handling the
-request lives.
+request lives. And https://lift.la/blog/lift-state-and-scaling[there's
+always state].
 
-There are numerous
+There are numerous advantages to event-based architecture:
+
+* Events can be converted into "`switched`" 
 
 
 
