@@ -45,4 +45,27 @@ buildscript {
     }
 }
 
+buildscript {
+    repositories {
+        // jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.ajoberstar:gradle-git:1.6.0'
+    }
+}
+
 apply plugin: "com.github.johnrengelman.shadow"
+apply plugin: 'org.ajoberstar.grgit'
+
+// Insert the Git SHA into the Manifest file for logging purposes
+import org.ajoberstar.grgit.*
+def repo = Grgit.open()
+jar {
+    manifest {
+        attributes("Built-By": System.getProperty("user.name"))
+        attributes(["Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                    "GitHeadRev": repo.head().getId() ], "common")
+    }
+    from sourceSets.main.output
+}
