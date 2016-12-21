@@ -1,14 +1,14 @@
 swagger: "2.0"
 info:
   version: 0.1.0
-  title: Funcatron Java Sample Built with Gradle
-  description: A simple Funcatron example in Java
+  title: Funcatron Groovy Sample
+  description: A simple Funcatron example in Groovy
   contact:
     name: Funcmaster D
     url: https://funcatron.org
   license:
     name: Apache 2.0
-basePath: /sample/java_gradle
+basePath: /sample/groovy
 schemes:
   - http
 consumes:
@@ -20,7 +20,7 @@ paths:
     get:
       description: |
         Returns a simple JSON data structure
-      operationId: funcatron.sample.java_gradle.SimpleGet
+      operationId: funcatron.sample.groovy.SimpleGet
       responses:
         "200":
           description: simple response
@@ -35,7 +35,7 @@ paths:
     get:
       description: |
         Returns a simple JSON data structure
-      operationId: funcatron.sample.java_gradle.SimpleGet
+      operationId: funcatron.sample.groovy.SimpleGet
       parameters:
         - name: num
           in: path
@@ -56,7 +56,7 @@ paths:
   /change/{cnt}:
     post:
       description: Returns a user based on a single ID, if the user does not have access to the pet
-      operationId: funcatron.sample.java_gradle.PostOrDelete
+      operationId: funcatron.sample.groovy.PostOrDelete
       parameters:
         - name: cnt
           in: path
@@ -78,7 +78,7 @@ paths:
             $ref: '#/definitions/Data'
     delete:
       description: returns a deleted record
-      operationId: funcatron.sample.java_gradle.PostOrDelete
+      operationId: funcatron.sample.groovy.PostOrDelete
       parameters:
         - name: cnt
           in: path
@@ -93,7 +93,7 @@ paths:
             $ref: '#/definitions/Data'
     get:
       description: trigger and error
-      operationId: funcatron.sample.java_gradle.PostOrDelete
+      operationId: funcatron.sample.groovy.PostOrDelete
       parameters:
         - name: cnt
           in: path
