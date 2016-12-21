@@ -49,7 +49,7 @@ There are numerous advantages to event-based architecture:
   no need to set up harnesses that simulate or provide the other end of a switch.
 
 
-## Funcatron Pieces and Packaging
+== Funcatron Pieces and Packaging
 
 In Funcatron, user code is referred to as Funcs. Funcs are bundled together
 along with routing descriptors in a single file that's called a _Func Bundle_.
@@ -72,16 +72,86 @@ Python support is scheduled for Funcatron 0.2.0
 ====
 JavaScript support is scheduled for Funcatron 0.3.0
 ====
+* CLR (Common Language Runtime). Run .Net assemblies in Mono (scheduled for Funcatron 0.4.0)
 
-Funcatron is broken into a series of pieces:
+
+== Network 
+
+Funcatron has a series of discrete components, all of which are packaged as https://docker.com[Docker]
+components:
 
 * Frontend -- the code the recieves the incoming request.
 * Message Queue -- the medium of communication among the system components.
 * Tron -- the control system that knows what
 * Runner -- The code that dequeues requests and runs the function associated with the request.
 
+The components communicate via network as follows:
+
 [plantuml]
 ----
+skinparam handwritten true
+
+
+() "Upload/Enable" as Operator
+
+() "HTTPS Proxy" as Proxy
+
+node "Message Queue" as MQ
+
+package "Public Facing" {
+    [Frontend]
+}
+
+node {
+    [Tron]
+    [Runner]
+}
+
+
+Proxy -> [Frontend] : "HTTP port 80"
+
+[Frontend] <--> MQ : Stomp
+
+[Tron] <--> MQ : AMQP
+
+Note left of [Frontend]: Multiple instances
+
+[Frontend] -> [Runner] : "HTTP port 4000"
+
+[Runner] -> [Tron] : "HTTP port 3000"
+
+Note left of [Runner] : Multiple instances\nAuto-scaled
+
+Note left of [Tron] : One instance
+
+Note left of MQ : Cluster
+
+Note left of Operator : Access to control\nFuncatron cluster
+
+
+[Runner] <--> MQ : AMQP
+
+Operator -> [Tron] : "HTTP port 3000"
+----
+
+In the current implementation, here is the actual technology used:
+
+* Frontend -- http://openresty.org/en/[OpenResty] with Lua scripts that enqueue the requests
+  and dequeue the response
+* Message Queue -- http://www.rabbitmq.com/[RabbitMQ]
+* Tron -- JVM code (Clojure and Java)
+* Runner -- JVM code that uses https://en.wikipedia.org/wiki/Java_Classloader[classloaders] to
+            load JVM Func Bundles. For other languages, a new process will be kicked off for each
+            Func Bundle
+
+### Request Sequence Diagram
+
+Incoming HTTP requests are handled as follows:
+
+
+[plantuml]
+----
+skinparam handwritten true
 
   browser  -> "Front End": HTTP Reqest
   "Front End" -> "Front End": Consult Route Table
@@ -94,11 +164,38 @@ Funcatron is broken into a series of pieces:
 
 ----
 
-In the current implementation, here is the actual technology used:
+#### Directly proxied requests (bypass message queue)
 
-* Frontend -- http://openresty.org/en/[OpenResty] with Lua scripts that enqueue the requests
-  and dequeue the response
-* Message Queue -- http://www.rabbitmq.com/[RabbitMQ]  
+Note, the specific route may be marked "`direct`" because the request or response
+payload is too big to be reasonably handled by a message queue. In the case of a direct
+request, the sequence is:
+
+[plantuml]
+----
+skinparam handwritten true
+
+  browser  -> "Front End": HTTP Reqest
+  "Front End" -> "Front End": Consult Route Table
+  "Front End" -> "message queue": Packaged HTTP request headers
+  "message queue" -> Runner
+  "message queue" <-- Runner: URL for HTTP request
+  "Front End" <-- "message queue": URL for HTTP request
+  "Front End" -> Runner : Proxied HTTP request
+  Runner -> Runner: Func application
+  "Front End" <-- Runner : HTTP response
+  browser <-- "Front End" : HTTP response
+
+----
+
+In the above example, the message queue is used so that the Runner that
+is available to handle the request is the Runner that has the HTTP request
+proxied to it. This avoids the Frontend systems needing an up to date
+list of available Runners and avoids having different logic for routing direct
+and normal requests. [NOTE]
+====
+The Frontend code may, in the future (post 0.2.0), look at the `Content-Length` header and
+opt to request a direct connection for large request bodies.
+====
 
 
 [plantuml]
@@ -108,3 +205,6 @@ In the current implementation, here is the actual technology used:
   message_queue <-- Tron: Route Table
   openresty <-- message_queue: Route Table
 ----
+
+
+
