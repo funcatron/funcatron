@@ -1,6 +1,6 @@
-# Kotlin Funcatron Example using Gradle
+# Groovy Funcatron Example using Gradle
 
-This is a simple Kotlin project built with [`gradle`](https://gradle.org/)
+This is a simple Groovy project built with [`gradle`](https://gradle.org/)
 
 To build a Funcatron deployable JAR file, type:
 
@@ -14,12 +14,12 @@ and build an [ShadowJar](https://github.com/johnrengelman/shadow)
 of the compiled Java code as well as all the dependencies.
 
 The compiled JAR file can be found at
-`build/libs/kotlin-all.jar`.
+`build/libs/groovy-all.jar`.
 
 To upload the build to your Funcatron cluster:
 
 ```shell
-wget -O - --post-file=build/libs/kotlin-all.jar \
+wget -O - --post-file=build/libs/groovy-all.jar \
      http://<TRON_HOST>:<TRON_PORT>/api/v1/add_func
 ```
 
@@ -28,5 +28,5 @@ for more information on how to upload and enable Func Bundles.
 
 
 ```shell
- curl -H "Content-Type: application/json" -d '{"sha":"KOTLIN_SHA", "props": {"key": "value"}}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/enable
+ curl -H "Content-Type: application/json" -d '{"sha":"GROOVY_SHA", "props": {"key": "value"}}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/enable
 ```

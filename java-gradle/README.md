@@ -26,12 +26,6 @@ wget -O - --post-file=build/libs/java-gradle-all.jar \
 See [this blog post](https://blog.goodstuff.im/funcatron_mesos_now#upload-and-enable-the-code)
 for more information on how to upload and enable Func Bundles.
 
-_NOTE_: If you have already enabled the [java](../java) sample
-you will want to disable it before enabling this **java-gradle**
-sample as they both use the `/simple/java` URI. For example:
-
 ```shell
- curl -H "Content-Type: application/json" -d '{"sha":"JAVA_SHA"}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/disable
  curl -H "Content-Type: application/json" -d '{"sha":"JAVA_GRADLE_SHA", "props": {"key": "value"}}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/enable
-
 ```
