@@ -1,14 +1,12 @@
 # Funcatron Samples
 
 Sample [Funcatron](https://funcatron.org) projects in Java,
-Scala, Clojure, and Kotlin.
-
-The Clojure and Kotlin examples are coming (soon)...
+Scala, Clojure, Groovy, and Kotlin.
 
 Serverless on Your Cluster:
 
 * Define Endpoints in Swagger
-* Write Functions in Java, Scala, Clojure, Python, or JavaScript
+* Write Functions in Java, Groovy, Kotlin, Scala, Clojure, Python, or JavaScript
 * Deploy to Mesos, Kubernets, or Swarm
 * Autoscale
 
