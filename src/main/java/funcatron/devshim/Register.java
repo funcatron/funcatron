@@ -5,7 +5,6 @@ import funcatron.intf.Context;
 import funcatron.intf.Func;
 import funcatron.intf.MetaResponse;
 import funcatron.intf.impl.ContextImpl;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -26,65 +25,6 @@ import java.util.logging.Logger;
  * instance.
  */
 public class Register {
-
-
-    public static class User implements java.io.Serializable {
-
-        private String name;
-        private Integer age;
-
-        public String getName(){
-            return this.name;
-        }
-
-        public void setName(String name){
-            this.name = name;
-        }
-
-        public Integer getAge(){
-            return this.age;
-        }
-
-        public void setAge(Integer age){
-            this.age = age;
-        }
-    }
-
-    public static class PetOwner implements java.io.Serializable {
-        private User pet;
-
-        public PetOwner(User pet) {
-            this.pet = pet;
-        }
-
-        public PetOwner() {
-
-        }
-
-        public User getPet() {return pet;}
-        public void setPet(User u) {pet = u;}
-    }
-
-    static class Mooser implements Func<PetOwner, User> {
-
-        @Override
-        public User apply(PetOwner po, Context context) {
-
-            User ret = null;
-
-            if (null != po) ret = po.getPet();
-
-            if (ret == null) {
-                ret = new User();
-                ret.setAge(52);
-                ret.setName("David");
-            }
-            ret.setName("Hello: "+ret.getName());
-            ret.setAge(1 + ret.getAge());
-
-            return ret;
-        }
-    }
 
     static final Logger logger = Logger.getLogger("funcatron.devshim.Register");
     /**
@@ -152,7 +92,6 @@ public class Register {
                 OutputStream os = sock.getOutputStream();
 
 
-
                 tronSocket = sock;
                 tronInput = is;
                 tronOutput = os;
@@ -177,6 +116,7 @@ public class Register {
 
     /**
      * Based on the incoming
+     *
      * @param info
      * @return
      */
@@ -185,8 +125,8 @@ public class Register {
         Map<String, Object> headers = (Map<String, Object>) info.get("headers");
 
         try {
-            Class<Func<Object, Object>> c = (Class<Func<Object, Object>>) Class.forName(classname);
-            Func<Object, Object> f = c.newInstance();
+            Class<Func<Object>> c = (Class<Func<Object>>) Class.forName(classname);
+            Func<Object> f = c.newInstance();
             Method meth =
                     Arrays.stream(c.getMethods()).filter(m -> m.getName().equals("apply") &&
                             m.getParameterCount() == 2).findFirst().get();
@@ -200,7 +140,7 @@ public class Register {
 
             Object ret = f.apply(
                     theParam,
-                    new ContextImpl(headers, LoggerFactory.getLogger(classname)));
+                    new ContextImpl(headers, Logger.getLogger(classname)));
 
             HashMap<String, Object> answer = new HashMap<>();
             HashMap<String, Object> response = new HashMap<>();
@@ -221,7 +161,7 @@ public class Register {
 
             } else if (ret instanceof MetaResponse) {
                 MetaResponse mr = (MetaResponse) ret;
-                response.put("headers",mr.getHeaders());
+                response.put("headers", mr.getHeaders());
                 response.put("status", mr.getResponseCode());
                 response.put("body", Base64.getEncoder().encode(mr.getBody()));
                 answer.put("decodeBody", true);
@@ -252,7 +192,7 @@ public class Register {
             } catch (IOException ioe) {
                 logger.log(Level.WARNING, ioe, () -> "Failed to send response");
             }
-            }
+        }
         return null;
     }
 
