@@ -135,14 +135,24 @@ public class Register {
     }
 
     private static Map<String, Object> getContextProperties() {
-        return new HashMap<>();
+        if (null == thePropsFile) return new HashMap<>();
+
+        try {
+            ObjectMapper om = new ObjectMapper();
+            return om.readValue(thePropsFile, Map.class);
+        } catch (IOException io) {
+            logger.log(Level.WARNING, "Failed to load Context Props file as JSON", io);
+            return new HashMap<>();
+        }
     }
 
     /**
-     * Based on the incoming
+     * Based on the incoming request map (a thing much like a Ring request https://github.com/ring-clojure/ring/wiki/Concepts#requests)
+     * the right class is loaded, the Context is re-initialized, and the class is loaded and the apply method
+     * is called
      *
-     * @param info
-     * @return
+     * @param info a map the represents an HTTP request
+     * @return nothing. It's Void
      */
     private static Void invoker(Map<String, Object> info) {
         try {
@@ -157,6 +167,18 @@ public class Register {
         try {
             Class<Func<Object>> c = (Class<Func<Object>>) Class.forName(classname);
             Func<Object> f = c.newInstance();
+
+            /*
+            data-class (->>
+            (.getAnnotatedInterfaces clz)
+            (map #(.getType ^AnnotatedType %))
+            (filter #(instance? ParameterizedType %))
+            (filter #(.startsWith (.getTypeName ^ParameterizedType %) "funcatron.intf.Func<"))
+            (mapcat #(.getActualTypeArguments ^ParameterizedType %))
+            (filter #(instance? Class %))
+            first)
+            */
+
             Method meth =
                     Arrays.stream(c.getMethods()).filter(m -> m.getName().equals("apply") &&
                             m.getParameterCount() == 2).findFirst().get();
@@ -164,13 +186,23 @@ public class Register {
             Object theParam = null;
 
             if (null != info.get("body")) {
-                theParam = (new ObjectMapper()).
-                        readValue((String) info.get("body"), paramType);
+                Function<Object, Object> decodeFunc = f.jsonDecoder();
+                if (null != decodeFunc) {
+                    theParam = decodeFunc.apply((new ObjectMapper()).
+                            readTree((String) info.get("body")));
+                } else {
+                    theParam = (new ObjectMapper()).
+                            readValue((String) info.get("body"), paramType);
+                }
             }
 
             Object ret = f.apply(
                     theParam,
                     new ContextImpl(headers, Logger.getLogger(classname)));
+
+            Function<Object, byte[]> encodeFunc = f.jsonEncoder();
+
+            if (null != encodeFunc) ret = encodeFunc.apply(ret);
 
             HashMap<String, Object> answer = new HashMap<>();
             HashMap<String, Object> response = new HashMap<>();
