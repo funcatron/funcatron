@@ -17,10 +17,10 @@ class Data(val name: String, val age: Int) {
 /**
  * Returns a simple Map
  */
-class SimpleGet : Func<Any> {
+class SimpleGet : Func<Any?> {
 
 
-    override fun apply(o: Any, c: Context): Any {
+    override fun apply(o: Any?, c: Context): Any {
 
         c.logger.info("In Simple Get...")
 
@@ -48,17 +48,18 @@ class SimpleGet : Func<Any> {
 /**
  * A class that handles POST or DELETE
  */
-class PostOrDelete : Func<Data> {
+class PostOrDelete : Func<Data?> {
 
-    override fun apply(data: Data, context: Context): Any {
+    override fun apply(data: Data?, context: Context): Any {
         val cnt = context.requestParams["path"]?.get("cnt") as Number
 
         return when (context.method) {
             "delete" -> Data("Deleted " + cnt.toLong(), cnt.toInt())
-            "post" -> (1..cnt.toInt()).map {
-                i ->
-                Data(data.name + i, data.age + i)
-            }
+            "post" -> if (data != null)
+                (1..cnt.toInt()).map {
+                    i ->
+                    Data(data.name + i, data.age + i)
+                } else listOf()
             else -> object : MetaResponse {
 
                 override fun getResponseCode(): Int = 400
