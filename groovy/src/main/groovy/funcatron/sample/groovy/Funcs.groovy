@@ -6,7 +6,7 @@ import funcatron.intf.MetaResponse
 import java.util.logging.Level
 
 /**
- * Created by dpp on 12/2/16.
+ * The Data object
  */
 class Data {
     String name
