@@ -67,6 +67,11 @@ public class Register {
      */
     private static final HashMap<String, Function<Map, Void>> execMap = new HashMap<>();
 
+    /**
+     * The properties file to send to the context for stuff like JDBC credentials
+     */
+    private static File thePropsFile = null;
+
     static {
         execMap.put("invoke", Register::invoker);
     }
@@ -80,7 +85,22 @@ public class Register {
      */
     public static void register(String host, int port, File funcatronFile)
             throws IOException {
+        register(host, port, funcatronFile, null);
+    }
+
+        /**
+         * Register the runtime with the Funcatron development server
+         *
+         * @param host          the host of the funcatron server
+         * @param port          the port of the funcatron server
+         * @param funcatronFile the funcatron.yaml, funcatron.yml, or funcatron.json file
+         * @param propsFile the properties file to be passed to the context
+         */
+    public static void register(String host, int port, File funcatronFile, File propsFile)
+            throws IOException {
         synchronized (syncObj) {
+            thePropsFile = propsFile;
+
             // start a new "version" of the registration
             runCount.incrementAndGet();
             shutdown();
@@ -114,6 +134,10 @@ public class Register {
 
     }
 
+    private static Map<String, Object> getContextProperties() {
+        return new HashMap<>();
+    }
+
     /**
      * Based on the incoming
      *
@@ -121,6 +145,12 @@ public class Register {
      * @return
      */
     private static Void invoker(Map<String, Object> info) {
+        try {
+            ContextImpl.initContext(getContextProperties(), Register.class.getClassLoader(), logger);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to initialize Context", e);
+        }
+
         String classname = (String) info.get("class");
         Map<String, Object> headers = (Map<String, Object>) info.get("headers");
 
