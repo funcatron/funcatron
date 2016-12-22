@@ -1,24 +1,24 @@
-# Java Funcatron Example using Maven
+# Clojure Funcatron Example 
 
-This is a simple Java project built with [`Maven`](https://maven.apache.org/)
+This is a simple Clojure project built with [`lein`](http://leiningen.org/)
 
 To build a Funcatron deployable JAR file, type:
 
 ```
-mvn clean package
+lein do clean, test, uberjar
 ```
 
-Those commands tell maven to clean any artifacts, compile,
-and build an [assembly](http://maven.apache.org/plugins/maven-assembly-plugin/)
-of the compiled Java code as well as all the dependencies.
+Those commands tell lein to clean any artifacts, compile, test,
+and build an [uberjar](http://asymmetrical-view.com/2010/06/08/building-standalone-jars-wtih-leiningen.html)
+of the compiled Clojure code as well as all the dependencies.
 
 The compiled JAR file can be found at
-`target/java_sample-0.1-SNAPSHOT-jar-with-dependencies.jar`.
+`target/target/clojure_sample-0.1.0-SNAPSHOT-standalone.jar`.
 
 To upload the build to your Funcatron cluster:
 
 ```shell
-wget -O - --post-file=target/java_sample-0.1-SNAPSHOT-jar-with-dependencies.jar \
+wget -O - --post-file=target/clojure_sample-0.1.0-SNAPSHOT-standalone.jar \
      http://<TRON_HOST>:<TRON_PORT>/api/v1/add_func
 ```
 
