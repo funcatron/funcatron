@@ -5,6 +5,8 @@ import funcatron.intf.Context;
 import funcatron.intf.Func;
 import funcatron.intf.MetaResponse;
 
+import javax.annotation.Resource;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,9 @@ import java.util.function.Function;
 public class PostOrDelete implements Func<Data> {
 
     private static final ObjectMapper jackson = new ObjectMapper();
+
+    private @Resource
+    Connection db;
 
     @Override
     public Object apply(Data data, Context context) {
