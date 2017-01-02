@@ -16,13 +16,13 @@ import java.util.logging.Logger;
  */
 public class ContextImpl implements Context, Accumulator {
 
-    private final Map<String, Object> data;
+    private final Map<Object, Object> data;
     private final Logger logger;
     private final CopyOnWriteArrayList<ReleasePair<?>> toTerminate = new CopyOnWriteArrayList<>();
 
     private static final ConcurrentHashMap<String, ServiceVendor<?>> services = new ConcurrentHashMap<>();
 
-    public ContextImpl(Map<String, Object> data, Logger logger) {
+    public ContextImpl(Map<Object, Object> data, Logger logger) {
         this.data = data;
         this.logger = logger;
     }
@@ -30,7 +30,7 @@ public class ContextImpl implements Context, Accumulator {
     private static Map<String, Object> props = new HashMap<>();
 
     public static void initContext(Map<String, Object> props, ClassLoader loader,final  Logger logger) throws Exception {
-        logger.log(Level.INFO, "Setting up context with props ", props);
+        logger.log(Level.INFO,  () -> "Setting up context with props " + props);
         ContextImpl.props = props;
         ServiceLoader<ServiceVendorBuilder> builders =
         ServiceLoader.load(ServiceVendorBuilder.class, loader);
@@ -47,10 +47,10 @@ public class ContextImpl implements Context, Accumulator {
             Map m = (Map) v;
             Object o = m.get("type");
             if (null != o && o instanceof String) {
-                logger.log(Level.INFO, "Looking for builder for type: ", o);
+                logger.log(Level.FINER, () -> "Looking for builder for type: " + o);
                 ServiceVendorBuilder b = builderMap.get(o);
                 if (null != b) {
-                    logger.log(Level.INFO, "Building with props ", m);
+                    logger.log(Level.FINER, () -> "Building with props " + m);
                     Optional<ServiceVendor<?>> opt = b.buildVendor(k, m, logger);
                     opt.map(vendor -> services.put(k, vendor));
 
@@ -82,7 +82,7 @@ public class ContextImpl implements Context, Accumulator {
      * @return key/value information for the request
      */
     @Override
-    public Map<String, Object> getRequestInfo() {
+    public Map<Object, Object> getRequestInfo() {
         return data;
     }
 
@@ -216,14 +216,17 @@ public class ContextImpl implements Context, Accumulator {
 
     @Override
     public <T> void accumulate(T item, ServiceVendor<T> vendor) {
+        getLogger().log(Level.FINER, () -> "Accumulating "+item);
         toTerminate.add(new ReleasePair(item, vendor));
     }
 
     public void finished(boolean success) {
+        getLogger().log(Level.FINER, () ->"Finished "+success+" Notifying "+toTerminate.size());
         toTerminate.forEach(a -> {
             // cast to something to avoid type error
             ReleasePair<Object> b = (ReleasePair<Object>) a;
             try {
+                getLogger().log(Level.FINER, () -> "Releasing "+b.item);
                 b.vendor.release(b.item, success);
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Exception releasing " + a.item, e);
@@ -250,6 +253,7 @@ public class ContextImpl implements Context, Accumulator {
      */
     @Override
     public Optional<ServiceVendor<?>> serviceForName(String name) {
+        if (!services.containsKey(name)) return Optional.empty();
         return Optional.of(services.get(name));
     }
 

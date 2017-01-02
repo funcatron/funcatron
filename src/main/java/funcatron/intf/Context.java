@@ -14,7 +14,7 @@ public interface Context {
      *
      * @return key/value information for the request
      */
-    Map<String, Object> getRequestInfo();
+    Map<Object, Object> getRequestInfo();
 
     /**
      * Get the logger

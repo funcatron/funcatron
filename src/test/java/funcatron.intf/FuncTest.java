@@ -42,8 +42,8 @@ public class FuncTest {
         }
     };
 
-    private Map<String, Object> buildContextMap() {
-        return new HashMap<String, Object>() {{
+    private Map<Object, Object> buildContextMap() {
+        return new HashMap<Object, Object>() {{
             put("uri", "/hello/world");
 
             put("scheme", "http");
@@ -69,7 +69,7 @@ public class FuncTest {
     }
 
     @Test
-    public void CallFunc() {
+    public void CallFunc() throws Exception {
         Map in = new HashMap() {{
             put("snark", 33);
         }};

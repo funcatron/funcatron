@@ -100,7 +100,11 @@ public class JDBCServiceVendorBuilder implements ServiceVendorBuilder {
                          */
                         @Override
                         public Connection vend(Accumulator acc) throws Exception {
-                            return ds.getConnection();
+                            final Connection ret = ds.getConnection();
+                            ret.setAutoCommit(false);
+                            // make sure we are notified of release
+                            acc.accumulate(ret, this);
+                            return ret;
                         }
 
                         /**
