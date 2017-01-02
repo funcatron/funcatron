@@ -32,18 +32,22 @@
            (com.fasterxml.jackson.module.paramnames ParameterNamesModule)
            (com.fasterxml.jackson.datatype.jdk8 Jdk8Module)
            (com.fasterxml.jackson.datatype.jsr310 JavaTimeModule)
-           (java.util.logging Logger LogRecord Level)))
+           (java.util.logging Logger LogRecord Level)
+           (com.fasterxml.jackson.core JsonParser$Feature)))
 
 
 (set! *warn-on-reflection* true)
 
 (def ^ObjectMapper jackson-json
   "The Jackson JSON ObjectMapper"
-  (->
-    (.findAndRegisterModules (ObjectMapper.))
-    (.registerModule (ParameterNamesModule.))
-    (.registerModule (Jdk8Module.))
-    (.registerModule (JavaTimeModule.))
+  (let [jackson (->
+                  (.findAndRegisterModules (ObjectMapper.))
+                  (.registerModule (ParameterNamesModule.))
+                  (.registerModule (Jdk8Module.))
+                  (.registerModule (JavaTimeModule.))
+                  )]
+    (.configure jackson JsonParser$Feature/ALLOW_SINGLE_QUOTES true)
+    jackson
     ))
 
 (defn walk
@@ -64,6 +68,8 @@
       )
     )
   )
+
+
 
 (defn kwd-to-string
   "Converts a keyword to a String"
@@ -100,6 +106,23 @@
   ([f m] (walk f csk/->kebab-case-keyword m))
   )
 
+(defn ensure-json-clean
+  "Return the value if it can be JSON serialized"
+  [v]
+  (if (or (nil? v)
+          (instance? List v)
+          (instance? Map v)
+          (string? v)
+          (instance? Number v)
+          (keyword? v)
+          (symbol? v)
+          (instance? Boolean v)
+          ) v nil))
+
+(defn json-clean
+  "Recursively make sure the data nodes are JSON serializable"
+  [m]
+  (walk ensure-json-clean identity m))
 
 (def ^CustomPrettyPrinter pretty-printer
   "a JSON Pretty Printer"
@@ -325,6 +348,10 @@
 (extend nil
   ABase64Encoder
   {:base64encode (fn [the-nil] "")})
+
+(extend InputStream
+  ABase64Encoder
+  {:base64encode (fn [^InputStream is] (base64encode (second (to-byte-array is))))})
 
 (def funcatron-file-regex
   #"(?:.*\/|^)funcatron\.(json|yml|yaml)$")
@@ -776,3 +803,31 @@
             (timbre/may-log? level name t-config)))
         (^void log [_ ^LogRecord record]
           (do-logging-via-timbre name t-config log-props record))))))
+
+(defn restore-body
+  "Okay... if we've preserved the body, restore it"
+  [req]
+  (if-let [bytes (:body-bytes req)]
+    (assoc req :body (ByteArrayInputStream. bytes))
+    req))
+
+(defn- -preserve-body
+  "The actual handler that preserves the body"
+  [handler req]
+  (let [req (if (instance? InputStream (:body req))
+              (let [ba (second (to-byte-array (:body req)))]
+                (-> req
+                    (assoc :body-bytes ba)
+                    (assoc :body (ByteArrayInputStream. ba))))
+              req)]
+    (handler req)))
+
+(defn preserve-body
+  "So, sometimes Ring middleware is destructive, which sucks... so
+  if there's a body field and it's a stream, slurp the bytes and allow
+  the stream to be restored"
+  [handler]
+  (fn [req]
+    (-preserve-body handler req)
+    )
+  )

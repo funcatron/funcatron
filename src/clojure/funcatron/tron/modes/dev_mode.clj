@@ -198,36 +198,56 @@
       (shutdown)))
   )
 
+(defn- or-empty-map
+  [v]
+  (or v {}))
+
 (defn exec-app
   [op-i req]
-  (info (str "Dispatching request to " op-i))
-  (let [req2 (dissoc req :swagger)
-        req2 (assoc req2 :body (get-in req [:parameters :body]))]
+
+  (let [req (fu/restore-body req)
+        the-body (if (:body req) (fu/base64encode (:body req)) nil)
+        req2 (assoc req :body the-body)
+        req2 (-> req2
+                 (update-in [:parameters :query] or-empty-map)
+                 (update-in [:parameters :body] or-empty-map)
+                 (update-in [:parameters :path] or-empty-map))
+        req2 (fu/json-clean req2)
+        ]
     (let [uuid (fu/random-uuid)
           p (promise)]
       (swap! shim-socket assoc-in [::requests uuid] p)
       (send-message {:cmd     "invoke"
-                     :headers (:headers req)
+                     :req req2
                      :class   op-i
                      :replyTo uuid
-                     :body    (if (:body req2) (json/generate-string (:body req2)) nil)})
-      (info "Sent the request over the wire to the IDE/App ")
-      (let [answer (deref p (* 1000 (-> @the-opts/command-line-options :options :dev_request_timeout)) ::failed)]
-        (if (= ::failed answer)
+                     })
+      (try
+        (let [answer (deref p (* 1000
+                                 (or
+                                   (-> @the-opts/command-line-options :options :dev_request_timeout)
+                                   50)) ::failed)]
+          (if (= ::failed answer)
+            (do
+              (info "Timed Out")
+              {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"})
+            (let [response (:response answer)
+                  response (update response :headers fu/stringify-keys)
+                  response (if (and (:body response) (:decodeBody answer))
+                             (assoc response
+                               :body
+                               (ByteArrayInputStream. (.decode (Base64/getDecoder) ^String (:body response))))
+                             response)
+                  ]
+              response
+              )
+            ))
+        (catch Exception e
           (do
-            (info "Timed Out")
-            {:status 500 :headers {"Content-Type" "text/plain"} :body "Didn't get the answer"})
-          (let [response (:response answer)
-                response (update response :headers fu/stringify-keys)
-                response (if (and (:body response) (:decodeBody answer))
-                           (assoc response
-                             :body
-                             (ByteArrayInputStream. (.decode (Base64/getDecoder) ^String (:body response))))
-                           response)
-                ]
-            (info (str "Got a response. Status code " (:status response)))
-            response
-            ))))))
+            (error e "Error")
+            (throw e)))
+        )
+      )))
 
 (defn resolve-app
   [req]
@@ -239,6 +259,7 @@
   [swagger]
   (-> {:definition     swagger
        :chain-handlers (list)}
+      (s1st/ring fu/preserve-body)
       (s1st/discoverer)
       (s1st/mapper)
       (s1st/parser)
@@ -279,6 +300,6 @@
   "The dev server entrypoint"
   []
   (reset! end-server (fu/start-http-server @the-opts/command-line-options #'http-handler))
-  (setup (-> @the-opts/command-line-options :options :shim_port))
+  (setup (or (-> @the-opts/command-line-options :options :shim_port) 54657))
   (info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
   )

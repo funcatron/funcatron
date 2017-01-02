@@ -11,7 +11,7 @@
             [cheshire.core :as json]
             [funcatron.tron.util :as fu])
   (:import (java.util.jar JarFile)
-           (java.io File InputStream ByteArrayInputStream)
+           (java.io InputStream ByteArrayInputStream)
            (java.net URLClassLoader URL)
            (java.lang.reflect Method Constructor InvocationTargetException AnnotatedType ParameterizedType)
            (funcatron.abstractions Router Router$Message)
@@ -35,7 +35,7 @@
 (s/def ::jar-info (s/keys :req [::jar ::classloader ::uuid]
                           :opt [::swagger]))
 
-(s/fdef jar-info-from-file
+#_(s/fdef jar-info-from-file
         :args (s/or :item string?
                     :item #(instance? File %)
                     )
@@ -51,7 +51,7 @@
      }
     ))
 
-(s/fdef get-swagger
+#_(s/fdef get-swagger
         :args (s/cat :jar-info ::jar-info)
         :ret ::swagger)
 
@@ -61,7 +61,7 @@
   (let [^JarFile jar (::jar jar-info)]
     (funcatron.tron.util/get-swagger-from-jar jar)))
 
-(s/fdef update-jar-info-with-swagger
+#_(s/fdef update-jar-info-with-swagger
         :args (s/cat :jar-info ::jar-info)
         :ret ::jar-info)
 
@@ -255,10 +255,10 @@
                               :body    (exception-to-string e)}))))))
 
 (defn- resolve-stuff
-  "Given a ::jar-info and a "
-    [{:keys [::classloader]} req]
+  "Given a ::jar-info and swagger, "
+    [{:keys [::classloader]} swagger-info]
 
-    (let [^String op-id (get req "operationId")
+    (let [^String op-id (get swagger-info "operationId")
           clz (.loadClass ^ClassLoader classloader op-id)
           data-class (->>
                        (.getAnnotatedInterfaces clz)
@@ -287,6 +287,7 @@
     [the-jar]
     (-> {:definition     (::swagger the-jar)
          :chain-handlers (list)}
+        (s1st/ring fu/preserve-body)
         (s1st/discoverer)
         (s1st/mapper)
         (s1st/parser)

@@ -14,8 +14,7 @@
             [funcatron.tron.options :as opts])
   (:import (java.io File)
            (funcatron.abstractions MessageBroker MessageBroker$ReceivedMessage Lifecycle)
-           (java.net URLEncoder)
-           (com.fasterxml.jackson.databind ObjectMapper)))
+           (java.net URLEncoder)))
 
 
 (set! *warn-on-reflection* true)
@@ -442,8 +441,6 @@
                ::shutdown-http-server shutdown-http-server
                ::route-map            route-map}
         ]
-
-    (.findAndRegisterModules (ObjectMapper.))
 
     (add-watch route-map state routes-changed)
 

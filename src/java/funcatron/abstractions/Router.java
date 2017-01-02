@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.function.Function;
 
 
-
 /**
  * The thing that routes a message
  */
@@ -14,32 +13,39 @@ public interface Router {
     interface Message {
         /**
          * The reply-to header
+         *
          * @return the reply-to header
          */
-        default String replyTo()  {
-            return (String)  metadata().get("reply-to");
+        default String replyTo() {
+            return (String) metadata().get("reply-to");
         }
 
         /**
          * The host header
+         *
          * @return the host header
          */
         default String host() {
-            return (String)  metadata().get("x-host");
+            return (String) metadata().get("x-host");
         }
 
         /**
          * Get the name of the reply queue to send the message to
+         *
          * @return the reply queue
          */
-        default String replyQueue() {return (String) metadata().get("x-reply-queue");}
+        default String replyQueue() {
+            return (String) metadata().get("x-reply-queue");
+        }
 
 
         /**
          * The uri header
+         *
          * @return the uri header
          */
         default String uri() {
+
             return (String) metadata().get("x-uri");
         }
 
@@ -49,11 +55,12 @@ public interface Router {
          * @return the scheme header
          */
         default String scheme() {
-            return (String)  metadata().get("x-scheme");
+            return (String) metadata().get("x-scheme");
         }
 
         /**
          * The method header
+         *
          * @return the method header
          */
         default String method() {
@@ -66,6 +73,7 @@ public interface Router {
 
         /**
          * Get the port... may be String, Number, or null
+         *
          * @return get the port
          */
         default Object port() {
@@ -74,6 +82,7 @@ public interface Router {
 
         /**
          * get the protocol for the request
+         *
          * @return
          */
         default String protocol() {
@@ -82,6 +91,7 @@ public interface Router {
 
         /**
          * Get the uri args for the request
+         *
          * @return the uri args for the request
          */
         default String args() {
@@ -90,6 +100,7 @@ public interface Router {
 
         /**
          * The content-type header
+         *
          * @return the content-type header
          */
         default String contentType() {
@@ -98,6 +109,7 @@ public interface Router {
 
         /**
          * The remote address of the client
+         *
          * @return remote address
          */
         default String remoteAddr() {
@@ -106,17 +118,22 @@ public interface Router {
 
         /**
          * The
+         *
          * @return
          */
         Map<String, Object> metadata();
+
         Object body();
+
         byte[] rawBody();
+
         MessageBroker.ReceivedMessage underlyingMessage();
     }
 
     /**
      * Convert the message from the more generic one from the MessageBroker into
      * something that can be routed
+     *
      * @param message
      * @return
      */
@@ -162,24 +179,28 @@ public interface Router {
 
     /**
      * Get the host that this Router is listening for
+     *
      * @return the name of the host. May be null
      */
     String host();
 
     /**
      * Get the base path for this Router
+     *
      * @return the base path for the router
      */
     String basePath();
 
     /**
      * Return the name of the queue that is associated with the host/path combination
+     *
      * @return the name of the queue associated with the host/path combination
      */
     String nameOfListenQueue();
 
     /**
      * Get the swagger for this Router
+     *
      * @return the Swagger information for the router
      */
     Map<String, Object> swagger();
