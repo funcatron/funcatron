@@ -159,6 +159,7 @@ connected via port 54657.
 
 Test to see if Funcation is running by pointing your browser to http://localhost:3000 .
 You should see a message like: `No Swagger Defined. Unable to route request`. This
+is because there's no application connected to Funcatron. So... let's create an app.
 
 === Create a new project
 
@@ -176,6 +177,14 @@ mvn archetype:generate -B \
    -Dversion=0.1.0 \
    -DarchetypeRepository=https://clojars.org/repo
 ----
+
+Or if you're using Windows PowerShell:
+
+[source,powershell]
+----
+mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.2.1" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" "-DarchetypeRepository=https://clojars.org/repo"
+----
+
 
 Things you'll change for your project: `-DgroupId=` and `-DartifactId`.
 
@@ -197,6 +206,8 @@ parts of the project.
 ==== The Java Stuff
 
 The actual code that's executed is the Java code.
+
+===== Data Shapes
 
 The data is in a https://en.wikipedia.org/wiki/Plain_Old_Java_Object[PoJo] in the
 `MyPojo.java` file. The code is pretty normal:
@@ -228,6 +239,14 @@ public class MyPojo implements java.io.Serializable {
 
 `MyPojo` is a Java class with getters and setters.
 
+Funcatron converts incoming requests into a parameter for the `Func` application (call
+to the `apply` method on the `Func` implementation) and serializes the return value.
+By default, Funcatron uses https://github.com/FasterXML/jackson[Jackson] to serialize
+and deserialize values. Having PoJos that represent the data shapes for your application
+makes it super simple to do serialization.
+
+===== Logic
+
 In the `MyFunction.java` file, there are a bunch of different pieces:
 the `apply` method that Funcatron applies, the database access
 code, and the "`dev-time`" code that
@@ -251,9 +270,20 @@ Let's start by looking at the dev-time code:
 The code prints some messages and connects to the
 development-time Funcatron instance in the Docker container.
 
+This code is useful for you to set up your IDE to do debugging, etc. while
+you run a mini version of Funcatron in a Docker container. What does it do?
+
+It makes a connection to the Docker container running mini-Funcatron. When mini-Func
+gets an HTTP request, it packages the request up and forwards the request to the
+app which is likely running in your IDE. You can see output, set breakpoints, and generally
+rapidly update your app.
+
+Also, given that your Funcatron apps should be small, recompile times should be short so you
+can quickly cycle and quickly build your app.
+
 If you're using a language or a development environment that allows
 dynamic code reloading (e.g., Clojure or https://zeroturnaround.com/software/jrebel/[JRebel])
-the funcatron.yaml (Swagger file) and the exec_props (runtime
+the `funcatron.yaml` (Swagger file) and the exec_props (runtime
 properties) will reflect the current values... update them
 at will.
 
@@ -288,13 +318,13 @@ The key takeaways are:
 
 * The `Context` allows access to logging via the `getLogger()` method.
 * Access to the database and other services is done via the `vendForName(name, class)`
-  method which returns an `Optional<class>`. These items are defines in the `exec_props.json` file.
+  method which returns an `Optional<class>`. These items are defined in the `exec_props.json` file.
 * The `map` method on the `Optional` accesses the vended instance.
 * If objects vended during a request are transactional (e.g., JDBC connections),
   the transactions will be automatically committed if the function returns
   successfully, but will be rolled back if the function throws an exception.
 
-Finally, let's take a look at the `apply` method:
+Finally, let's take a look at the `apply` method (the heart of the business logic for the `Func`):
 
 [source,java]
 ----
@@ -314,20 +344,32 @@ Finally, let's take a look at the `apply` method:
 
         pojo.setName("Hello: " + pojo.getName() + " at " + (new Date()));
         pojo.setAge(pojo.getAge() + 1);
+        
         // put the pojo in the DB
         addToDatabase(pojo, context);
+        
         return pojo;
     }
 ----
 
 If the `pojo` is passed as a parameter (i.e., the function was invoked via
-a `POST` or `PUT`), it will be populated in the parameter.
+a `POST` or `PUT`), it will be populated in the `pojo` parameter.
 
 The method contains plain old Java code, which is exactly what you want: focus
 on the business logic.
 
 Oh... and we print a message if we've got a Redis driver... so... how
 did we get a Redis driver?
+
+"`Why does Funcatron use the Java logger?`" Well... it's like this...
+there are 18 billion logging libraries in Java-land and we needed
+to choose one, so we chose the one built into Java.
+ 
+Under the covers, we do lots of fun things with logging including
+associating each log line with the Git SHA (unique code version)
+of the code that generated the log line as well as having a unique
+id for each request that's propagated across the cluster so you can
+see all the places where a request fanned out to.
 
 Let's take a gander at `RedisDriver.java`:
 
@@ -423,11 +465,153 @@ and get an `Optional<Jedis>` back.
 You can create `ServiceVendorBuilder` instances for any `type` and, boom, have access to those services
 based on Execution Properties.
 
-== Execution Properties
+=== Serializers
+
+By default, Funcatron uses https://github.com/FasterXML/jackson[Jackson] to serialize and
+ deserialized JSON data. This is fine for Java PoJos that have getters/setters. But if you
+ are using http://stackoverflow.com/questions/3511120/why-shouldnt-i-use-immutable-pojos-instead-of-javabeans[immutable pojos],
+ Scala case classes, etc., you may have more complex serialization needs.
+ 
+The `Func` interface allows you to write custom serializers.
+
+To deserialize incoming data using special rules, override the `jsonDecoder` method in `Func`
+and to serialize returned data using special rules, override the `jsonEncoder` method:
+
+[source,java]
+----
+    public Function<InputStream, Data> jsonDecoder() {
+        return m -> {
+            try {
+                return jackson.readValue(m, Data.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize", e);
+            }
+        };
+    }
+----
+
+The method returns a `Function` that takes an `InputStream` and returns an instance
+of the type matching the first parameter of `apply` method.
+
+The `jsonEncoder` method does the opposite. Here's a Scala example:
+
+[source,scala]
+----
+trait DecoderOMatic[T] {
+
+  protected def ct: Class[T]
+
+  def jsonDecoder(): Function[InputStream, T] = {
+    new Function[InputStream, T] {
+      def apply(t: InputStream): T = DecoderOMatic.jackson.readValue(t, ct)
+    }
+  }
+
+  def jsonEncoder(): Function[Object, Array[Byte]] =
+    new Function[Object, Array[Byte]] {
+      def apply(o: Object) = DecoderOMatic.jackson.writer().writeValueAsBytes(o)
+    }
+}
+
+object DecoderOMatic {
+  val jackson: ObjectMapper = {
+    val mapper = new ObjectMapper()
+    mapper.registerModule(DefaultScalaModule)
+    mapper
+  }
+}
+----
+
+The above code creates an instance of the Jackson `ObjectMapper` and adds the Scala module.
+
+For complex data types, build your own serializers.
 
 == Funcatron Swagger File
 
-== The Build File
+So... how does Funcatron associate code with HTTP endpoints? How does Funcatron
+ ensure that the functions are called with properly shaped data?
+ 
+Funcatron endpoints are defined in a http://swagger.io/[Swagger] file named
+ either `funcatron.yaml` or `funcatron.json`. Define the endpoints, associate them with
+ the class that implements the `Func` interface via the `operationId` field and
+ Funcatron does the rest.
+ 
+What's "the rest"?
+
+* Funcatron ensures the incoming data is shaped correctly and will not
+  attempt to deserialize the JSON data if it's not properly shaped.
+* Funcatron ensures all the rules defined in the Swagger file (e.g.,
+  OAuth rules, etc.) are properly enforced.
+* In production, wires up the front end web servers to respond to requests.
+* In development mode, presents a UI to test out the API endpoints at
+  http://localhost:3000/ui/
+  
+So, let's see some of the Swagger magic in action. Point your browser to
+http://localhost:3000/ui/ then click through "default" and "POST". Cool.
+You can try out a `POST` from your browser.
+
+Next, let's update the `funcatron.yaml` file. Replace the `post:` line
+and all subsequent lines in the file with:
+
+[source,yaml]
+----
+    post:
+      description: Creates new sample data
+      operationId: my.stellar.MyFunction
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Data'
+      responses:
+        "200":
+          description: sample response
+        default:
+          description: unexpected error
+
+definitions:
+  Data:
+    required:
+      - name
+      - age
+    properties:
+      name:
+        type: string
+      age:
+        type: number
+----
+
+Now, reload the browser and you can see the UI presents you with the option
+of entering JSON data. Enter some and click the `Try it out!` button.
+
+Well... you get the idea. Basically, model your REST endpoints in Swagger,
+test stuff out in the browser. Associate your classes with the `operationId`
+field, and the code will Just Work(TM).
+
+== Execution Properties
+
+The static relationship between REST endpoints and your code as well as access control
+rules, etc. are defined in your code and the `funcatron.yaml` Swagger file.
+
+However, there will be runtime properties that are different among different environments.
+For example, you'll have database access credentials for development time, for testing time,
+staging, and production.
+
+Those items bundled together in "`Execution Properties`".
+
+For the development-time project, we have the `exec_props.json` file which
+contains Execution Properties that are used during development-time.
+
+We've seen if the Execution Properties have a `type` field and a named Service Vendor
+is associated with the type, the service is available in the `Context`.
+
+The entire contents of the Execution Properties information is available in the
+`Context.properties()` method. This returns a `Map` of key/value pairs.
+Put any old information associated with the execution of the code in the
+Execution Properties and it's available to the `Func`.
+
+Execution properties are defined via JSON when a Func Bundle is deployed. See <<Deploying>>.
 
 == Packaging your Func Bundle
 
@@ -446,6 +630,8 @@ dpp@octopus:~/tmp/thang$ ls -l target/thang-0.1.0-jar-with-dependencies.jar
 -rw-rw-r-- 1 dpp dpp 4254796 Jan  2 17:42 target/thang-0.1.0-jar-with-dependencies.jar
 ----
 
+=== Deploying
+
 To upload:
 
 [source, shell]
@@ -454,6 +640,5 @@ wget -q -O - --post-file=target/thang-0.1.0-jar-with-dependencies.jar http://<SE
 ----
 
 
-
-
+== The Build File
 
