@@ -22,6 +22,16 @@ To run the Funcatron dev server:
 docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1
 ```
 
+To run your project code:
+
+```
+mvn compile exec:java
+```
+
+
+Then point your browser to [http://localhost:3000/api/sample](http://localhost:3000/api/sample)
+
+
 ## Contributing
 
 Please see [CONTRIBUTING](https://github.com/funcatron/tron/blob/master/CONTRIBUTING.md) for details on

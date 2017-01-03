@@ -30,7 +30,7 @@ public class MyFunction implements Func<MyPojo> {
         }
 
         // if we have a Redis driver, let the world know
-        context.vendForName("cache", Jedis.class).toStream().forEach(a ->
+        context.vendForName("cache", Jedis.class).map(a ->
         {
             context.getLogger().log(Level.INFO, "Yay!. Got Redis Driver");
             return null;
@@ -102,7 +102,8 @@ public class MyFunction implements Func<MyPojo> {
      */
     public static void main(String[] args) throws Exception {
         System.out.println("Starting connection to Funcatron dev server");
-        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -p 3000:3000 -p 54657:54657 funcatron/dev-docker:latest");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1");
+        System.out.println("Then point your browser to http://localhost:3000/api/sample");
 
         Register.register(funcatronDevHost(), funcatronDevPort(),
                 new File("src/main/resources/funcatron.yaml"),

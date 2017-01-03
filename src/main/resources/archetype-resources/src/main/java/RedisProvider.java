@@ -62,7 +62,7 @@ public class RedisProvider implements ServiceVendorBuilder {
 
             @Override
             public Jedis vend(Accumulator acc) throws Exception {
-                Jedit ret = new Jedis(host);
+                Jedis ret = new Jedis(host);
                 // make sure we are notified of release
                 acc.accumulate(ret, this);
                 return ret;
