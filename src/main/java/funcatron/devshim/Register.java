@@ -1,21 +1,21 @@
 package funcatron.devshim;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import funcatron.intf.Context;
-import funcatron.intf.Func;
-import funcatron.intf.MetaResponse;
 import funcatron.intf.impl.ContextImpl;
+import funcatron.intf.impl.Dispatcher;
+
 
 import java.io.*;
-import java.lang.reflect.Method;
 import java.net.Socket;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -72,8 +72,11 @@ public class Register {
      */
     private static File thePropsFile = null;
 
+    private static ObjectMapper jackson = new ObjectMapper();
+
     static {
         execMap.put("invoke", Register::invoker);
+        jackson.configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
     }
 
     /**
@@ -138,8 +141,7 @@ public class Register {
         if (null == thePropsFile) return new HashMap<>();
 
         try {
-            ObjectMapper om = new ObjectMapper();
-            return om.readValue(thePropsFile, Map.class);
+            return jackson.readValue(thePropsFile, Map.class);
         } catch (IOException io) {
             logger.log(Level.WARNING, "Failed to load Context Props file as JSON", io);
             return new HashMap<>();
@@ -154,7 +156,7 @@ public class Register {
      * @param info a map the represents an HTTP request
      * @return nothing. It's Void
      */
-    private static Void invoker(Map<String, Object> info) {
+    private static Void invoker(Map<Object, Object> info) {
         try {
             ContextImpl.initContext(getContextProperties(), Register.class.getClassLoader(), logger);
         } catch (Exception e) {
@@ -162,75 +164,51 @@ public class Register {
         }
 
         String classname = (String) info.get("class");
-        Map<String, Object> headers = (Map<String, Object>) info.get("headers");
+
+        Map<Object, Object> request = (Map<Object, Object>) info.get("req");
 
         try {
-            Class<Func<Object>> c = (Class<Func<Object>>) Class.forName(classname);
-            Func<Object> f = c.newInstance();
+            Dispatcher d = new Dispatcher();
 
-            /*
-            data-class (->>
-            (.getAnnotatedInterfaces clz)
-            (map #(.getType ^AnnotatedType %))
-            (filter #(instance? ParameterizedType %))
-            (filter #(.startsWith (.getTypeName ^ParameterizedType %) "funcatron.intf.Func<"))
-            (mapcat #(.getActualTypeArguments ^ParameterizedType %))
-            (filter #(instance? Class %))
-            first)
-            */
+            BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>> applyFunc = d.apply(classname,
+                    new HashMap<Object, Object>((Map<Object, Object>)request.get("swagger")) {{
+                put("$deserializer", new BiFunction<InputStream, Class<?>, Object>() {
+                    @Override
+                    public Object apply(InputStream inputStream, Class<?> aClass) {
+                        try {
+                            return jackson.readValue(inputStream, aClass);
+                        } catch (IOException ioe) {
+                            throw new RuntimeException("Failed to deserialize data", ioe);
+                        }
+                    }
+                });
+                put("$serializer", new Function<Object, byte[]>() {
+                    @Override
+                    public byte[] apply(Object o) {
+                        try {
+                            return jackson.writeValueAsBytes(o);
+                        } catch (JsonProcessingException e) {
+                            throw new RuntimeException("Failed to serialize data", e);
+                        }
+                    }
+                });
+            }});
 
-            Method meth =
-                    Arrays.stream(c.getMethods()).filter(m -> m.getName().equals("apply") &&
-                            m.getParameterCount() == 2).findFirst().get();
-            Class paramType = meth.getParameterTypes()[0];
-            Object theParam = null;
+            final String s = (String) request.get("body");
+            InputStream bodyStream = null;
 
-            if (null != info.get("body")) {
-                Function<Object, Object> decodeFunc = f.jsonDecoder();
-                if (null != decodeFunc) {
-                    theParam = decodeFunc.apply((new ObjectMapper()).
-                            readTree((String) info.get("body")));
-                } else {
-                    theParam = (new ObjectMapper()).
-                            readValue((String) info.get("body"), paramType);
-                }
+            if (null != s && s.length() > 0) {
+                bodyStream = new ByteArrayInputStream(Base64.getDecoder().decode(s));
             }
 
-            Object ret = f.apply(
-                    theParam,
-                    new ContextImpl(headers, Logger.getLogger(classname)));
-
-            Function<Object, byte[]> encodeFunc = f.jsonEncoder();
-
-            if (null != encodeFunc) ret = encodeFunc.apply(ret);
+            Map<Object, Object> response = applyFunc.apply(bodyStream, request);
 
             HashMap<String, Object> answer = new HashMap<>();
-            HashMap<String, Object> response = new HashMap<>();
-            HashMap<String, Object> repHeaders = new HashMap<>();
 
             answer.put("cmd", "reply");
             answer.put("replyTo", info.get("replyTo"));
             answer.put("response", response);
-
-            response.put("status", 200);
-            response.put("headers", repHeaders);
-
-
-            if (null == ret) {
-
-                repHeaders.put("Content-Type", "text/plain");
-                response.put("body", "");
-
-            } else if (ret instanceof MetaResponse) {
-                MetaResponse mr = (MetaResponse) ret;
-                response.put("headers", mr.getHeaders());
-                response.put("status", mr.getResponseCode());
-                response.put("body", Base64.getEncoder().encode(mr.getBody()));
-                answer.put("decodeBody", true);
-            } else {
-                response.put("body", ret);
-                repHeaders.put("Content-Type", "application/json");
-            }
+            answer.put("decodeBody", true);
 
             sendMessage(answer);
 
@@ -254,6 +232,7 @@ public class Register {
             } catch (IOException ioe) {
                 logger.log(Level.WARNING, ioe, () -> "Failed to send response");
             }
+
         }
         return null;
     }
@@ -308,7 +287,7 @@ public class Register {
             while (version == runCount.longValue()) {
                 String line = br.readLine();
                 byte[] bytes = Base64.getDecoder().decode(line);
-                final Map message = (new ObjectMapper()).reader().forType(Map.class).readValue(bytes);
+                final Map message = jackson.reader().forType(Map.class).readValue(bytes);
 
                 String cmd = (String) message.get("cmd");
                 if (null != cmd) {
@@ -332,7 +311,7 @@ public class Register {
     }
 
     private static void sendMessage(Map msg) throws IOException {
-        byte[] bytes = (new ObjectMapper()).writer().writeValueAsBytes(msg);
+        byte[] bytes = jackson.writer().writeValueAsBytes(msg);
         String line = Base64.getEncoder().encodeToString(bytes);
         synchronized (syncObj) {
             BufferedWriter br = new BufferedWriter(new OutputStreamWriter(tronOutput, "UTF-8"));

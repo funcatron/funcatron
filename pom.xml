@@ -6,7 +6,7 @@
 
     <groupId>funcatron</groupId>
     <artifactId>devshim</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.1</version>
 
     <build>
         <plugins>
@@ -39,7 +39,7 @@
         <dependency>
             <groupId>funcatron</groupId>
             <artifactId>intf</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1</version>
         </dependency>
     </dependencies>
 
