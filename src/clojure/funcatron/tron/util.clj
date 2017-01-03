@@ -25,7 +25,7 @@
            (java.security MessageDigest)
            (java.util.jar JarFile JarEntry)
            (java.util.concurrent Executors ScheduledExecutorService TimeUnit)
-           (java.util.function Function)
+           (java.util.function Function BiFunction)
            (funcatron.helpers Tuple2 Tuple3 LoggerBridge LoggerBridge$ActualLogger)
            (com.spotify.dns DnsSrvResolvers DnsSrvResolver LookupResult)
            (java.lang.management ManagementFactory ThreadMXBean RuntimeMXBean)
@@ -653,7 +653,7 @@
     (.close out)
     (.toByteArray bos)))
 
-(defn- clean-queue-name
+(defn clean-sha
   "Take a base-64 encoded sha and turn it into a valid RabbitMQ name"
   [^String s]
   (clojure.string/join (take 16 (filter #(Character/isJavaLetterOrDigit %) s))))
@@ -664,7 +664,7 @@
   (-> (str host ";" path)
       sha256
       base64encode
-      clean-queue-name))
+      clean-sha))
 
 
 (defn string-to-properties
@@ -831,3 +831,13 @@
     (-preserve-body handler req)
     )
   )
+
+(def ^Function jackson-serializer
+  "A Java function that serializes any object to a byte array"
+  (reify Function
+    (apply [_ o] (.writeValueAsBytes jackson-json o))))
+
+(def ^BiFunction jackson-deserializer
+  "A Java BiFunction that takes an InputStream and target class and returns a Jackson read-type"
+  (reify BiFunction
+    (apply [_ is clz] (.readValue jackson-json ^InputStream is ^Class clz))))

@@ -40,6 +40,8 @@
    [compojure "1.5.1"]
    [ring/ring-json "0.4.0"]
 
+   [instaparse "1.4.5"]
+
    [com.cognitect/transit-clj "0.8.293"]
 
    [camel-snake-kebab "0.4.0"]

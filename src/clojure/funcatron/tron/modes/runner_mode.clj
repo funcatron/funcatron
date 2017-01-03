@@ -70,7 +70,7 @@
           (fn [{:keys [status body error]}]
             (if (or error (not (= 200 status)))
               ;; something went wrong...
-              (error (str "Failed to load func bundle with sha " sha "error " error " status " status))
+              (timbre/error (str "Failed to load func bundle with sha " sha " error " error " status " status))
 
               ;; save the bundle, update the table, and then execute the functions
               (try

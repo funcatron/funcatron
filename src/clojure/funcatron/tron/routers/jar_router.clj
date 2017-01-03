@@ -6,20 +6,18 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [io.sarnowski.swagger1st.core :as s1st]
-            [funcatron.tron.util :as f-util]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
             [cheshire.core :as json]
             [funcatron.tron.util :as fu])
   (:import (java.util.jar JarFile)
            (java.io InputStream ByteArrayInputStream)
            (java.net URLClassLoader URL)
-           (java.lang.reflect Method Constructor InvocationTargetException AnnotatedType ParameterizedType)
+           (java.lang.reflect Method InvocationTargetException)
            (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)
-           (java.util Base64 Map$Entry Map)
+           (java.util Base64 Map)
            (java.util.logging Logger)
-           (org.w3c.dom Node)
-           (java.util.function Function)))
+           (java.util.function Function BiFunction)))
 
 
 (set! *warn-on-reflection* true)
@@ -36,10 +34,10 @@
                           :opt [::swagger]))
 
 #_(s/fdef jar-info-from-file
-        :args (s/or :item string?
-                    :item #(instance? File %)
-                    )
-        :ret ::jar-info)
+          :args (s/or :item string?
+                      :item #(instance? File %)
+                      )
+          :ret ::jar-info)
 
 (defn jar-info-from-file
   "Take a file object and turn it into a combo classloader and JarFile"
@@ -52,8 +50,8 @@
     ))
 
 #_(s/fdef get-swagger
-        :args (s/cat :jar-info ::jar-info)
-        :ret ::swagger)
+          :args (s/cat :jar-info ::jar-info)
+          :ret ::swagger)
 
 (defn get-swagger
   "Take the output from jar-info-from-file and get the swagger definition"
@@ -62,8 +60,8 @@
     (funcatron.tron.util/get-swagger-from-jar jar)))
 
 #_(s/fdef update-jar-info-with-swagger
-        :args (s/cat :jar-info ::jar-info)
-        :ret ::jar-info)
+          :args (s/cat :jar-info ::jar-info)
+          :ret ::jar-info)
 
 (defn update-jar-info-with-swagger
   "Takes the jar-info and adds the parsed swagger information"
@@ -102,19 +100,19 @@
 
   (let [resp (try
                (handler req)
-               (catch Exception e {:status 500
-                                   ::raw true
-                                   :body (exception-to-string e)
+               (catch Exception e {:status  500
+                                   ::raw    true
+                                   :body    (exception-to-string e)
                                    :headers {"content-type" "text/plain"}})
                )
         fixed (cond
                 (::raw resp)
                 (dissoc resp ::raw)
 
-                :else {:status 200
+                :else {:status  200
 
                        :headers {"Content-Type" "application/json"}
-                       :body resp})
+                       :body    resp})
 
         ;; sneak byte array past the output formatters
         fixed (if (instance? (Class/forName "[B") (:body fixed))
@@ -141,165 +139,78 @@
   )
 
 
-
-(defn- coerse-body-to
-  "Convert the body to the type"
-  [{:keys [body] :as req} ^Class clz inst ^Method get-decoder-method]
-
-  ;; FIXME deal with XML nodes
-  (cond
-    (nil? body)
-    body
-
-    (-> req :parameters :body)
-    (let [m (-> req :parameters :body first second fu/stringify-keys)]
-      (if-let [^Function decoder (.invoke get-decoder-method inst (make-array Class 0))]
-        (.apply decoder m)
-        (.convertValue fu/jackson-json m clz)))
-
-    :else
-    (let [
-          ^InputStream in
-          (cond
-            (instance? InputStream body)
-            body
-
-            (string? body)
-            (ByteArrayInputStream. (.getBytes ^String body "UTF-8"))
-
-            (instance? (Class/forName "[B") body)
-            (ByteArrayInputStream. ^"[B" body)
-
-            :else nil
-            )
-          ]
-      (if in (.readValue fu/jackson-json in clz) nil)
-      ))
-  )
-
 (defn- or-empty-map
   [v]
   (or v {}))
 
 (defn- handle-actual-request
   "Handle the request. Split into its own function so we can modify behavior in the REPL"
-  [^Class clz
-   ^Constructor constructor
-   ^Method apply-method
-   ^Method get-encoder-method
-   ^Method get-decoder-method
-   ^Class data-class
-   ^Class meta-clz
+  [^BiFunction the-func
    req]
 
-  (let [logger (fu/logger-for (or (::log-props req) {}))
-        req-s (let [body (:body req)]
-                (assoc
-                  (f-util/stringify-keys
-                    (-> req
-                        (dissoc :body)
-                        (update-in [:parameters :query] or-empty-map)
-                        (update-in [:parameters :body] or-empty-map)
-                        (update-in [:parameters :path] or-empty-map)
-                        ))
-                  "body"
-                  body))
-        context (.newInstance constructor (into-array Object [req-s
-                                                              logger]))
-        func-obj (.newInstance clz)
-        param (coerse-body-to req
-                              data-class
-                              func-obj
-                              get-decoder-method
-                              )
-        res (try
-              (.invoke apply-method func-obj
-                       (into-array Object [param context]))
-              (catch Exception e {::exception e})
-              )
-        ]
+  (try
+    (let [req
+          (-> req
+              fu/restore-body
+              (update-in [:parameters :query] or-empty-map)
+              (update-in [:parameters :body] or-empty-map)
+              (update-in [:parameters :path] or-empty-map))
 
-    (cond
-      (and (map? res) (::exception res))
-      {:status 500 :headers {"content-type" "text/plain"}
-       :body (exception-to-string (::exception res)) ::raw true}
+          resp
+          (.apply
+            the-func
+            (:body req)
+            (-> req
+                (assoc "$logger" (fu/logger-for (or (::log-props req) {})))
+                fu/stringify-keys))
 
-      (and res (.isInstance meta-clz res))
+          ret
+          (-> resp
+              fu/keywordize-keys
+              (assoc ::raw true))]
+      ret)
+    (catch Exception e
       (do
-        (let [^Iterable it res
-              res-as-map (into {} (map
-                                    (fn [^Map$Entry me] [(.getKey me) (.getValue me)])
-                                    (-> it .iterator iterator-seq)))
-
-              ]
-          {:status  (get res-as-map "responseCode")
-           :headers (merge (into {} (get res-as-map "headers"))
-                           {"content-type" (get res-as-map "contentType")})
-           :body    (get res-as-map "body")
-           ::raw    true}))
-
-      (instance? Node res)
-      {:status  200
-       :headers {"content-type" "text/xml"}
-       ::raw    true
-       :body    (fu/xml-to-utf-byte-array res)}
-
-      :else
-      (if-let [^Function encoder (.invoke get-encoder-method func-obj (object-array 0))]
-        (.apply encoder res)
-        (try
-          (.writeValueAsString fu/jackson-json res)
-          (catch Exception e {:status  500
-                              ::raw    true
-                              :headers {"content-type" "text/plain"}
-                              :body    (exception-to-string e)}))))))
+        (warn e "Failed to service request")
+        {::raw true
+         :status 500
+         :headers {"content-type" "text/plain"}
+         :body (exception-to-string e)}))
+    ))
 
 (defn- resolve-stuff
   "Given a ::jar-info and swagger, "
-    [{:keys [::classloader]} swagger-info]
+  [{:keys [::classloader]} swagger-info]
 
-    (let [^String op-id (get swagger-info "operationId")
-          clz (.loadClass ^ClassLoader classloader op-id)
-          data-class (->>
-                       (.getAnnotatedInterfaces clz)
-                       (map #(.getType ^AnnotatedType %))
-                       (filter #(instance? ParameterizedType %))
-                       (filter #(.startsWith (.getTypeName ^ParameterizedType %) "funcatron.intf.Func<"))
-                       (mapcat #(.getActualTypeArguments ^ParameterizedType %))
-                       (filter #(instance? Class %))
-                       first)
-          ^Method apply-method (.getMethod clz "apply" (into-array Class [data-class
-                                                                          (.loadClass ^ClassLoader classloader
-                                                                                      "funcatron.intf.Context")]))
-          ^Method get-encoder-method (.getMethod clz "jsonEncoder" (make-array Class 0))
-          ^Method get-decoder-method (.getMethod clz "jsonDecoder" (make-array Class 0))
-          ctx-clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.ContextImpl")
-          meta-clz (.loadClass ^ClassLoader classloader "funcatron.intf.MetaResponse")
-          ^Constructor constructor (first (.getConstructors ctx-clz))]
+  (let [^String op-id (get swagger-info "operationId")
+        clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.Dispatcher")
+        dispatcher ^BiFunction (.newInstance clz)
+        apply-bi-func ^BiFunction (.apply dispatcher op-id
+                                          (-> swagger-info
+                                              (assoc "$deserializer" fu/jackson-deserializer)
+                                              (assoc "$serializer" fu/jackson-serializer)
+                                              fu/stringify-keys ))]
 
-      (fn [req] (handle-actual-request
-                  clz constructor apply-method
-                  get-encoder-method get-decoder-method
-                  data-class
-                  meta-clz req))))
+    (fn [req] (handle-actual-request
+                apply-bi-func req))))
 
 (defn make-app
-    [the-jar]
-    (-> {:definition     (::swagger the-jar)
-         :chain-handlers (list)}
-        (s1st/ring fu/preserve-body)
-        (s1st/discoverer)
-        (s1st/mapper)
-        (s1st/parser)
-        (s1st/protector {"oauth2" (s1stsec/allow-all)})
-        (s1st/ring wrap-response)
-        (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
-    )
+  [the-jar]
+  (-> {:definition     (::swagger the-jar)
+       :chain-handlers (list)}
+      (s1st/ring fu/preserve-body)
+      (s1st/discoverer)
+      (s1st/mapper)
+      (s1st/parser)
+      (s1st/protector {"oauth2" (s1stsec/allow-all)})
+      (s1st/ring wrap-response)
+      (put-def-in-meta s1st/executor :resolver (partial resolve-stuff the-jar)))
+  )
 
 (defn- route-to-jar
   "Routes the message to the JAR file"
   [^Router$Message message the-app log-props reply?]
-  (let [ring-req (f-util/make-ring-request message)
+  (let [ring-req (fu/make-ring-request message)
         resp (the-app (assoc
                         ring-req
                         ::log-props
@@ -382,8 +293,8 @@
          queue-name (fu/route-to-sha (:host swagger) (:basePath swagger))
 
          log-props (merge (fu/version-info-from-classloader classloader)
-                          {:queue queue-name,
-                           :host host,
+                          {:queue    queue-name,
+                           :host     host,
                            :basePath basePath}
                           (fu/some-when (:$log-props properties) map?))
 

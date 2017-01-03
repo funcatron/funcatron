@@ -1,4 +1,5 @@
 (ns funcatron.tron.modes.tron-mode
+  (:gen-class)
   (:require [funcatron.tron.util :as fu]
             [clojure.java.io :as cio]
             [taoensso.timbre
@@ -83,7 +84,7 @@
 
 
 (defn- tell-runners-to-alter-listening
-  "Tell all the runners to stop listening to a sha"
+  "Tell all the runners to alter their listening"
   [host path sha properties {:keys [::network] :as state} action]
 
   (clean-network state)
@@ -91,7 +92,7 @@
     (cond
       (= type "runner")
       (do
-        (info (str "Alter " k))
+        (info (str "Alter " k " action " action))
         (fu/run-in-pool (fn [] (alter-listening host path sha properties k state action))))
       ))
   )
@@ -217,7 +218,7 @@
                               (common/calc-storage-directory opts)
                               (str (System/currentTimeMillis)
                                    "-"
-                                   (URLEncoder/encode sha) ".funcbundle"))]
+                                   (fu/clean-sha (URLEncoder/encode sha)) ".funcbundle"))]
               (when (no-file-with-same-sha sha state)
                 (cio/copy file dest-file))
               (.delete file)
@@ -229,12 +230,15 @@
                         :route    basePath
                         :swagger  swagger
                         :sha      sha}})
-            {:status 400
-             :body   {:accepted false
-                      :error    "Could not determine the file type"}}))
-        (catch Exception e {:status 400
-                            :body   {:accepted false
-                                     :error    (.toString e)}}))
+            (do
+              {:status 400
+                 :body   {:accepted false
+                          :error    "Could not determine the file type"}})))
+        (catch Exception e (do
+                             (error e "Failed up upload JAR")
+                             {:status 400
+                                :body   {:accepted false
+                                         :error    (.toString e)}})))
       )
     {:status 400
      :body   {:accepted false
@@ -317,7 +321,7 @@
 (defn- return-sha
   "Get the Func bundle with the sha"
   [req {:keys [::bundles]}]
-  (let [sha (-> req :params :sha)]
+  (let [sha (-> req :params vals first)]
     (if-let [{:keys [file]} (get @bundles sha)]
       {:status 200
        :body   (clojure.java.io/input-stream file)}
@@ -340,7 +344,8 @@
         (POST "/api/v1/add_func"
               req (upload-func-bundle req state)))
       wrap-json-response
-      (rm-json/wrap-json-params)))
+      rm-json/wrap-json-params
+      ))
 
 (defmulti dispatch-tron-message
           "Dispatch the incoming message"
@@ -371,7 +376,7 @@
      }))
 
 (defmethod dispatch-tron-message "awake"
-  [{:keys [from type host_info] :as msg} _ {:keys [::network] :as state}]
+  [{:keys [from type host_info] :as msg} _ {:keys [::network ::route-map] :as state}]
   (info (str "awake from " msg))
   (clean-network state)
   (swap! network assoc from
@@ -393,7 +398,11 @@
 
     (= "runner" type)
     (do
-      (send-func-bundles from state))))
+      (send-func-bundles from state)
+      (let [routes @route-map]
+        (doseq [{:keys [host path sha props]} routes]
+          (alter-listening host path sha props from state "enable")))
+      )))
 
 (defmethod dispatch-tron-message "died"
   [{:keys [from]} _ {:keys [::network]}]
@@ -416,12 +425,18 @@
 (defn- build-handler-func
   [state]
   (let [ver (atom file-version)
+        _ (atom (tron-routes state))                        ;; do this twice
         the-func (atom (tron-routes state))]
     (fn [req]
       (when (not= @ver file-version)
         (reset! ver file-version)
         (reset! the-func (tron-routes state)))
-      (@the-func req)
+      (try
+        (@the-func req)
+        (catch Exception e
+          (do
+            (error e "Why did this fail?")
+            (throw e))))
       )))
 
 (defn ^Lifecycle build-tron

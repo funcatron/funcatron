@@ -1,4 +1,5 @@
 (ns funcatron.tron.core
+  (:gen-class)
   (:require [funcatron.tron.modes.dev-mode :as shimmy]
             [taoensso.timbre :as timbre
              :refer [log trace debug info warn error fatal report
@@ -10,8 +11,6 @@
             [funcatron.tron.modes.tron-mode :as tronny]
             [clojure.tools.cli :as cli]
             [funcatron.tron.util :as fu])
-
-  (:gen-class)
   (:import (funcatron.abstractions Lifecycle)
            (java.util Properties)
            (java.io StringReader Reader File)))
@@ -82,10 +81,12 @@
   (info (str "Starting Funcatron. Args: " args))
   (info (str "Version " version-info))
   (info (str "Env Vars" (System/getenv)))
-  (let [opts (merge
-               (cli/parse-opts args the-opts/cli-options)
-               (cli/parse-opts (ordered-tron-env (System/getenv)) the-opts/cli-options)
-               )]
+  (let [clio (cli/parse-opts args the-opts/cli-options)
+        clie (cli/parse-opts (ordered-tron-env (System/getenv)) the-opts/cli-options)
+        opts {:options (merge (:options clio) (:options clie))
+              :summary (:summary clio)
+              :arguments (:arguments clio)
+              :e-arguments (:arguments clie)}]
     (info "Computed command line options: " opts)
     (reset! the-opts/command-line-options opts)
     (trace (str "Argument options: " opts))
@@ -143,7 +144,3 @@
   []
   (test-start-tron)
   (test-start-runner))
-
-(defn start-dev
-  []
-  )

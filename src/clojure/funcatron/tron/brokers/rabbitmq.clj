@@ -1,10 +1,12 @@
 (ns funcatron.tron.brokers.rabbitmq
   "Create a MessageBroker instance that talks to RabbitMQ"
+  (:require [taoensso.timbre :as timbre
              :refer [log  trace  debug  info  warn  error  fatal  report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [langohr.core :as lc]
             [langohr.basic :as lb]
+            [funcatron.tron.util :as f-util]
             [langohr.channel :as lch]
             [langohr.consumers :as lcons]
             [funcatron.tron.options :as opts]
