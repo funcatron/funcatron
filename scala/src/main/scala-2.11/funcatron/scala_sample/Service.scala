@@ -1,6 +1,6 @@
 package funcatron.scala_sample
 
-import java.io.OutputStream
+import java.io.{InputStream, OutputStream}
 import java.util.function.Function
 import java.util.logging.Level
 
@@ -52,9 +52,9 @@ trait DecoderOMatic[T] {
 
   protected def ct: Class[T]
 
-  def jsonDecoder(): Function[JMap[String, AnyRef], T] = {
-    new Function[JMap[String, AnyRef], T] {
-      def apply(t: JMap[String, AnyRef]): T = DecoderOMatic.jackson.convertValue(t, ct)
+  def jsonDecoder(): Function[InputStream, T] = {
+    new Function[InputStream, T] {
+      def apply(t: InputStream): T = DecoderOMatic.jackson.readValue(t, ct)
     }
   }
 
