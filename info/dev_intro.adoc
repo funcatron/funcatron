@@ -1,0 +1,459 @@
+= Funcation for Developers
+
+Funcatron lets you focus on the business logic of your code. What?
+
+Much of the code you write deals with a cross-section of concerns...
+"`How do I serialize/deserialize the data?`" "`What are the security
+ rules associated with this REST endpoint?`" "`How does this
+ code scale?`" etc. Note that none of the above is the actual
+ business logic of what the code is supposed to do.
+
+Funcatron separates the concerns in your code so that you
+can focus on the business logic and declare the rules for the
+other concerns.
+
+Funcatron uses technology that you're familiar with (Java, Scala,
+JSON, JavaScript, etc.) as well as some newer, but very popular technology:
+http://swagger.io/[Swagger].
+
+With Funcation you:
+
+1. Define your endpoints including data shapes and access control in
+   a Swagger document.
+2. Write methods/functions to implement those endpoints.
+3. Package the pieces together in an https://maven.apache.org/plugins/maven-assembly-plugin/usage.html[Assembly],
+   https://github.com/pantsbuild/pex[PEX], or other "`collection of libraries and code`" bundle. These
+   are known as "`Func Bundles`".
+4. Deploy to https://mesosphere.com/[Mesos], http://kubernetes.io/[Kubernetes], or https://www.docker.com/products/docker-swarm[Docker Swarm].
+   These are known as "`Container Substrates`".
+
+What Funcatron does:
+
+1. Wires up HTTP endpoints.
+2. Routes requests.
+3. Serializes/Deserializes data.
+4. Handles access control.
+5. Auto-scales.
+
+Initially, Funcatron will handle HTTP-based REST endpoints. But an HTTP
+    request is an event. Funcatron will route events... so the same
+    code that may service an HTTP endpoint, may also service a
+    "`new customer added`" event.
+
+== Basic Coding Concepts
+
+So, what do you have to care about? Writing simple classes:
+
+
+[source,java]
+----
+public class SimpleFunc implements Func<Data> {
+    @Override
+    public Object apply(Data data, Context context) {
+        Number cnt = (Number) context.getRequestParams().get("path").get("cnt");
+
+        List<Data> ret = new ArrayList<>();
+        for (int i = 1; i <= cnt.intValue(); i++) {
+            ret.add(new Data(data.getName() + i, data.getAge() + i));
+        }
+
+        return ret;
+    }
+}
+----
+
+The above code is your business logic. The first parameter to the `apply` method
+is the value that came from the "`caller`" (e.g., the HTTP POST), and the
+second parameter is the "`Context`"
+
+Each Funcatron `Func` extends the `funcatron.intf.Func` interface.
+The type parameter tells Funcatron what class to deserialize the parameter
+into.
+
+The `Context` parameter contains the raw request information as well as access to
+`Logger` and other resources.
+
+The `apply` method is invoked (applied) when the event occurs and the return
+value of the method is serialized and returned as a response to the event.
+
+To wire the Func to an HTTP endpoint, a Swagger file named `funcatron.yml`
+defines the relationship:
+
+[source,yaml]
+----
+  /change/{cnt}:
+    post:
+      description: Returns a user based on a single ID, if the user does not have access to the pet
+      operationId: funcatron.java_sample.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: number of Data to return
+          required: true
+          type: integer
+          format: int64
+        - name: data
+          in: body
+          description: The data
+          required: true
+          schema:
+            $ref: '#/definitions/Data'
+      responses:
+        "200":
+          description: Repeats the posted data cnt times
+          type: array
+          items:
+            $ref: '#/definitions/Data'
+...
+  Data:
+    required:
+      - name
+      - age
+----
+
+The `operationId` field contains the class of the Func. Note the `cnt` path
+parameter is defined as an `integer`. The `cnt` parameter is `required`. Funcatron
+will coerce the parameter to a `Number` before the `apply` method is called.
+The contract allows the developer to focus on the business logic without
+having to test all the parameters.
+
+== Getting Started
+
+Okay, we've taken a look at the basic concepts in Funcatron. Now, let's
+start a new project.
+
+To get started, you will need to install the following:
+
+* https://docker.com[Docker] -- Docker allows you to run Funcatron on your development box so that you can
+  do live debugging.
+* http://www.oracle.com/technetwork/java/javase/overview/index.html[Java] -- Install the Java Development
+  Kit (JDK) so you can run and compile Java code
+* https://maven.apache.org/[Maven] -- You can use the build tool of your choice with Funcatron. However,
+  for this tutorial, we are using Maven. There are https://github.com/funcatron/samples[sample]
+   Funcatron projects using Maven,
+  Gradle, sbt, and lein.
+* Your IDE of choice.
+
+=== Start Funcatron
+
+First, let's start a local version of Funcatron running in a Docker container:
+
+[source,shell]
+----
+docker run -ti --rm -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1
+----
+
+That command tells `docker` to `run` the `funcatron/tron:v0.2.1` container.
+
+We want
+an `-ti` interactive terminal so we can see the logs from Funcatron.
+
+`--rm` removes the
+instance at the end of execution.
+
+`-e TRON_1=--devmode` tells Funcatron to run in developer mode where HTTP requests to
+port 3000 are run through the Funcatron code and forwarded to a developer "`shim`"
+connected via port 54657.
+
+`-p 3000:3000 -p 54657:54657` exposes the container's port on `localhost`.
+
+Test to see if Funcation is running by pointing your browser to http://localhost:3000 .
+You should see a message like: `No Swagger Defined. Unable to route request`. This
+
+=== Create a new project
+
+The first thing we do is create a new project using Maven's Archetype
+feature:
+
+[source,shell]
+----
+mvn archetype:generate -B \
+   -DarchetypeGroupId=funcatron \
+   -DarchetypeArtifactId=starter \
+   -DarchetypeVersion=0.2.1 \
+   -DgroupId=my.stellar \
+   -DartifactId=thang \
+   -Dversion=0.1.0 \
+   -DarchetypeRepository=https://clojars.org/repo
+----
+
+Things you'll change for your project: `-DgroupId=` and `-DartifactId`.
+
+Once you have the project created, `cd` into the project directory and
+type `mvn compile exec:java`.
+
+Once the code is running, you'll be able to browse to http://localhost:3000/api/sample
+and see data.
+
+Yay!
+
+You've got your new Funcatron project up and running.
+
+=== Pieces Parts
+
+We've created a running project. Now, let's go through the
+parts of the project.
+
+==== The Java Stuff
+
+The actual code that's executed is the Java code.
+
+The data is in a https://en.wikipedia.org/wiki/Plain_Old_Java_Object[PoJo] in the
+`MyPojo.java` file. The code is pretty normal:
+
+
+[source,java]
+-----
+public class MyPojo implements java.io.Serializable {
+     private String name;
+     private int age;
+
+     public String getName(){
+         return this.name;
+     }
+
+     public void setName(String name){
+         this.name = name;
+     }
+
+     public Integer getAge(){
+         return this.age;
+     }
+
+     public void setAge(Integer age){
+         this.age = age;
+     }
+ }
+-----
+
+`MyPojo` is a Java class with getters and setters.
+
+In the `MyFunction.java` file, there are a bunch of different pieces:
+the `apply` method that Funcatron applies, the database access
+code, and the "`dev-time`" code that
+connects to the Funcatron instance.
+
+Let's start by looking at the dev-time code:
+
+[source,java]
+----
+    public static void main(String[] args) throws Exception {
+        System.out.println("Starting connection to Funcatron dev server");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1");
+        System.out.println("Then point your browser to http://localhost:3000/api/sample");
+
+        Register.register(funcatronDevHost(), funcatronDevPort(),
+                new File("src/main/resources/funcatron.yaml"),
+                new File("src/main/resources/exec_props.json"));
+    }
+----
+
+The code prints some messages and connects to the
+development-time Funcatron instance in the Docker container.
+
+If you're using a language or a development environment that allows
+dynamic code reloading (e.g., Clojure or https://zeroturnaround.com/software/jrebel/[JRebel])
+the funcatron.yaml (Swagger file) and the exec_props (runtime
+properties) will reflect the current values... update them
+at will.
+
+Next, let's look at the database code:
+
+[source,java]
+----
+    /**
+     * Add the pojo to the database
+     * @param pojo the Pojo to add
+     * @param c the context
+     */
+    private void addToDatabase(MyPojo pojo, Context c) {
+        try {
+            // get the DB connection
+            c.vendForName("db", Connection.class).
+                    map((Connection db) -> {
+                        try {
+                            // db stuff here
+                        } catch (SQLException se) {
+                            c.getLogger().log(Level.WARNING, "Failed to insert pojo", se);
+                        }
+                        return null;
+                    });
+        } catch (Exception e) {
+            c.getLogger().log(Level.WARNING, "Failed to add pojo to db", e);
+        }
+    }
+----
+
+The key takeaways are:
+
+* The `Context` allows access to logging via the `getLogger()` method.
+* Access to the database and other services is done via the `vendForName(name, class)`
+  method which returns an `Optional<class>`. These items are defines in the `exec_props.json` file.
+* The `map` method on the `Optional` accesses the vended instance.
+* If objects vended during a request are transactional (e.g., JDBC connections),
+  the transactions will be automatically committed if the function returns
+  successfully, but will be rolled back if the function throws an exception.
+
+Finally, let's take a look at the `apply` method:
+
+[source,java]
+----
+    public Object apply(MyPojo pojo, final Context context) throws Exception {
+        if (null == pojo) {
+            pojo = new MyPojo();
+            pojo.setName("Example");
+            pojo.setAge(42);
+        }
+
+        // if we have a Redis driver, let the world know
+        context.vendForName("cache", Jedis.class).map(a ->
+        {
+            context.getLogger().log(Level.INFO, "Yay!. Got Redis Driver");
+            return null;
+        });
+
+        pojo.setName("Hello: " + pojo.getName() + " at " + (new Date()));
+        pojo.setAge(pojo.getAge() + 1);
+        // put the pojo in the DB
+        addToDatabase(pojo, context);
+        return pojo;
+    }
+----
+
+If the `pojo` is passed as a parameter (i.e., the function was invoked via
+a `POST` or `PUT`), it will be populated in the parameter.
+
+The method contains plain old Java code, which is exactly what you want: focus
+on the business logic.
+
+Oh... and we print a message if we've got a Redis driver... so... how
+did we get a Redis driver?
+
+Let's take a gander at `RedisDriver.java`:
+
+[source,java]
+----
+public class RedisProvider implements ServiceVendorBuilder {
+    /**
+     * What's the name of this driver?
+     * @return the unique name
+     */
+    @Override
+    public String forType() {
+        return "redis";
+    }
+
+    /**
+     * Some fancy null testing
+     * @param o an object
+     * @param clz a class to test
+     * @param <T> the type of the class
+     * @return null if o is not an instance of the class or null
+     */
+    private <T> T ofType(Object o, Class<T> clz) {
+        if (null != o &&
+                clz.isInstance(o)) return (T) o;
+        return null;
+    }
+
+    /**
+     * Build something that will vend the named service based on the property map
+     * @param name the name of the item
+     * @param properties the properties
+     * @param logger if something needs logging
+     * @return If the properties are valid, return a ServiceVendor that will do the right thing
+     */
+    @Override
+    public Optional<ServiceVendor<?>> buildVendor(String name, Map<String, Object> properties, Logger logger) {
+        final String host = ofType(properties.get("host"), String.class);
+
+        if (null == host) return Optional.empty();
+
+        return Optional.of(new ServiceVendor<Jedis>() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public Class<Jedis> type() {
+                return Jedis.class;
+            }
+
+            @Override
+            public Jedis vend(Accumulator acc) throws Exception {
+                Jedis ret = new Jedis(host);
+                // make sure we are notified of release
+                acc.accumulate(ret, this);
+                return ret;
+            }
+
+            @Override
+            public void endLife() {
+
+            }
+
+            @Override
+            public void release(Jedis item, boolean success) throws Exception {
+                item.close();
+            }
+        });
+    }
+}
+
+----
+
+The above code associates Execution Properties with code that will vend connections
+to databases, caches, and other services. How does it work?
+
+Take a look at `exec_props.json`. There's an entry:
+
+[source,json]
+----
+  "cache": {
+    "type": "redis",
+    "host": "localhost"
+  }
+----
+
+This entry says "`there's a service named `cache` that has a driver type `redis` that connects to
+a host named `localhost`.`" To access the service, we invoke `context.vendForName("cache", Jedis.class)`
+and get an `Optional<Jedis>` back.
+
+You can create `ServiceVendorBuilder` instances for any `type` and, boom, have access to those services
+based on Execution Properties.
+
+== Execution Properties
+
+== Funcatron Swagger File
+
+== The Build File
+
+== Packaging your Func Bundle
+
+Once you're happy with your code and want to create a "`Func Bundle`" and upload it to
+Funcatron:
+
+----
+mvn clean test package
+----
+
+Once the packaging is done, you'll have a bundle that you can upload to the Funcatron cluster:
+
+[source, shell]
+----
+dpp@octopus:~/tmp/thang$ ls -l target/thang-0.1.0-jar-with-dependencies.jar
+-rw-rw-r-- 1 dpp dpp 4254796 Jan  2 17:42 target/thang-0.1.0-jar-with-dependencies.jar
+----
+
+To upload:
+
+[source, shell]
+----
+wget -q -O - --post-file=target/thang-0.1.0-jar-with-dependencies.jar http://<SERVER>:<PORT>/api/v1/add_func
+----
+
+
+
+
+

@@ -60,22 +60,25 @@ routing description for HTTP-focused Func Bundles is written in https://swagger.
 Func Bundles contain all the information necessary to create routes and run
 code based on incoming requests. Funcatron supports the following languages:
 
-* Java/JVM (including Scala, Kotlin, Clojure, etc). JVM Func Bundles are packages as 
+* Java/JVM (including Scala, Kotlin, Clojure, etc). JVM Func Bundles are packages as
   http://maven.apache.org/plugins/maven-assembly-plugin/[Assemblies] or an
   http://imagej.net/Uber-JAR[UberJar].
 * Python. Python code is packaged up into a https://github.com/pantsbuild/pex[PEX]
-  [NOTE]
+
+[NOTE]
 ====
 Python support is scheduled for Funcatron 0.2.0
 ====
-* JavaScript. JavaScript code is bundled using https://webpack.github.io/docs/[Webpack] [NOTE]
+* JavaScript. JavaScript code is bundled using https://webpack.github.io/docs/[Webpack]
+
+[NOTE]
 ====
 JavaScript support is scheduled for Funcatron 0.3.0
 ====
 * CLR (Common Language Runtime). Run .Net assemblies in Mono (scheduled for Funcatron 0.4.0)
 
 
-== Network 
+== Network
 
 Funcatron has a series of discrete components, all of which are packaged as https://docker.com[Docker]
 components:
@@ -191,12 +194,15 @@ In the above example, the message queue is used so that the Runner that
 is available to handle the request is the Runner that has the HTTP request
 proxied to it. This avoids the Frontend systems needing an up to date
 list of available Runners and avoids having different logic for routing direct
-and normal requests. [NOTE]
+and normal requests.
+
+[NOTE]
 ====
 The Frontend code may, in the future (post 0.2.0), look at the `Content-Length` header and
 opt to request a direct connection for large request bodies.
 ====
 
+Dogs and cats can eat catfood!
 
 [plantuml]
 ----
@@ -205,6 +211,3 @@ opt to request a direct connection for large request bodies.
   message_queue <-- Tron: Route Table
   openresty <-- message_queue: Route Table
 ----
-
-
-
