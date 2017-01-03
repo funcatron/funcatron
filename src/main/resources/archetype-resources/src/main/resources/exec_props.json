@@ -1,0 +1,11 @@
+{
+  "db": {
+    "type": "database",
+    "url": "jdbc:h2:mem:db1"
+  },
+
+  "cache": {
+    "type": "redis",
+    "host": "localhost"
+  }
+}

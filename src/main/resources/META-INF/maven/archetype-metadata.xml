@@ -13,6 +13,7 @@
             <!--Filters example-->
             <includes>
                 <include>*.yaml</include>
+                <include>*.json</include>
             </includes>
         </fileSet>
 

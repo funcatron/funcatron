@@ -18,13 +18,72 @@
             </plugin>
 
             <plugin>
+                <groupId>org.codehaus.gmaven</groupId>
+                <artifactId>gmaven-plugin</artifactId>
+                <version>1.5</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>execute</goal>
+                        </goals>
+                        <configuration>
+                            <providerSelection>2.0</providerSelection>
+                            <properties>
+                                <script>git rev-parse HEAD</script>
+                            </properties>
+                            <source>
+                                def command = project.properties.script
+                                def process = command.execute()
+                                process.waitFor()
+
+                                def describe = process.in.text.trim()
+
+                                project.properties.setProperty('gitVersion',describe)
+                            </source>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <GitHeadRev>${gitVersion}</GitHeadRev>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.6</version>
+                <version>3.0.0</version>
+
                 <configuration>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <mainClass>${package}.MyFunction</mainClass>
+                        </manifest>
+                        <manifestEntries>
+                            <GitHeadRev>${gitVersion}</GitHeadRev>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
+
                 <executions>
                     <execution>
                         <id>make-assembly</id> <!-- this is used for inheritance merges -->
@@ -34,7 +93,39 @@
                         </goals>
                     </execution>
                 </executions>
+
             </plugin>
+
+            <plugin>
+                <groupId>eu.somatik.serviceloader-maven-plugin</groupId>
+                <artifactId>serviceloader-maven-plugin</artifactId>
+                <version>1.0.7</version>
+                <configuration>
+                    <services>
+                        <param>funcatron.intf.ServiceVendorBuilder</param>
+                    </services>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.5.0</version>
+                <configuration>
+                    <mainClass>${package}.MyFunction</mainClass>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 
@@ -48,11 +139,27 @@
     </repositories>
 
     <dependencies>
+        <!-- https://mvnrepository.com/artifact/com.h2database/h2 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>1.4.193</version>
+        </dependency>
+
         <dependency>
             <groupId>funcatron</groupId>
             <artifactId>devshim</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.1</version>
         </dependency>
+
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>2.9.0</version>
+            <type>jar</type>
+            <scope>compile</scope>
+        </dependency>
+
 
         <dependency>
             <groupId>junit</groupId>
