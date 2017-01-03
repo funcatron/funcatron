@@ -7,8 +7,8 @@ import funcatron.intf.MetaResponse;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
+import java.io.InputStream;
 
 /**
  * A class that handles POST or DELETE
@@ -56,7 +56,13 @@ public class PostOrDelete implements Func<Data> {
      * @return a customer JSON to Object parser or null if Funcatron should use the default Jackson implementation
      */
     @Override
-    public Function<Map<String, Object>, Data> jsonDecoder() {
-        return m -> jackson.convertValue(m, Data.class);
+    public Function<InputStream, Data> jsonDecoder() {
+        return m -> {
+            try {
+                return jackson.readValue(m, Data.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize", e);
+            }
+        };
     }
 }
