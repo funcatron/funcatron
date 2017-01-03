@@ -1,12 +1,14 @@
-(defproject clojure_sample "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "Eclipse Public License"
-            :url  "http://www.eclipse.org/legal/epl-v10.html"}
+(defproject clojure_sample "0.2.1"
+  :description "Clojure Funcatron sample"
+  :url "http://funcatron.org"
+  :license {:name "Apache 2.0"}
   :dependencies [
                  [org.clojure/clojure "1.8.0"]
                  [funcatron/intf "0.2.1"]
                  ]
+
+  :manifest
+  {"GitHeadRev" ~(fn [x] (some-> (clojure.java.shell/sh "git" "rev-parse" "HEAD") :out .trim))}
 
   :profiles {
              ;; activated automatically during uberjar

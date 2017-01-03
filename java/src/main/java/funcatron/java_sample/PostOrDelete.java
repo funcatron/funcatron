@@ -6,6 +6,7 @@ import funcatron.intf.Func;
 import funcatron.intf.MetaResponse;
 
 import javax.annotation.Resource;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +20,8 @@ public class PostOrDelete implements Func<Data> {
 
     private static final ObjectMapper jackson = new ObjectMapper();
 
-    private @Resource
+    private
+    @Resource
     Connection db;
 
     @Override
@@ -35,14 +37,16 @@ public class PostOrDelete implements Func<Data> {
 
             return ret;
         } else {
-            return new MetaResponse(){
+            return new MetaResponse() {
 
                 @Override
                 public int getResponseCode() {
                     return 400;
                 }
 
-                public String getContentType() {return "text/plain";}
+                public String getContentType() {
+                    return "text/plain";
+                }
 
                 @Override
                 public byte[] getBody() {
@@ -60,8 +64,14 @@ public class PostOrDelete implements Func<Data> {
      *
      * @return a customer JSON to Object parser or null if Funcatron should use the default Jackson implementation
      */
-   @Override
-    public Function<Map<String, Object>, Data> jsonDecoder() {
-       return m -> jackson.convertValue(m, Data.class);
+    @Override
+    public Function<InputStream, Data> jsonDecoder() {
+        return m -> {
+            try {
+                return jackson.readValue(m, Data.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize", e);
+            }
+        };
     }
 }
