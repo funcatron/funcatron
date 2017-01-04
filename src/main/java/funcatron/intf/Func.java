@@ -36,7 +36,7 @@ public interface Func<Request> {
      *
      * @throws Exception if there's a problem. A 500 will be returned to the caller
      *
-     * @return
+     * @return Object
      */
     Object apply(Request req, Context context) throws Exception;
 

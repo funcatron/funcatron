@@ -23,7 +23,7 @@ public interface ServiceVendor<T> {
      * Is the class of a given type? For example `ofType(java.sql.Connection.class)`
      * to test for JDBC
      * @param clz
-     * @return
+     * @return boolean
      */
     default boolean ofType(Class<?> clz) {
         return type().isAssignableFrom(clz);

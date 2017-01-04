@@ -3,6 +3,8 @@
 This is the simple Interface that Funcatron uses.
 Implement the Func interface and you're ready to go.
 
+See the [intf API docs](https://funcatron.github.io/intf/apidocs/)
+
 [![Clojars Project](https://img.shields.io/clojars/v/funcatron/intf.svg)](https://clojars.org/funcatron/intf)
 
 [![Travis Build](https://travis-ci.org/funcatron/intf.svg?branch=master)](https://travis-ci.org/funcatron/intf)
