@@ -1,4 +1,4 @@
-= Funcation for Developers
+= Funcatron for Developers
 
 Funcatron lets you focus on the business logic of your code. What?
 
@@ -344,10 +344,10 @@ Finally, let's take a look at the `apply` method (the heart of the business logi
 
         pojo.setName("Hello: " + pojo.getName() + " at " + (new Date()));
         pojo.setAge(pojo.getAge() + 1);
-        
+
         // put the pojo in the DB
         addToDatabase(pojo, context);
-        
+
         return pojo;
     }
 ----
@@ -364,7 +364,7 @@ did we get a Redis driver?
 "`Why does Funcatron use the Java logger?`" Well... it's like this...
 there are 18 billion logging libraries in Java-land and we needed
 to choose one, so we chose the one built into Java.
- 
+
 Under the covers, we do lots of fun things with logging including
 associating each log line with the Git SHA (unique code version)
 of the code that generated the log line as well as having a unique
@@ -471,7 +471,7 @@ By default, Funcatron uses https://github.com/FasterXML/jackson[Jackson] to seri
  deserialized JSON data. This is fine for Java PoJos that have getters/setters. But if you
  are using http://stackoverflow.com/questions/3511120/why-shouldnt-i-use-immutable-pojos-instead-of-javabeans[immutable pojos],
  Scala case classes, etc., you may have more complex serialization needs.
- 
+
 The `Func` interface allows you to write custom serializers.
 
 To deserialize incoming data using special rules, override the `jsonDecoder` method in `Func`
@@ -530,12 +530,12 @@ For complex data types, build your own serializers.
 
 So... how does Funcatron associate code with HTTP endpoints? How does Funcatron
  ensure that the functions are called with properly shaped data?
- 
+
 Funcatron endpoints are defined in a http://swagger.io/[Swagger] file named
  either `funcatron.yaml` or `funcatron.json`. Define the endpoints, associate them with
  the class that implements the `Func` interface via the `operationId` field and
  Funcatron does the rest.
- 
+
 What's "the rest"?
 
 * Funcatron ensures the incoming data is shaped correctly and will not
@@ -545,7 +545,7 @@ What's "the rest"?
 * In production, wires up the front end web servers to respond to requests.
 * In development mode, presents a UI to test out the API endpoints at
   http://localhost:3000/ui/
-  
+
 So, let's see some of the Swagger magic in action. Point your browser to
 http://localhost:3000/ui/ then click through "default" and "POST". Cool.
 You can try out a `POST` from your browser.
@@ -641,4 +641,3 @@ wget -q -O - --post-file=target/thang-0.1.0-jar-with-dependencies.jar http://<SE
 
 
 == The Build File
-

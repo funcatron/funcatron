@@ -1,3 +1,8 @@
+# Project specific files
+/info/rendered
+
+# Emacs backup files
+*~
+
 *`
 .idea/
-

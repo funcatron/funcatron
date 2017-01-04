@@ -1,0 +1,11 @@
+= funcatron: The main Funcatron Repo image:logo2.png[]
+
+== Documentation
+
+* link:dev_intro.html[Funcation for Developers]
+* link:architecture_strategy.html[Funcatron Architecture and Strategy]
+
+== Resources
+
+* link:..[Funcatron Documentation]
+* https://funcatron.org/[Funcatron Home Page]
