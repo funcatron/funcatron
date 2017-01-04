@@ -1,3 +1,10 @@
+# Project specific files
+/.asciidoctor
+/.keep
+/docs/rendered
+
+# Emacs backup files
+*~
+
 *`
 .idea/
-

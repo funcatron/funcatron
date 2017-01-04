@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=edge"><![endif]-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Asciidoctor 1.5.5">
+<title>Funcatron Architecture and Strategy</title>
+<link rel="stylesheet" href="css/funcatron-adoc.css">
+</head>
+<body class="article">
+<div id="header">
+<h1>Funcatron Architecture and Strategy</h1>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This document describes the <a href="https://funcatron.org">Funcatron</a>
+architecture and development strategy.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron is a <a href="http://martinfowler.com/bliki/Serverless.html">Serverless</a>
+framework.
+It&#8217;s dead simple: associate a "function" with an event.
+Each time the event happens, the function is applied and the
+function&#8217;s return value is returned to the event source.
+An event can be an HTTP(S) request, something on an event queue, whatever.</p>
+</div>
+<div class="paragraph">
+<p>Functions are ephemeral. They exist for the duration of the function call.
+Once the function returns a value, all of its state and scope and
+everything else about it is assumed to go away.</p>
+</div>
+<div class="paragraph">
+<p>Scaling this kind of architecture is simple: the more frequently a function
+gets applied, the more compute resources are allocated to support the function.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron, where possible, abstracts away "switched" connections
+into events. What does this mean?</p>
+</div>
+<div class="paragraph">
+<p>Think of <a href="https://en.wikipedia.org/wiki/Internet_protocol_suite">TCP/IP</a>.
+To a developer, data in and out of a TCP/IP socket appears
+to be a switched connection to the machine on the other side.
+But, the protocol is implemented as a series of packets that
+may not be reliably delivered.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron uses a message queue, where possible, to transmit
+requests. Each request is stateless in that it may be serviced
+by a different system than the previous request. All state
+associated with request is pushed to databases and caches outside of
+the address space where the code that&#8217;s handling the
+request lives. And <a href="https://lift.la/blog/lift-state-and-scaling">there&#8217;s
+always state</a>.</p>
+</div>
+<div class="paragraph">
+<p>There are numerous advantages to event-based architecture:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Events can be converted into &#8220;switched&#8221; or blocking calls easily,
+but the inverse is not true. Switch architectures rely on polling
+to check for updates or new information.</p>
+</li>
+<li>
+<p>Message Queues are mature and well understood. Switch service routers
+like <a href="https://github.com/buoyantio/linkerd">linkerd</a> are newer and less well understood
+by ops.</p>
+</li>
+<li>
+<p>There are many kinds of events that do not require an "answer". Switched
+systems imply an answer beyond an ACK that a message was reliably enqueued.</p>
+</li>
+<li>
+<p>Event-based architectures are easier to test. Each block in the architecture
+can be tested by sending events and capturing the resulting events. There&#8217;s
+no need to set up harnesses that simulate or provide the other end of a switch.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_funcatron_pieces_and_packaging"><a class="anchor" href="#_funcatron_pieces_and_packaging"></a><a class="link" href="#_funcatron_pieces_and_packaging">Funcatron Pieces and Packaging</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In Funcatron, user code is referred to as Funcs. Funcs are bundled together
+along with routing descriptors in a single file that&#8217;s called a <em>Func Bundle</em>.</p>
+</div>
+<div class="paragraph">
+<p>Initially, Funcatron is focused on associating HTTP endpoints with code. The
+routing description for HTTP-focused Func Bundles is written in <a href="https://swagger.io">Swagger</a>.</p>
+</div>
+<div class="paragraph">
+<p>Func Bundles contain all the information necessary to create routes and run
+code based on incoming requests. Funcatron supports the following languages:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Java/JVM (including Scala, Kotlin, Clojure, etc). JVM Func Bundles are packages as
+<a href="http://maven.apache.org/plugins/maven-assembly-plugin/">Assemblies</a> or an
+<a href="http://imagej.net/Uber-JAR">UberJar</a>.</p>
+</li>
+<li>
+<p>Python. Python code is packaged up into a <a href="https://github.com/pantsbuild/pex">PEX</a></p>
+</li>
+</ul>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Python support is scheduled for Funcatron 0.2.0</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>JavaScript. JavaScript code is bundled using <a href="https://webpack.github.io/docs/">Webpack</a></p>
+</li>
+</ul>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>JavaScript support is scheduled for Funcatron 0.3.0</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>CLR (Common Language Runtime). Run .Net assemblies in Mono (scheduled for Funcatron 0.4.0)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_network"><a class="anchor" href="#_network"></a><a class="link" href="#_network">Network</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Funcatron has a series of discrete components, all of which are packaged as <a href="https://docker.com">Docker</a>
+components:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Frontend&#8201;&#8212;&#8201;the code the recieves the incoming request.</p>
+</li>
+<li>
+<p>Message Queue&#8201;&#8212;&#8201;the medium of communication among the system components.</p>
+</li>
+<li>
+<p>Tron&#8201;&#8212;&#8201;the control system that knows what</p>
+</li>
+<li>
+<p>Runner&#8201;&#8212;&#8201;The code that dequeues requests and runs the function associated with the request.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The components communicate via network as follows:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="images/diag-7de02e942de8e578254a0d5d4c2090aa.png" alt="diag 7de02e942de8e578254a0d5d4c2090aa" width="823" height="429">
+</div>
+</div>
+<div class="paragraph">
+<p>In the current implementation, here is the actual technology used:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Frontend&#8201;&#8212;&#8201;<a href="http://openresty.org/en/">OpenResty</a> with Lua scripts that enqueue the requests
+and dequeue the response</p>
+</li>
+<li>
+<p>Message Queue&#8201;&#8212;&#8201;<a href="http://www.rabbitmq.com/">RabbitMQ</a></p>
+</li>
+<li>
+<p>Tron&#8201;&#8212;&#8201;JVM code (Clojure and Java)</p>
+</li>
+<li>
+<p>Runner&#8201;&#8212;&#8201;JVM code that uses <a href="https://en.wikipedia.org/wiki/Java_Classloader">classloaders</a> to
+load JVM Func Bundles. For other languages, a new process will be kicked off for each
+Func Bundle</p>
+</li>
+</ul>
+</div>
+<div class="sect2">
+<h3 id="_request_sequence_diagram"><a class="anchor" href="#_request_sequence_diagram"></a><a class="link" href="#_request_sequence_diagram">Request Sequence Diagram</a></h3>
+<div class="paragraph">
+<p>Incoming HTTP requests are handled as follows:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="images/diag-db374371816c728d4ecac64fb7ec6b2c.png" alt="diag db374371816c728d4ecac64fb7ec6b2c" width="579" height="342">
+</div>
+</div>
+<div class="sect3">
+<h4 id="_directly_proxied_requests_bypass_message_queue"><a class="anchor" href="#_directly_proxied_requests_bypass_message_queue"></a><a class="link" href="#_directly_proxied_requests_bypass_message_queue">Directly proxied requests (bypass message queue)</a></h4>
+<div class="paragraph">
+<p>Note, the specific route may be marked &#8220;direct&#8221; because the request or response
+payload is too big to be reasonably handled by a message queue. In the case of a direct
+request, the sequence is:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="images/diag-5c3a8cd813b46fa036147919cc809933.png" alt="diag 5c3a8cd813b46fa036147919cc809933" width="675" height="400">
+</div>
+</div>
+<div class="paragraph">
+<p>In the above example, the message queue is used so that the Runner that
+is available to handle the request is the Runner that has the HTTP request
+proxied to it. This avoids the Frontend systems needing an up to date
+list of available Runners and avoids having different logic for routing direct
+and normal requests.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>The Frontend code may, in the future (post 0.2.0), look at the <code>Content-Length</code> header and
+opt to request a direct connection for large request bodies.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Dogs and cats can eat catfood!</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="images/diag-6410a0942a9c4620c2ba3110642f959e.png" alt="diag 6410a0942a9c4620c2ba3110642f959e" width="307" height="215">
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2017-01-04 13:47:10 CST
+</div>
+</div>
+</body>
+</html>

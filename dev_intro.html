@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=edge"><![endif]-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Asciidoctor 1.5.5">
+<title>Funcatron for Developers</title>
+<link rel="stylesheet" href="css/funcatron-adoc.css">
+</head>
+<body class="article">
+<div id="header">
+<h1>Funcatron for Developers</h1>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>Funcatron lets you focus on the business logic of your code. What?</p>
+</div>
+<div class="paragraph">
+<p>Much of the code you write deals with a cross-section of concerns&#8230;&#8203;
+&#8220;How do I serialize/deserialize the data?&#8221; &#8220;What are the security
+ rules associated with this REST endpoint?&#8221; &#8220;How does this
+ code scale?&#8221; etc. Note that none of the above is the actual
+ business logic of what the code is supposed to do.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron separates the concerns in your code so that you
+can focus on the business logic and declare the rules for the
+other concerns.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron uses technology that you&#8217;re familiar with (Java, Scala,
+JSON, JavaScript, etc.) as well as some newer, but very popular technology:
+<a href="http://swagger.io/">Swagger</a>.</p>
+</div>
+<div class="paragraph">
+<p>With Funcation you:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Define your endpoints including data shapes and access control in
+a Swagger document.</p>
+</li>
+<li>
+<p>Write methods/functions to implement those endpoints.</p>
+</li>
+<li>
+<p>Package the pieces together in an <a href="https://maven.apache.org/plugins/maven-assembly-plugin/usage.html">Assembly</a>,
+<a href="https://github.com/pantsbuild/pex">PEX</a>, or other &#8220;collection of libraries and code&#8221; bundle. These
+are known as &#8220;Func Bundles&#8221;.</p>
+</li>
+<li>
+<p>Deploy to <a href="https://mesosphere.com/">Mesos</a>, <a href="http://kubernetes.io/">Kubernetes</a>, or <a href="https://www.docker.com/products/docker-swarm">Docker Swarm</a>.
+These are known as &#8220;Container Substrates&#8221;.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>What Funcatron does:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Wires up HTTP endpoints.</p>
+</li>
+<li>
+<p>Routes requests.</p>
+</li>
+<li>
+<p>Serializes/Deserializes data.</p>
+</li>
+<li>
+<p>Handles access control.</p>
+</li>
+<li>
+<p>Auto-scales.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Initially, Funcatron will handle HTTP-based REST endpoints. But an HTTP
+    request is an event. Funcatron will route events&#8230;&#8203; so the same
+    code that may service an HTTP endpoint, may also service a
+    &#8220;new customer added&#8221; event.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_basic_coding_concepts"><a class="anchor" href="#_basic_coding_concepts"></a><a class="link" href="#_basic_coding_concepts">Basic Coding Concepts</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>So, what do you have to care about? Writing simple classes:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public class SimpleFunc implements Func&lt;Data&gt; {
+    @Override
+    public Object apply(Data data, Context context) {
+        Number cnt = (Number) context.getRequestParams().get("path").get("cnt");
+
+        List&lt;Data&gt; ret = new ArrayList&lt;&gt;();
+        for (int i = 1; i &lt;= cnt.intValue(); i++) {
+            ret.add(new Data(data.getName() + i, data.getAge() + i));
+        }
+
+        return ret;
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above code is your business logic. The first parameter to the <code>apply</code> method
+is the value that came from the &#8220;caller&#8221; (e.g., the HTTP POST), and the
+second parameter is the &#8220;Context&#8221;</p>
+</div>
+<div class="paragraph">
+<p>Each Funcatron <code>Func</code> extends the <code>funcatron.intf.Func</code> interface.
+The type parameter tells Funcatron what class to deserialize the parameter
+into.</p>
+</div>
+<div class="paragraph">
+<p>The <code>Context</code> parameter contains the raw request information as well as access to
+<code>Logger</code> and other resources.</p>
+</div>
+<div class="paragraph">
+<p>The <code>apply</code> method is invoked (applied) when the event occurs and the return
+value of the method is serialized and returned as a response to the event.</p>
+</div>
+<div class="paragraph">
+<p>To wire the Func to an HTTP endpoint, a Swagger file named <code>funcatron.yml</code>
+defines the relationship:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-yaml" data-lang="yaml">  /change/{cnt}:
+    post:
+      description: Returns a user based on a single ID, if the user does not have access to the pet
+      operationId: funcatron.java_sample.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: number of Data to return
+          required: true
+          type: integer
+          format: int64
+        - name: data
+          in: body
+          description: The data
+          required: true
+          schema:
+            $ref: '#/definitions/Data'
+      responses:
+        "200":
+          description: Repeats the posted data cnt times
+          type: array
+          items:
+            $ref: '#/definitions/Data'
+...
+  Data:
+    required:
+      - name
+      - age</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>operationId</code> field contains the class of the Func. Note the <code>cnt</code> path
+parameter is defined as an <code>integer</code>. The <code>cnt</code> parameter is <code>required</code>. Funcatron
+will coerce the parameter to a <code>Number</code> before the <code>apply</code> method is called.
+The contract allows the developer to focus on the business logic without
+having to test all the parameters.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_getting_started"><a class="anchor" href="#_getting_started"></a><a class="link" href="#_getting_started">Getting Started</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Okay, we&#8217;ve taken a look at the basic concepts in Funcatron. Now, let&#8217;s
+start a new project.</p>
+</div>
+<div class="paragraph">
+<p>To get started, you will need to install the following:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://docker.com">Docker</a>&#8201;&#8212;&#8201;Docker allows you to run Funcatron on your development box so that you can
+do live debugging.</p>
+</li>
+<li>
+<p><a href="http://www.oracle.com/technetwork/java/javase/overview/index.html">Java</a>&#8201;&#8212;&#8201;Install the Java Development
+Kit (JDK) so you can run and compile Java code</p>
+</li>
+<li>
+<p><a href="https://maven.apache.org/">Maven</a>&#8201;&#8212;&#8201;You can use the build tool of your choice with Funcatron. However,
+for this tutorial, we are using Maven. There are <a href="https://github.com/funcatron/samples">sample</a>
+ Funcatron projects using Maven,
+Gradle, sbt, and lein.</p>
+</li>
+<li>
+<p>Your IDE of choice.</p>
+</li>
+</ul>
+</div>
+<div class="sect2">
+<h3 id="_start_funcatron"><a class="anchor" href="#_start_funcatron"></a><a class="link" href="#_start_funcatron">Start Funcatron</a></h3>
+<div class="paragraph">
+<p>First, let&#8217;s start a local version of Funcatron running in a Docker container:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-shell" data-lang="shell">docker run -ti --rm -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That command tells <code>docker</code> to <code>run</code> the <code>funcatron/tron:v0.2.1</code> container.</p>
+</div>
+<div class="paragraph">
+<p>We want
+an <code>-ti</code> interactive terminal so we can see the logs from Funcatron.</p>
+</div>
+<div class="paragraph">
+<p><code>--rm</code> removes the
+instance at the end of execution.</p>
+</div>
+<div class="paragraph">
+<p><code>-e TRON_1=--devmode</code> tells Funcatron to run in developer mode where HTTP requests to
+port 3000 are run through the Funcatron code and forwarded to a developer &#8220;shim&#8221;
+connected via port 54657.</p>
+</div>
+<div class="paragraph">
+<p><code>-p 3000:3000 -p 54657:54657</code> exposes the container&#8217;s port on <code>localhost</code>.</p>
+</div>
+<div class="paragraph">
+<p>Test to see if Funcation is running by pointing your browser to <a href="http://localhost:3000" class="bare">http://localhost:3000</a> .
+You should see a message like: <code>No Swagger Defined. Unable to route request</code>. This
+is because there&#8217;s no application connected to Funcatron. So&#8230;&#8203; let&#8217;s create an app.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_a_new_project"><a class="anchor" href="#_create_a_new_project"></a><a class="link" href="#_create_a_new_project">Create a new project</a></h3>
+<div class="paragraph">
+<p>The first thing we do is create a new project using Maven&#8217;s Archetype
+feature:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-shell" data-lang="shell">mvn archetype:generate -B \
+   -DarchetypeGroupId=funcatron \
+   -DarchetypeArtifactId=starter \
+   -DarchetypeVersion=0.2.1 \
+   -DgroupId=my.stellar \
+   -DartifactId=thang \
+   -Dversion=0.1.0 \
+   -DarchetypeRepository=https://clojars.org/repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Or if you&#8217;re using Windows PowerShell:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-powershell" data-lang="powershell">mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.2.1" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" "-DarchetypeRepository=https://clojars.org/repo"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Things you&#8217;ll change for your project: <code>-DgroupId=</code> and <code>-DartifactId</code>.</p>
+</div>
+<div class="paragraph">
+<p>Once you have the project created, <code>cd</code> into the project directory and
+type <code>mvn compile exec:java</code>.</p>
+</div>
+<div class="paragraph">
+<p>Once the code is running, you&#8217;ll be able to browse to <a href="http://localhost:3000/api/sample" class="bare">http://localhost:3000/api/sample</a>
+and see data.</p>
+</div>
+<div class="paragraph">
+<p>Yay!</p>
+</div>
+<div class="paragraph">
+<p>You&#8217;ve got your new Funcatron project up and running.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pieces_parts"><a class="anchor" href="#_pieces_parts"></a><a class="link" href="#_pieces_parts">Pieces Parts</a></h3>
+<div class="paragraph">
+<p>We&#8217;ve created a running project. Now, let&#8217;s go through the
+parts of the project.</p>
+</div>
+<div class="sect3">
+<h4 id="_the_java_stuff"><a class="anchor" href="#_the_java_stuff"></a><a class="link" href="#_the_java_stuff">The Java Stuff</a></h4>
+<div class="paragraph">
+<p>The actual code that&#8217;s executed is the Java code.</p>
+</div>
+<div class="sect4">
+<h5 id="_data_shapes"><a class="anchor" href="#_data_shapes"></a><a class="link" href="#_data_shapes">Data Shapes</a></h5>
+<div class="paragraph">
+<p>The data is in a <a href="https://en.wikipedia.org/wiki/Plain_Old_Java_Object">PoJo</a> in the
+<code>MyPojo.java</code> file. The code is pretty normal:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public class MyPojo implements java.io.Serializable {
+     private String name;
+     private int age;
+
+     public String getName(){
+         return this.name;
+     }
+
+     public void setName(String name){
+         this.name = name;
+     }
+
+     public Integer getAge(){
+         return this.age;
+     }
+
+     public void setAge(Integer age){
+         this.age = age;
+     }
+ }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>MyPojo</code> is a Java class with getters and setters.</p>
+</div>
+<div class="paragraph">
+<p>Funcatron converts incoming requests into a parameter for the <code>Func</code> application (call
+to the <code>apply</code> method on the <code>Func</code> implementation) and serializes the return value.
+By default, Funcatron uses <a href="https://github.com/FasterXML/jackson">Jackson</a> to serialize
+and deserialize values. Having PoJos that represent the data shapes for your application
+makes it super simple to do serialization.</p>
+</div>
+</div>
+<div class="sect4">
+<h5 id="_logic"><a class="anchor" href="#_logic"></a><a class="link" href="#_logic">Logic</a></h5>
+<div class="paragraph">
+<p>In the <code>MyFunction.java</code> file, there are a bunch of different pieces:
+the <code>apply</code> method that Funcatron applies, the database access
+code, and the &#8220;dev-time&#8221; code that
+connects to the Funcatron instance.</p>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s start by looking at the dev-time code:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    public static void main(String[] args) throws Exception {
+        System.out.println("Starting connection to Funcatron dev server");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.1");
+        System.out.println("Then point your browser to http://localhost:3000/api/sample");
+
+        Register.register(funcatronDevHost(), funcatronDevPort(),
+                new File("src/main/resources/funcatron.yaml"),
+                new File("src/main/resources/exec_props.json"));
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The code prints some messages and connects to the
+development-time Funcatron instance in the Docker container.</p>
+</div>
+<div class="paragraph">
+<p>This code is useful for you to set up your IDE to do debugging, etc. while
+you run a mini version of Funcatron in a Docker container. What does it do?</p>
+</div>
+<div class="paragraph">
+<p>It makes a connection to the Docker container running mini-Funcatron. When mini-Func
+gets an HTTP request, it packages the request up and forwards the request to the
+app which is likely running in your IDE. You can see output, set breakpoints, and generally
+rapidly update your app.</p>
+</div>
+<div class="paragraph">
+<p>Also, given that your Funcatron apps should be small, recompile times should be short so you
+can quickly cycle and quickly build your app.</p>
+</div>
+<div class="paragraph">
+<p>If you&#8217;re using a language or a development environment that allows
+dynamic code reloading (e.g., Clojure or <a href="https://zeroturnaround.com/software/jrebel/">JRebel</a>)
+the <code>funcatron.yaml</code> (Swagger file) and the exec_props (runtime
+properties) will reflect the current values&#8230;&#8203; update them
+at will.</p>
+</div>
+<div class="paragraph">
+<p>Next, let&#8217;s look at the database code:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    /**
+     * Add the pojo to the database
+     * @param pojo the Pojo to add
+     * @param c the context
+     */
+    private void addToDatabase(MyPojo pojo, Context c) {
+        try {
+            // get the DB connection
+            c.vendForName("db", Connection.class).
+                    map((Connection db) -&gt; {
+                        try {
+                            // db stuff here
+                        } catch (SQLException se) {
+                            c.getLogger().log(Level.WARNING, "Failed to insert pojo", se);
+                        }
+                        return null;
+                    });
+        } catch (Exception e) {
+            c.getLogger().log(Level.WARNING, "Failed to add pojo to db", e);
+        }
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The key takeaways are:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The <code>Context</code> allows access to logging via the <code>getLogger()</code> method.</p>
+</li>
+<li>
+<p>Access to the database and other services is done via the <code>vendForName(name, class)</code>
+method which returns an <code>Optional&lt;class&gt;</code>. These items are defined in the <code>exec_props.json</code> file.</p>
+</li>
+<li>
+<p>The <code>map</code> method on the <code>Optional</code> accesses the vended instance.</p>
+</li>
+<li>
+<p>If objects vended during a request are transactional (e.g., JDBC connections),
+the transactions will be automatically committed if the function returns
+successfully, but will be rolled back if the function throws an exception.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Finally, let&#8217;s take a look at the <code>apply</code> method (the heart of the business logic for the <code>Func</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    public Object apply(MyPojo pojo, final Context context) throws Exception {
+        if (null == pojo) {
+            pojo = new MyPojo();
+            pojo.setName("Example");
+            pojo.setAge(42);
+        }
+
+        // if we have a Redis driver, let the world know
+        context.vendForName("cache", Jedis.class).map(a -&gt;
+        {
+            context.getLogger().log(Level.INFO, "Yay!. Got Redis Driver");
+            return null;
+        });
+
+        pojo.setName("Hello: " + pojo.getName() + " at " + (new Date()));
+        pojo.setAge(pojo.getAge() + 1);
+
+        // put the pojo in the DB
+        addToDatabase(pojo, context);
+
+        return pojo;
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <code>pojo</code> is passed as a parameter (i.e., the function was invoked via
+a <code>POST</code> or <code>PUT</code>), it will be populated in the <code>pojo</code> parameter.</p>
+</div>
+<div class="paragraph">
+<p>The method contains plain old Java code, which is exactly what you want: focus
+on the business logic.</p>
+</div>
+<div class="paragraph">
+<p>Oh&#8230;&#8203; and we print a message if we&#8217;ve got a Redis driver&#8230;&#8203; so&#8230;&#8203; how
+did we get a Redis driver?</p>
+</div>
+<div class="paragraph">
+<p>&#8220;Why does Funcatron use the Java logger?&#8221; Well&#8230;&#8203; it&#8217;s like this&#8230;&#8203;
+there are 18 billion logging libraries in Java-land and we needed
+to choose one, so we chose the one built into Java.</p>
+</div>
+<div class="paragraph">
+<p>Under the covers, we do lots of fun things with logging including
+associating each log line with the Git SHA (unique code version)
+of the code that generated the log line as well as having a unique
+id for each request that&#8217;s propagated across the cluster so you can
+see all the places where a request fanned out to.</p>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s take a gander at <code>RedisDriver.java</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public class RedisProvider implements ServiceVendorBuilder {
+    /**
+     * What's the name of this driver?
+     * @return the unique name
+     */
+    @Override
+    public String forType() {
+        return "redis";
+    }
+
+    /**
+     * Some fancy null testing
+     * @param o an object
+     * @param clz a class to test
+     * @param &lt;T&gt; the type of the class
+     * @return null if o is not an instance of the class or null
+     */
+    private &lt;T&gt; T ofType(Object o, Class&lt;T&gt; clz) {
+        if (null != o &amp;&amp;
+                clz.isInstance(o)) return (T) o;
+        return null;
+    }
+
+    /**
+     * Build something that will vend the named service based on the property map
+     * @param name the name of the item
+     * @param properties the properties
+     * @param logger if something needs logging
+     * @return If the properties are valid, return a ServiceVendor that will do the right thing
+     */
+    @Override
+    public Optional&lt;ServiceVendor&lt;?&gt;&gt; buildVendor(String name, Map&lt;String, Object&gt; properties, Logger logger) {
+        final String host = ofType(properties.get("host"), String.class);
+
+        if (null == host) return Optional.empty();
+
+        return Optional.of(new ServiceVendor&lt;Jedis&gt;() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public Class&lt;Jedis&gt; type() {
+                return Jedis.class;
+            }
+
+            @Override
+            public Jedis vend(Accumulator acc) throws Exception {
+                Jedis ret = new Jedis(host);
+                // make sure we are notified of release
+                acc.accumulate(ret, this);
+                return ret;
+            }
+
+            @Override
+            public void endLife() {
+
+            }
+
+            @Override
+            public void release(Jedis item, boolean success) throws Exception {
+                item.close();
+            }
+        });
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above code associates Execution Properties with code that will vend connections
+to databases, caches, and other services. How does it work?</p>
+</div>
+<div class="paragraph">
+<p>Take a look at <code>exec_props.json</code>. There&#8217;s an entry:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-json" data-lang="json">  "cache": {
+    "type": "redis",
+    "host": "localhost"
+  }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This entry says &#8220;there&#8217;s a service named <code>cache</code> that has a driver type <code>redis</code> that connects to
+a host named <code>localhost</code>.&#8221; To access the service, we invoke <code>context.vendForName("cache", Jedis.class)</code>
+and get an <code>Optional&lt;Jedis&gt;</code> back.</p>
+</div>
+<div class="paragraph">
+<p>You can create <code>ServiceVendorBuilder</code> instances for any <code>type</code> and, boom, have access to those services
+based on Execution Properties.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_serializers"><a class="anchor" href="#_serializers"></a><a class="link" href="#_serializers">Serializers</a></h3>
+<div class="paragraph">
+<p>By default, Funcatron uses <a href="https://github.com/FasterXML/jackson">Jackson</a> to serialize and
+ deserialized JSON data. This is fine for Java PoJos that have getters/setters. But if you
+ are using <a href="http://stackoverflow.com/questions/3511120/why-shouldnt-i-use-immutable-pojos-instead-of-javabeans">immutable pojos</a>,
+ Scala case classes, etc., you may have more complex serialization needs.</p>
+</div>
+<div class="paragraph">
+<p>The <code>Func</code> interface allows you to write custom serializers.</p>
+</div>
+<div class="paragraph">
+<p>To deserialize incoming data using special rules, override the <code>jsonDecoder</code> method in <code>Func</code>
+and to serialize returned data using special rules, override the <code>jsonEncoder</code> method:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    public Function&lt;InputStream, Data&gt; jsonDecoder() {
+        return m -&gt; {
+            try {
+                return jackson.readValue(m, Data.class);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize", e);
+            }
+        };
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The method returns a <code>Function</code> that takes an <code>InputStream</code> and returns an instance
+of the type matching the first parameter of <code>apply</code> method.</p>
+</div>
+<div class="paragraph">
+<p>The <code>jsonEncoder</code> method does the opposite. Here&#8217;s a Scala example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-scala" data-lang="scala">trait DecoderOMatic[T] {
+
+  protected def ct: Class[T]
+
+  def jsonDecoder(): Function[InputStream, T] = {
+    new Function[InputStream, T] {
+      def apply(t: InputStream): T = DecoderOMatic.jackson.readValue(t, ct)
+    }
+  }
+
+  def jsonEncoder(): Function[Object, Array[Byte]] =
+    new Function[Object, Array[Byte]] {
+      def apply(o: Object) = DecoderOMatic.jackson.writer().writeValueAsBytes(o)
+    }
+}
+
+object DecoderOMatic {
+  val jackson: ObjectMapper = {
+    val mapper = new ObjectMapper()
+    mapper.registerModule(DefaultScalaModule)
+    mapper
+  }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above code creates an instance of the Jackson <code>ObjectMapper</code> and adds the Scala module.</p>
+</div>
+<div class="paragraph">
+<p>For complex data types, build your own serializers.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_funcatron_swagger_file"><a class="anchor" href="#_funcatron_swagger_file"></a><a class="link" href="#_funcatron_swagger_file">Funcatron Swagger File</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>So&#8230;&#8203; how does Funcatron associate code with HTTP endpoints? How does Funcatron
+ ensure that the functions are called with properly shaped data?</p>
+</div>
+<div class="paragraph">
+<p>Funcatron endpoints are defined in a <a href="http://swagger.io/">Swagger</a> file named
+ either <code>funcatron.yaml</code> or <code>funcatron.json</code>. Define the endpoints, associate them with
+ the class that implements the <code>Func</code> interface via the <code>operationId</code> field and
+ Funcatron does the rest.</p>
+</div>
+<div class="paragraph">
+<p>What&#8217;s "the rest"?</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Funcatron ensures the incoming data is shaped correctly and will not
+attempt to deserialize the JSON data if it&#8217;s not properly shaped.</p>
+</li>
+<li>
+<p>Funcatron ensures all the rules defined in the Swagger file (e.g.,
+OAuth rules, etc.) are properly enforced.</p>
+</li>
+<li>
+<p>In production, wires up the front end web servers to respond to requests.</p>
+</li>
+<li>
+<p>In development mode, presents a UI to test out the API endpoints at
+<a href="http://localhost:3000/ui/" class="bare">http://localhost:3000/ui/</a></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>So, let&#8217;s see some of the Swagger magic in action. Point your browser to
+<a href="http://localhost:3000/ui/" class="bare">http://localhost:3000/ui/</a> then click through "default" and "POST". Cool.
+You can try out a <code>POST</code> from your browser.</p>
+</div>
+<div class="paragraph">
+<p>Next, let&#8217;s update the <code>funcatron.yaml</code> file. Replace the <code>post:</code> line
+and all subsequent lines in the file with:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-yaml" data-lang="yaml">    post:
+      description: Creates new sample data
+      operationId: my.stellar.MyFunction
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Data'
+      responses:
+        "200":
+          description: sample response
+        default:
+          description: unexpected error
+
+definitions:
+  Data:
+    required:
+      - name
+      - age
+    properties:
+      name:
+        type: string
+      age:
+        type: number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, reload the browser and you can see the UI presents you with the option
+of entering JSON data. Enter some and click the <code>Try it out!</code> button.</p>
+</div>
+<div class="paragraph">
+<p>Well&#8230;&#8203; you get the idea. Basically, model your REST endpoints in Swagger,
+test stuff out in the browser. Associate your classes with the <code>operationId</code>
+field, and the code will Just Work&#8482;.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_execution_properties"><a class="anchor" href="#_execution_properties"></a><a class="link" href="#_execution_properties">Execution Properties</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The static relationship between REST endpoints and your code as well as access control
+rules, etc. are defined in your code and the <code>funcatron.yaml</code> Swagger file.</p>
+</div>
+<div class="paragraph">
+<p>However, there will be runtime properties that are different among different environments.
+For example, you&#8217;ll have database access credentials for development time, for testing time,
+staging, and production.</p>
+</div>
+<div class="paragraph">
+<p>Those items bundled together in &#8220;Execution Properties&#8221;.</p>
+</div>
+<div class="paragraph">
+<p>For the development-time project, we have the <code>exec_props.json</code> file which
+contains Execution Properties that are used during development-time.</p>
+</div>
+<div class="paragraph">
+<p>We&#8217;ve seen if the Execution Properties have a <code>type</code> field and a named Service Vendor
+is associated with the type, the service is available in the <code>Context</code>.</p>
+</div>
+<div class="paragraph">
+<p>The entire contents of the Execution Properties information is available in the
+<code>Context.properties()</code> method. This returns a <code>Map</code> of key/value pairs.
+Put any old information associated with the execution of the code in the
+Execution Properties and it&#8217;s available to the <code>Func</code>.</p>
+</div>
+<div class="paragraph">
+<p>Execution properties are defined via JSON when a Func Bundle is deployed. See <a href="#_deploying">Deploying</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_packaging_your_func_bundle"><a class="anchor" href="#_packaging_your_func_bundle"></a><a class="link" href="#_packaging_your_func_bundle">Packaging your Func Bundle</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Once you&#8217;re happy with your code and want to create a &#8220;Func Bundle&#8221; and upload it to
+Funcatron:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>mvn clean test package</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Once the packaging is done, you&#8217;ll have a bundle that you can upload to the Funcatron cluster:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-shell" data-lang="shell">dpp@octopus:~/tmp/thang$ ls -l target/thang-0.1.0-jar-with-dependencies.jar
+-rw-rw-r-- 1 dpp dpp 4254796 Jan  2 17:42 target/thang-0.1.0-jar-with-dependencies.jar</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_deploying"><a class="anchor" href="#_deploying"></a><a class="link" href="#_deploying">Deploying</a></h3>
+<div class="paragraph">
+<p>To upload:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-shell" data-lang="shell">wget -q -O - --post-file=target/thang-0.1.0-jar-with-dependencies.jar http://&lt;SERVER&gt;:&lt;PORT&gt;/api/v1/add_func</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_the_build_file"><a class="anchor" href="#_the_build_file"></a><a class="link" href="#_the_build_file">The Build File</a></h2>
+<div class="sectionbody">
+
+</div>
+</div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2017-01-04 14:06:45 CST
+</div>
+</div>
+</body>
+</html>
