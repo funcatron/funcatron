@@ -6,7 +6,7 @@
 
     <groupId>funcatron</groupId>
     <artifactId>devshim</artifactId>
-    <version>0.2.1</version>
+    <version>0.2.2</version>
 
     <build>
         <plugins>
@@ -42,6 +42,16 @@
             <version>0.2.1</version>
         </dependency>
     </dependencies>
+
+
+    <repositories>
+        <repository>
+            <id>clojars</id>
+            <name>Clojars</name>
+            <url>https://clojars.org/repo</url>
+        </repository>
+    </repositories>
+
 
     <distributionManagement>
         <repository>
