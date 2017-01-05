@@ -157,6 +157,13 @@ connected via port 54657.
 
 `-p 3000:3000 -p 54657:54657` exposes the container's port on `localhost`.
 
+A couple of notes. This is a stripped down version of Funcatron that __only__ routes
+HTTP requests to the development time code. It does not host Func Bundles. It does
+not have any statistics about usage. It's just a dumb pipe of HTTP request to the "`shim`" port.
+Also, the "`shim`" port speaks a very dumb protocol. Don't try to `curl` to it or do
+anything else with it. Why a dumb protocol? Because we wanted to have as small a footprint
+as possible for the code that runs in your application.
+
 Test to see if Funcation is running by pointing your browser to http://localhost:3000 .
 You should see a message like: `No Swagger Defined. Unable to route request`. This
 is because there's no application connected to Funcatron. So... let's create an app.
