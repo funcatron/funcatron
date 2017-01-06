@@ -9,12 +9,30 @@ import xml.etree.ElementTree as ET
 import re
 import time
 import requests
+import atexit
 
+subprocess.call(["rm", "-rf", "/newdata"])
+subprocess.call(["cp", "-r", "/data", "/newdata"])
+os.environ["LEIN_ROOT"]="true"
 
-compile = True  # set to false to test pom stuff
+require_commit = True # set to False if we're in a development cycle
+# require_commit = False
+
+compile = True  # set to false to speed things up
 # compile = False
 
+http_server = 'http://localhost:8680' # might be different for different configs
+# http_server = 'http://localhost:8780'
+
+def kill_java():
+    subprocess.call(["killall", "java"])
+
+atexit.register(kill_java)
+
 def test_git_status():
+    if not require_commit:
+        return
+
     [code, str] = commands.getstatusoutput("git status -bs")
 
     if code != 0:
@@ -71,340 +89,420 @@ def check_gradle_version(ver, name):
             print "", name, " file needs updating from version ", the_ver, " to ", ver
             sys.exit(1)
 
+def test_http_sample(base_url_path):
+    answer = requests.get(http_server + base_url_path + "/simple")
+
+    if answer.status_code != 200 or len(answer.json()["time"]) < 5:
+        print "Got a bad answer from our app ", answer.status_code
+        sys.exit(1)
+
+def upload_and_enable(file_name, props):
+    in_file = open(file_name, "rb")  # opening for [r]eading as [b]inary
+    bytes = in_file.read()
+    in_file.close()
+
+    answer = requests.post('http://localhost:3000/api/v1/add_func', data=bytes)
+
+    if answer.status_code != 200:
+        print "Failed to upload func bundle, status ", answer.status_code
+        sys.exit(1)
+
+    uuid = answer.json()['sha']
+
+    answer = requests.post('http://localhost:3000/api/v1/enable', json={'sha': uuid, 'props': props})
+
+    time.sleep(2)
+
+    if answer.status_code != 200:
+        print "Failed to enable bundle, status ", answer.status_code
+        sys.exit(1)
+
+    return uuid
+
+
+def compile_gradle(base_url_path, props = {}):
+    if not compile:
+        return
+
+    code = subprocess.call(["./gradlew", "clean"])
+    if code != 0:
+        print "Failed Gradle Clean"
+        sys.exit(code)
+
+    code = subprocess.call(["./gradlew", "shadowJar"])
+    if code != 0:
+        print "Failed Gradle ShadowJar"
+        sys.exit(code)
+
+    file_name = "build/libs/" + [f for f in os.listdir('build/libs') if f.endswith('-all.jar')][0]
+
+    uuid = upload_and_enable(file_name, props)
+
+    test_http_sample(base_url_path)
+
+    return uuid
+
 
 ### Begin actual code
+def test_intf():
+    os.chdir('/newdata/intf')
 
-os.environ['HOME'] = "/m2"
+    print("testing and installing intf")
 
-os.environ['MAVEN_OPTS'] = "-Dmaven.repo.local=/m2/repository"
+    test_git_status()
 
-os.chdir('/data/intf')
+    e = parse_xml(read_file('pom.xml'))
 
-print("testing and installing intf")
+    intf_ver = e.find("./version").text
 
-test_git_status()
+    print "We're working with version ", intf_ver
 
-e = parse_xml(read_file('pom.xml'))
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
 
-intf_ver = e.find("./version").text
+    if code != 0:
+        print "Failed to install intf"
+        sys.exit(code)
 
-print "We're working with version ", intf_ver
-
-if compile:
-    code = subprocess.call(
-        ["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml", "clean", "install"])
-else:
-    code = 0
-
-if code != 0:
-    print "Failed to install intf"
-    sys.exit(code)
+    return intf_ver
 
 ## Scala
 
-print "Checking Scala sample"
+def test_scala(intf_ver):
+    print "Checking Scala sample"
 
-os.chdir("/data/samples/scala")
+    os.chdir("/newdata/samples/scala")
 
-test_git_status()
+    test_git_status()
 
-sbt = read_file("build.sbt").splitlines()
+    sbt = read_file("build.sbt").splitlines()
 
-has_func = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in sbt if "funcatron" in line]
+    has_func = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in sbt if "funcatron" in line]
 
-for num in has_func:
-    if num != intf_ver:
-        print "SBT file needs updating from version ", num, " to ", intf_ver
-        sys.exit(1)
+    for num in has_func:
+        if num != intf_ver:
+            print "SBT file needs updating from version ", num, " to ", intf_ver
+            sys.exit(1)
+
+    code = subprocess.call(["sbt", "-v", "clean", "assembly"])
+    if code != 0:
+        print "Failed to compile sbt"
+        sys.exit(code)
+
+    uuid = upload_and_enable("target/scala-2.11/scala_sample-assembly-1.0.jar", {})
+
+    test_http_sample("/sample/scala")
+
 
 ## Java Gradle
 
-print "Checking Java Gradle sample"
+def test_java_gradle(intf_ver):
+    print "Checking Java Gradle sample"
 
-os.chdir("/data/samples/java-gradle")
+    os.chdir("/newdata/samples/java-gradle")
 
-test_git_status()
+    test_git_status()
 
-check_gradle_version(intf_ver, "Java Gradle Sample")
+    check_gradle_version(intf_ver, "Java Gradle Sample")
+
+    compile_gradle("/sample/java_gradle")
+
 
 ## Groovy
 
-print "Checking Groovy sample"
+def test_groovy(intf_ver):
+    print "Checking Groovy sample"
 
-os.chdir("/data/samples/groovy")
+    os.chdir("/newdata/samples/groovy")
 
-test_git_status()
+    test_git_status()
 
-check_gradle_version(intf_ver, "Groovy Sample")
+    check_gradle_version(intf_ver, "Groovy Sample")
+
+    compile_gradle("/sample/groovy")
+
+## Front End
+
+def test_frontend_version(intf_ver):
+    print "Testing front end version"
+    os.chdir("/newdata/frontend")
+
+    test_git_status()
+
+    fel = read_file("frontend.lua").splitlines()
+
+    ver_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in fel if line.startswith("funcation.version")][0]
+
+    if ver_line != intf_ver:
+        print "Frontend wrong version ", ver_line
+        sys.exit(1)
 
 ## Kotlin
+def test_kotlin(intf_ver):
+    print "Checking Kotlin sample"
 
-print "Checking Kotlin sample"
+    os.chdir("/newdata/samples/kotlin")
 
-os.chdir("/data/samples/kotlin")
+    test_git_status()
 
-test_git_status()
+    check_gradle_version(intf_ver, "Kotlin Sample")
 
-check_gradle_version(intf_ver, "Kotlin Sample")
-
-print "Testing DevShim"
-
-os.chdir("/data/devshim")
-
-test_git_status()
-
-test_pom_deps(intf_ver, "devshim")
-
-if compile:
-    code = subprocess.call(
-        ["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml", "clean", "install"])
-else:
-    code = 0
-
-if code != 0:
-    print "Failed to install devshim"
-    sys.exit(code)
-
-print "Testing starter project"
-
-os.chdir("/data/starter")
-
-test_git_status()
-
-test_pom_deps(intf_ver, "starter")
+    compile_gradle("/sample/kotlin")
 
 
-os.chdir("/data/starter/src/main/resources/archetype-resources")
+def test_dev_shim(intf_ver):
+    print "Testing DevShim"
 
-test_pom_deps(intf_ver, "starter archetype pom", only_deps=True)
+    os.chdir("/newdata/devshim")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "devshim")
+
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to install devshim"
+        sys.exit(code)
+
+def test_starter(intf_ver):
+    print "Testing starter project"
+
+    os.chdir("/newdata/starter")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "starter")
 
 
-os.chdir("/data/starter")
+    os.chdir("/newdata/starter/src/main/resources/archetype-resources")
+
+    test_pom_deps(intf_ver, "starter archetype pom", only_deps=True)
 
 
-if compile:
-    code = subprocess.call(
-        ["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml", "clean", "install"])
-else:
-    code = 0
+    os.chdir("/newdata/starter")
 
-if code != 0:
-    print "Failed to install starter"
-    sys.exit(code)
 
-print "Testing tron"
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
 
-os.chdir("/data/tron")
+    if code != 0:
+        print "Failed to install starter"
+        sys.exit(code)
 
-# get rid of any turds in the directory (thank you, NOT, maven)
-subprocess.call(["rm", "-rf", "?"])
+def test_tron(intf_ver):
+    print "Testing tron"
 
-test_git_status()
+    os.chdir("/newdata/tron")
 
-proj = read_file('project.clj').splitlines()[0]
+    test_git_status()
 
-proj = re.search('[0-9]+\.[0-9]+\.[0-9]', proj).group(0)
+    proj = read_file('project.clj').splitlines()[0]
 
-if proj != intf_ver:
-    print "Tron is at version ", proj, " which is not compatible with intf ", intf_ver
-    sys.exit(1)
+    proj = re.search('[0-9]+\.[0-9]+\.[0-9]', proj).group(0)
 
-if compile:
-    code = subprocess.call(["lein", "do", "clean,", "uberjar"])
-else:
-    code = 0
+    if proj != intf_ver:
+        print "Tron is at version ", proj, " which is not compatible with intf ", intf_ver
+        sys.exit(1)
 
-if code != 0:
-    print "Failed to build tron"
-    sys.exit(0)
+    if compile:
+        code = subprocess.call(["lein", "do", "clean,", "uberjar"])
+    else:
+        code = 0
 
-tron_pid = subprocess.Popen(["java", "-jar", "target/uberjar/tron-" + proj + "-standalone.jar", "--tron"]).pid
+    if code != 0:
+        print "Failed to build tron"
+        sys.exit(0)
 
-runner_pid =  subprocess.Popen(["java", "-jar", "target/uberjar/tron-" + proj + "-standalone.jar", "--runner"]).pid
+    tron_pid = subprocess.Popen(["java", "-jar", "target/uberjar/tron-" + proj + "-standalone.jar", "--tron"]).pid
 
-print "Sleeping for 15 seconds to allow the Tron and the Runner to start"
-# wait for everything to wake up
-time.sleep(15)
+    runner_pid =  subprocess.Popen(["java", "-jar", "target/uberjar/tron-" + proj + "-standalone.jar", "--runner"]).pid
 
-data = requests.get('http://localhost:3000/api/v1/stats')
+    print "Sleeping for 15 seconds to allow the Tron and the Runner to start"
+    # wait for everything to wake up
+    time.sleep(15)
 
-if data.status_code != 200:
-    print "Failed to talk to the Tron, status code ", data.status_code
-    sys.exit(1)
+    data = requests.get('http://localhost:3000/api/v1/stats')
 
-print "Answer from the tron: ", data.json()
+    if data.status_code != 200:
+        print "Failed to talk to the Tron, status code ", data.status_code
+        sys.exit(1)
+
+    print "Answer from the tron: ", data.json()
+
+    return tron_pid, runner_pid
+
 
 ## Java Sample
+def test_java_sample(intf_ver):
+    print "Testing java sample"
 
-print "Testing java sample"
+    os.chdir("/newdata/samples/java")
 
-os.chdir("/data/samples/java")
+    test_git_status()
 
-test_git_status()
+    test_pom_deps(intf_ver, "Java sample", True)
 
-test_pom_deps(intf_ver, "Java sample", True)
+    if compile:
+        code = subprocess.call(["mvn", "clean", "package"])
+    else:
+        code = 0
 
-if compile:
-    code = subprocess.call(
-        ["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml", "clean", "package"])
-else:
-    code = 0
+    if code != 0:
+        print "Failed to package Java sample"
+        sys.exit(code)
 
-if code != 0:
-    print "Failed to package Java sample"
-    sys.exit(code)
+    upload_and_enable("target/java_sample-0.1-SNAPSHOT-jar-with-dependencies.jar", {"foo": "bar"})
 
-in_file = open("target/java_sample-0.1-SNAPSHOT-jar-with-dependencies.jar", "rb")  # opening for [r]eading as [b]inary
-bytes = in_file.read()
-in_file.close()
-
-answer = requests.post('http://localhost:3000/api/v1/add_func', data=bytes)
-
-if answer.status_code != 200:
-    print "Failed to upload func bundle, status ", answer.status_code
-    sys.exit(1)
-
-uuid = answer.json()['sha']
-
-answer = requests.post('http://localhost:3000/api/v1/enable', json={'sha': uuid, 'props': {"foo": "bar"}})
-
-time.sleep(2)
-
-if answer.status_code != 200:
-    print "Failed to enable bundle, status ", answer.status_code
-    sys.exit(1)
-
-answer = requests.get("http://localhost:8680/sample/java/simple")
-
-if answer.status_code != 200 or len(answer.json()["time"]) < 5:
-    print "Got a bad answer from our app ", answer.status_code
-    sys.exit(1)
+    test_http_sample("/sample/java")
 
 ## Clojure Sample
+def test_clojure_sample(intf_ver):
+    print "Testing Clojure sample"
 
-print "Testing Clojure sample"
+    os.chdir("/newdata/samples/clojure")
 
-os.chdir("/data/samples/clojure")
+    test_git_status()
 
-test_git_status()
+    proj_clj = read_file("project.clj").splitlines()
 
-proj_clj = read_file("project.clj").splitlines()
-
-if not intf_ver in proj_clj[0]:
-    print "Clojure project.clj file needs proper version set"
-    sys.exit(1)
-
-func_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', aline).group(0) for aline in proj_clj
-             if "funcatron" in aline and not ":url" in aline]
-
-for the_ver in func_line:
-    if the_ver != intf_ver:
-        print "Clojure project.clj file needs updating from version ", num, " to ", ver
+    if not intf_ver in proj_clj[0]:
+        print "Clojure project.clj file needs proper version set"
         sys.exit(1)
-#
-# if compile:
-#     code = subprocess.call(["lein", "do", "clean,", "uberjar"])
-# else:
-#     code = 0
-#
-# if code != 0:
-#     print "Failed to package Clojure sample"
-#     sys.exit(code)
-#
-# in_file = open("target/clojure_sample-" + intf_ver + "-standalone.jar", "rb")  # opening for [r]eading as [b]inary
-# bytes = in_file.read()
-# in_file.close()
-#
-# answer = requests.post('http://localhost:3000/api/v1/add_func', data=bytes)
-#
-# if answer.status_code != 200:
-#     print "Failed to upload func bundle, status ", answer.status_code
-#     sys.exit(1)
-#
-# uuid = answer.json()['sha']
-#
-# answer = requests.post('http://localhost:3000/api/v1/enable', json={'sha': uuid, 'props': {"foo": "bar"}})
-#
-# time.sleep(2)
-#
-# if answer.status_code != 200:
-#     print "Failed to enable bundle, status ", answer.status_code
-#     sys.exit(1)
-#
-# answer = requests.get("http://localhost:8680/sample/clojure/simple")
-#
-# if answer.status_code != 200 or len(answer.json()["time"]) < 5:
-#     print "Got a bad answer from our app ", answer.status_code
-#     sys.exit(1)
+
+    func_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', aline).group(0) for aline in proj_clj
+                 if "funcatron" in aline and not ":url" in aline]
+
+    for the_ver in func_line:
+        if the_ver != intf_ver:
+            print "Clojure project.clj file needs updating from version ", num, " to ", ver
+            sys.exit(1)
+
+    if compile:
+        code = subprocess.call(["lein", "do", "clean,", "uberjar"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to package Clojure sample"
+        sys.exit(code)
+
+    upload_and_enable("target/clojure_sample-" + intf_ver + "-standalone.jar", {"foo": "bar"})
+
+    test_http_sample("/sample/clojure")
 
 ## Test the archetype
+def test_archetype(intf_ver):
+    print "Testing creation of and uploading a new project"
 
-print "Testing creation of and uploading a new project"
+    os.chdir("/newdata")
 
-os.chdir("/m2")
+    code = subprocess.call(["mvn",
+                            "archetype:generate", "-B", "-DarchetypeGroupId=funcatron", "-DarchetypeArtifactId=starter",
+                            "-DarchetypeVersion=" + intf_ver, "-DgroupId=my.stellar", "-DartifactId=thang",
+                            "-Dversion=0.1.0",
+                            "-DarchetypeRepository=https://clojars.org/repo"])
 
-code = subprocess.call(["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml",
-                        "archetype:generate", "-B", "-DarchetypeGroupId=funcatron", "-DarchetypeArtifactId=starter",
-                        "-DarchetypeVersion=" + intf_ver, "-DgroupId=my.stellar", "-DartifactId=thang",
-                        "-Dversion=0.1.0",
-                        "-DarchetypeRepository=https://clojars.org/repo"])
+    if code != 0:
+        print "Failed to create project from archetype", code
+        sys.exit(code)
 
-if code != 0:
-    print "Failed to create project from archetype", code
-    sys.exit(code)
+    os.chdir("/newdata/thang")
 
-os.chdir("/m2/thang")
+    code = subprocess.call(["mvn", "clean", "package"])
 
-code = subprocess.call(["mvn", "--global-settings", "/data/funcatron/holistic_test/settings.xml", "clean", "package"])
+    if code != 0:
+        print "Failed to package Java sample"
+        sys.exit(code)
 
-if code != 0:
-    print "Failed to package Java sample"
-    sys.exit(code)
+    upload_and_enable("target/thang-0.1.0-jar-with-dependencies.jar", {
+        "db": {
+            "type": "database",
+            "classname": "org.h2.Driver",
+            "url": "jdbc:h2:mem:db1"
+        },
 
-in_file = open("target/thang-0.1.0-jar-with-dependencies.jar", "rb")  # opening for [r]eading as [b]inary
-bytes = in_file.read()
-in_file.close()
+        "cache": {
+            "type": "redis",
+            "host": "localhost"
+        }
+    })
 
-answer = requests.post('http://localhost:3000/api/v1/add_func', data=bytes)
+    answer = requests.get(http_server + "/api/sample")
 
-if answer.status_code != 200:
-    print "Failed to upload func bundle, status ", answer.status_code
-    sys.exit(1)
+    if answer.status_code != 200 or len(answer.json()["name"]) < 5:
+        print "Got a bad answer from our app ", answer.status_code
+        sys.exit(1)
 
-uuid = answer.json()['sha']
+    answer = requests.post(http_server + "/api/sample", json={"name": "David", "age": 52})
 
-answer = requests.post('http://localhost:3000/api/v1/enable', json={'sha': uuid, 'props': {
-    "db": {
-        "type": "database",
-        "classname": "org.h2.Driver",
-        "url": "jdbc:h2:mem:db1"
-    },
+    if answer.status_code != 200 or answer.json()["age"] != 53:
+        print "Got a bad answer from our app ", answer.status_code
+        sys.exit(1)
 
-    "cache": {
-        "type": "redis",
-        "host": "localhost"
-    }
-}})
+def test_devmode(intf_ver):
+    print "Testing dev mode"
+    os.chdir("/newdata/thang")
 
-if answer.status_code != 200:
-    print "Failed to enable bundle, status ", answer.status_code
-    sys.exit(1)
+    print "Firing up tron in dev mode"
+    tron_pid = subprocess.Popen(["java", "-jar", "/newdata/tron/target/uberjar/tron-" + intf_ver +
+                                 "-standalone.jar", "--devmode"]).pid
+    time.sleep(5)
 
-time.sleep(2)
+    print "Firing up Maven exec mode"
+    app_pid = subprocess.Popen(["mvn", "compile", "exec:java"]).pid
 
-answer = requests.get("http://localhost:8680/api/sample")
+    time.sleep(5)
+    answer = requests.get("http://localhost:3000/api/sample")
 
-if answer.status_code != 200 or len(answer.json()["name"]) < 5:
-    print "Got a bad answer from our app ", answer.status_code
-    sys.exit(1)
+    if answer.status_code != 200 or len(answer.json()["name"]) < 5:
+        print "Got a bad answer from our dev-time app ", answer.status_code
+        sys.exit(1)
 
-answer = requests.post("http://localhost:8680/api/sample", json={"name": "David", "age": 52})
-
-if answer.status_code != 200 or answer.json()["age"] != 53:
-    print "Got a bad answer from our app ", answer.status_code
-    sys.exit(1)
+    os.kill(tron_pid, 9)
+    os.kill(app_pid, 9)
 
 
+def run_tests():
 
-os.kill(runner_pid, 9)
-os.kill(tron_pid, 9)
+    # Test the core pieces
+    intf_ver = test_intf()
+    test_dev_shim(intf_ver)
+    test_starter(intf_ver)
+
+    # Test Front end version
+    test_frontend_version(intf_ver)
+
+
+    # Test the Tron and start the tron
+    [tron_pid, runner_pid] = test_tron(intf_ver)
+
+    # now that the Tron is up, let's test the various samples
+    test_clojure_sample(intf_ver)
+    test_scala(intf_ver)
+    test_java_gradle(intf_ver)
+    test_groovy(intf_ver)
+    test_kotlin(intf_ver)
+    test_java_sample(intf_ver)
+
+    # And the Archetype
+    test_archetype(intf_ver)
+
+    os.kill(runner_pid, 9)
+    os.kill(tron_pid, 9)
+
+    test_devmode(intf_ver)
+
+run_tests()
+
+print ""
+print "*********"
+print "Successfully Ran All Tests!"
+print ""

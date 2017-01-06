@@ -14,13 +14,13 @@ RUN apt-get update && \
     apt-get install -y maven python-pip vim && \
     apt remove -y openjdk-7-jre-headless openjdk-7-jre
 
-
-# RUN update-java-alternatives --set java-1.8.0-openjdk-amd64
-
-RUN mkdir /m2 && \
-    chmod og+rwx /m2
-
 RUN pip install requests
+
+ADD sbt /usr/bin/sbt
+
+ADD sbt-launch.jar /usr/bin/sbt-launch.jar
+
+RUN chmod +x /usr/bin/sbt
 
 ADD tests_in_docker.py /usr/bin/run_tests.py
 
