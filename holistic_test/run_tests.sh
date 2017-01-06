@@ -10,8 +10,6 @@ ${DIR}/../scripts/start_frontend.sh
 
 docker build -t funcatron/holistic:latest .
 
-# -u "$(id -u):$(id -g)"
-
 docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest /usr/bin/run_tests.py
 
 echo $?

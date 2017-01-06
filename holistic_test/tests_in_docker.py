@@ -231,9 +231,9 @@ def test_frontend_version(intf_ver):
 
     test_git_status()
 
-    fel = read_file("frontend.lua").splitlines()
+    fel = read_file("funcatron.lua").splitlines()
 
-    ver_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in fel if line.startswith("funcation.version")][0]
+    ver_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in fel if line.startswith("funcatron.version")][0]
 
     if ver_line != intf_ver:
         print "Frontend wrong version ", ver_line
@@ -474,12 +474,13 @@ def run_tests():
 
     # Test the core pieces
     intf_ver = test_intf()
-    test_dev_shim(intf_ver)
-    test_starter(intf_ver)
 
     # Test Front end version
     test_frontend_version(intf_ver)
 
+    # Test other pieces
+    test_dev_shim(intf_ver)
+    test_starter(intf_ver)
 
     # Test the Tron and start the tron
     [tron_pid, runner_pid] = test_tron(intf_ver)
