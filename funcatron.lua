@@ -10,7 +10,7 @@ local semaphore = require "ngx.semaphore"
 
 -- generate a UUID
 function funcatron.uuid()
-   local template ='Fxxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+   local template ='FRNTxxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
    return string.gsub(template, '[xy]', function (c)
                          local v = (c == 'x') and random.number(0, 0xf) or
                             random.number(8, 0xb)
@@ -70,6 +70,28 @@ funcatron.instance_uuid = funcatron.uuid();
 local response_handlers = {}
 
 
+local function send_awake(rabbit)
+   local msg_uuid = funcatron.uuid()
+
+   local msg = cjson.encode({action="awake",
+                             type="frontend",
+                             ["instance-id"]=nginx_uuid,
+                             from=funcatron.instance_uuid,
+                             at=(os.time() * 1000),
+                             host_info={host=http_host, port=http_port},
+                             ["msg-id"]=msg_uuid})
+
+   local headers = {["x-type"] = "awake",
+      destination=("/amq/queue/" .. tron_queue),
+      persistent="false",
+      ["content-type"]="application/json",
+      receipt=msg_uuid
+   }
+
+   return rabbit:send(msg, headers)
+
+end
+
 -- register with the Tron and listen
 -- for messages
 local function register_and_listen()
@@ -91,38 +113,14 @@ local function register_and_listen()
       return
    end
 
-   local msg_uuid = funcatron.uuid()
-
-   -- {:action "awake"
-   --     :type "frontend"
-   --     :msg-id UUID-string
-   --     :instance-id Unique-id
-   --     :from UUID-String
-   --     :at currentTimeMillis
-   -- }
-
-   local msg = cjson.encode({action="awake",
-                             type="frontend",
-                             ["instance-id"]=nginx_uuid,
-                             from=funcatron.instance_uuid,
-                             at=(os.time() * 1000),
-                             host_info={host=http_host, port=http_port},
-                             ["msg-id"]=msg_uuid})
-
-   local headers = {["x-type"] = "awake",
-      destination=("/amq/queue/" .. tron_queue),
-      persistent="false",
-      ["content-type"]="application/json",
-      receipt=msg_uuid
-   }
-
-   local ok, err = rabbit:send(msg, headers)
+   local ok, err = send_awake(rabbit);
 
    if err then
       rabbit:close()
       ngx.timer.at(0.3, register_and_listen)
       return
    end
+
 
    local ok, err = rabbit:subscribe({destination="/queue/" ..
                                         funcatron.instance_uuid,
@@ -219,6 +217,16 @@ response_handlers["answer"] = function(msg)
    -- semaphore, wake them
    if current and current.type == "wait" then
       current.sema:post(99)
+   end
+
+end
+
+response_handlers["resend-awake"] = function(msg)
+   local rabbit, err = funcatron.rabbit_connection()
+
+   if rabbit then
+      send_awake(rabbit)
+      rabbit:close()
    end
 
 end
