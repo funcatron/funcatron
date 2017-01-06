@@ -149,7 +149,7 @@
         <dependency>
             <groupId>funcatron</groupId>
             <artifactId>devshim</artifactId>
-            <version>0.2.1</version>
+            <version>$version</version>
         </dependency>
 
         <dependency>
