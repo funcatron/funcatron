@@ -4,18 +4,32 @@ local funcatron = require("/data/funcatron")
 
 local rid = ngx.var.request_id
 
+if ngx.var.uri == '/' then
+   ngx.status = 200
+   ngx.header.content_type = "text/html"
+   ngx.say('<!DOCTYPE html>\n<html><head><meta content="text/html" http-equiv="Content-Type"><title>Funcatron</title></head><body><br><br><br><br><br><br><br><table align="center" cellpadding="0" cellspacing="0" border="0" width="100%"><tbody><tr><td align="center"><h1 style="margin:0;padding:0;font-family: Tahoma;"><a href="https://funcatron.org">Funcatron</a></h1></td></tr></tbody></table></body></html>')
+   return ngx.exit(200)
+end
+
+if ngx.var.uri == '/__routes' then
+   ngx.status = 200
+   ngx.header.content_type = "application/json"
+   ngx.say(cjson.encode({version=funcatron.version,
+   routes=funcatron.routing_table}))
+   return ngx.exit(200)
+end
 
 local target_queue, err = funcatron.route_for(ngx.var.host,
                                               ngx.var.uri)
 
 if err then
-   ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+   ngx.status = ngx.HTTP_NOT_FOUND
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
-   return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+   return ngx.exit(ngx.HTTP_NOT_FOUND)
 end
 
-
+ngx.log(ngx.ALERT, "Sending message to queue " .. target_queue .. " request " .. rid)
 
 -- get the body
 ngx.req.read_body()

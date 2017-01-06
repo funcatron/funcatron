@@ -20,6 +20,8 @@ end
 
 funcatron.random = random
 
+funcatron.version = '0.2.3'
+
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 
 local http_port = os.getenv("PORT_80") or "80"
@@ -75,6 +77,7 @@ local function send_awake(rabbit)
 
    local msg = cjson.encode({action="awake",
                              type="frontend",
+                             version=funcatron.version,
                              ["instance-id"]=nginx_uuid,
                              from=funcatron.instance_uuid,
                              at=(os.time() * 1000),
