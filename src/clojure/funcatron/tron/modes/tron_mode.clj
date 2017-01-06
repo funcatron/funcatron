@@ -212,7 +212,7 @@
         ;; load the file and make sure it's a valid func bundle
         (let [thing (jarjar/build-router file {})]
           (.endLife thing))
-        (let [{:keys [sha type swagger host basePath file-info]} (common/sha-and-swagger-for-file file)]
+        (let [{:keys [sha type swagger host basePath file-info] :as dog} (common/sha-and-swagger-for-file file)]
           (if (and type file-info)
             (let [dest-file (fu/new-file
                               (common/calc-storage-directory opts)
@@ -231,7 +231,11 @@
                         :swagger  swagger
                         :sha      sha}})
             (do
+              (info (str "Failed to upload Func Bundle... failed the type and file-info test. Type "
+                         type " file-info " file-info))
+              (info (str "The most likely reason is a missing or malformed funcatron.yaml file"))
               {:status 400
+
                  :body   {:accepted false
                           :error    "Could not determine the file type"}})))
         (catch Exception e (do
