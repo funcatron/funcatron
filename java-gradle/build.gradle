@@ -15,6 +15,7 @@ repositories {
     // Use 'jcenter' for resolving your dependencies.
     // You can declare any Maven/Ivy/file repository here.
     jcenter()
+    mavenLocal()
     maven {
         url "https://clojars.org/repo"
     }
@@ -29,7 +30,7 @@ dependencies {
     // 'test.useTestNG()' to your build script.
     testCompile 'junit:junit:4.12'
 
-    compile 'funcatron:intf:0.2.2'
+    compile 'funcatron:intf:0.2.3'
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
 }

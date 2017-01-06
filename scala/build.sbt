@@ -8,7 +8,9 @@ scalaVersion := "2.11.8"
 
 resolvers += "Clojars" at "https://clojars.org/repo"
 
-libraryDependencies += "funcatron" % "intf" % "0.2.2"
+resolvers += Resolver.mavenLocal
+
+libraryDependencies += "funcatron" % "intf" % "0.2.3"
 
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.5"
 
