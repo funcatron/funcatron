@@ -8,6 +8,7 @@ import funcatron.intf.ServiceVendorBuilder;
 
 import java.sql.Connection;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -57,8 +58,17 @@ public class JDBCServiceVendorBuilder implements ServiceVendorBuilder {
         Object url = properties.get("url");
         Object username = properties.get("username");
         Object password = properties.get("password");
+        Object classname = properties.get("classname");
 
         if (null != url && url instanceof String) {
+            if (null != classname && classname instanceof String) {
+                try {
+                    this.getClass().getClassLoader().loadClass((String) classname);
+                } catch (ClassNotFoundException cnf) {
+                    logger.log(Level.WARNING, cnf, () -> "Unable to load DB driver class "+classname);
+                }
+            }
+
             HikariConfig config = new HikariConfig();
             config.setJdbcUrl((String) url);
             if (null != username && username instanceof String) config.setUsername((String) username);
