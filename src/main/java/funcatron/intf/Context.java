@@ -38,6 +38,13 @@ public interface Context {
     Map<String, Map<String, Object>> getRequestParams();
 
     /**
+     * Get the http request headers
+     *
+     * @return the request headers
+     */
+    Map<String, Object> getHeaders();
+
+    /**
      * Get the Swagger-coerced query parameters
      * @return the swagger-coerced query params
      */

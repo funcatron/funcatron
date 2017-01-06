@@ -116,6 +116,15 @@ public class ContextImpl implements Context, Accumulator {
         return (Map<String, Map<String, Object>>) data.get("parameters");
     }
 
+    /**
+     * Get the http request headers
+     *
+     * @return the request headers
+     */
+    @Override
+    public Map<String, Object> getHeaders() {
+        return (Map<String, Object>) data.get("headers");
+    }
 
     /**
      * Get the Swagger-coerced path parameters
