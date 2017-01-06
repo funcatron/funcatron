@@ -167,7 +167,6 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
 
 
             return (InputStream inputStream, Map<Object, Object> om) -> {
-
                 Logger theLogger = (Logger) om.get("$logger");
                 if (null == theLogger) theLogger = Logger.getLogger(className);
                 final ContextImpl theContext = new ContextImpl(om, theLogger);
@@ -178,7 +177,14 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                     final HashMap<Object, Object> ret = new HashMap<>();
                     Object param = null;
                     if (null != inputStream) {
-                        Function<InputStream, Object> instDeserializer = func.jsonDecoder();
+                        Function<InputStream, Object> instDeserializer = null;
+
+                        try {
+                            instDeserializer = func.jsonDecoder();
+                        } catch (UnsupportedOperationException e) {
+                            // ignore ... the implementation didn't get the Java default method... sigh
+                        }
+
                         if (null != instDeserializer) {
                             param = instDeserializer.apply(inputStream);
                         } else if (null != basicDeserializer) {
@@ -191,7 +197,13 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                     Object retVal = func.apply(param, theContext);
                     boolean allSet = false;
 
-                    final Function<Object, byte[]> instSerializer = func.jsonEncoder();
+                    Function<Object, byte[]> instSerializer = null;
+
+                    try {
+                        instSerializer = func.jsonEncoder();
+                    } catch (UnsupportedOperationException e) {
+                        // ignore ... the implementation didn't get the Java default method... sigh
+                    }
 
                     String contentType =  "application/json" ;
 
@@ -223,12 +235,36 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                         }
                     }
 
-                    final String ct2 = func.contentType() == null ? contentType : func.contentType();
+                    String fct = null;
+
+                    try {
+                        fct = func.contentType();
+                    } catch (UnsupportedOperationException e) {
+                        // ignore ... the implementation didn't get the Java default method... sigh
+                    }
+
+                    final String ct2 = fct == null ? contentType : fct;
+
+                    Map<String, Object> someHeaders = new HashMap<>();
+
+                    try {
+                        someHeaders = func.headers();
+                    } catch (UnsupportedOperationException e) {
+                        // ignore ... the implementation didn't get the Java default method... sigh
+                    }
+
+                    int status = 200;
+
+                    try {
+                        status = func.statusCode();
+                    }  catch (UnsupportedOperationException e) {
+                        // ignore ... the implementation didn't get the Java default method... sigh
+                    }
 
                     // we didnt' get a MetaResponse, so set the return value
                     if (!allSet) {
-                        ret.put("status", 200);
-                        HashMap<String, Object> headers = new HashMap<>(func.headers());
+                        ret.put("status", status);
+                        HashMap<String, Object> headers = new HashMap<>(someHeaders);
                         if (!headers.containsKey("content-type")) {
                             headers.put("content-type", ct2);
                         }

@@ -31,6 +31,18 @@ public class ContextImpl implements Context, Accumulator {
 
     public static void initContext(Map<String, Object> props, ClassLoader loader,final  Logger logger) throws Exception {
         logger.log(Level.INFO,  () -> "Setting up context with props " + props);
+
+        Thread.currentThread().setContextClassLoader(ContextImpl.class.getClassLoader());
+
+        // try to pre-warm Clojure in this Classloader
+        // Allows Clojure gen-class code to run in this space
+        try {
+            Class<?> c = ContextImpl.class.getClassLoader().loadClass("clojure.java.api.Clojure");
+            ContextImpl.class.getClassLoader().loadClass("clojure.lang.RT");
+        } catch (Throwable t) {
+            // ignore... probably thrown if there's no clojure
+        }
+
         ContextImpl.props = props;
         ServiceLoader<ServiceVendorBuilder> builders =
         ServiceLoader.load(ServiceVendorBuilder.class, loader);
