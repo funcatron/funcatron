@@ -63,7 +63,8 @@ public class JDBCServiceVendorBuilder implements ServiceVendorBuilder {
         if (null != url && url instanceof String) {
             if (null != classname && classname instanceof String) {
                 try {
-                    this.getClass().getClassLoader().loadClass((String) classname);
+                    Class<?> clz = this.getClass().getClassLoader().loadClass((String) classname);
+                    logger.log(Level.INFO, () -> "Loaded class " + clz +" for JDBC");
                 } catch (ClassNotFoundException cnf) {
                     logger.log(Level.WARNING, cnf, () -> "Unable to load DB driver class "+classname);
                 }
