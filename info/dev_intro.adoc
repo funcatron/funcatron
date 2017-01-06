@@ -178,7 +178,7 @@ feature:
 mvn archetype:generate -B \
    -DarchetypeGroupId=funcatron \
    -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.2.1 \
+   -DarchetypeVersion=0.2.2 \
    -DgroupId=my.stellar \
    -DartifactId=thang \
    -Dversion=0.1.0 \
