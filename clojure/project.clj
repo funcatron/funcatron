@@ -1,4 +1,4 @@
-(defproject clojure_sample "0.2.1"
+(defproject clojure_sample "0.2.2"
   :description "Clojure Funcatron sample"
   :url "http://funcatron.org"
   :license {:name "Apache 2.0"}
