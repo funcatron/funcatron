@@ -67,15 +67,15 @@ code based on incoming requests. Funcatron supports the following languages:
 
 [NOTE]
 ====
-Python support is scheduled for Funcatron 0.2.0
+Python support is scheduled for Funcatron in the future
 ====
 * JavaScript. JavaScript code is bundled using https://webpack.github.io/docs/[Webpack]
 
 [NOTE]
 ====
-JavaScript support is scheduled for Funcatron 0.3.0
+JavaScript support is scheduled for Funcatron in the future
 ====
-* CLR (Common Language Runtime). Run .Net assemblies in Mono (scheduled for Funcatron 0.4.0)
+* CLR (Common Language Runtime). Run .Net assemblies in Mono (scheduled for Funcatron in the future)
 
 
 == Network
@@ -198,7 +198,7 @@ and normal requests.
 
 [NOTE]
 ====
-The Frontend code may, in the future (post 0.2.0), look at the `Content-Length` header and
+The Frontend code may, in the future, look at the `Content-Length` header and
 opt to request a direct connection for large request bodies.
 ====
 
