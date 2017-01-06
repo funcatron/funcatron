@@ -4,7 +4,7 @@
   :license {:name "Apache 2.0"}
   :dependencies [
                  [org.clojure/clojure "1.8.0"]
-                 [funcatron/intf "0.2.1"]
+                 [funcatron/intf "0.2.2"]
                  ]
 
   :manifest
