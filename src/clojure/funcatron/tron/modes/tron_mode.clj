@@ -312,10 +312,10 @@
 
 (defn- get-stats
   "Return statistics on activity"
-  [_ _]
+  [_ {:keys [::network ::route-map]}]
   {:status 200
-   :body   {:success false
-            :action  "FIXME"}
+   :body   {:network @network
+            :route-map @route-map}
    })
 
 (defn- return-sha

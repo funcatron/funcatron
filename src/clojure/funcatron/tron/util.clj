@@ -354,7 +354,7 @@
   {:base64encode (fn [^InputStream is] (base64encode (second (to-byte-array is))))})
 
 (def funcatron-file-regex
-  #"(?:.*\/|^)funcatron\.(json|yml|yaml)$")
+  #"(?:.*\/|^)funcatron\.(json|yaml)$")
 
 (defn- funcatron-file-type
   "Is the entry a Funcatron definition file"

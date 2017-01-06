@@ -1,4 +1,4 @@
-(defproject funcatron/tron "0.2.1"
+(defproject funcatron/tron "0.2.2"
   :description "Route request for Funcatron"
   :url "http://funcatron.org"
   :license {:name "Apache 2.0"}
