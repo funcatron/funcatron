@@ -6,7 +6,6 @@ info:
   license:
     name: MIT
     url: http://github.com/gruntjs/grunt/blob/master/LICENSE-MIT
-host: myserver.func.a.tron
 basePath: /api
 schemes:
   - http
