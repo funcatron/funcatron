@@ -24,5 +24,7 @@ RUN chmod +x /usr/bin/sbt
 
 ADD tests_in_docker.py /usr/bin/run_tests.py
 
+RUN sbt help
+
 RUN chmod +x /usr/bin/run_tests.py
 
