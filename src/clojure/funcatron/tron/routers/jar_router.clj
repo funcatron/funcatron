@@ -274,7 +274,7 @@
                                          "?")))
         end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
         init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
-    (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys properties) classloader (fu/logger-for log-props)]))
+    (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys (or properties {})) classloader (fu/logger-for log-props)]))
 
     [version (fn [] (.invoke end-life-method nil (make-array Object 0)))]
     )

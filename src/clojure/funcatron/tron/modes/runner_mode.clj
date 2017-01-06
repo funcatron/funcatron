@@ -236,6 +236,12 @@
   (schedule-ping state)
   )
 
+(defmethod dispatch-runner-message "resend-awake"
+  [_ _ state]
+  (wake-up state)
+  )
+
+
 (defn- i-died
   "Tell the Tron we've died"
   [state]

@@ -357,12 +357,23 @@
           )
 
 (defmethod dispatch-tron-message "heartbeat"
-  [{:keys [from]} _ {:keys [::network] :as state}]
+  [{:keys [from] :as dog} _ {:keys [::network ::queue ::opts] :as state}]
   (trace (str "Heartbeat from " from))
   (clean-network state)
+  (let [rn @network]
+    (when (not (get-in rn [from :type]))
+      (.sendMessage
+        ^MessageBroker queue
+        from
+        {:content-type "application/json"}
+        {:action    "resend-awake"
+         :tron-host (fu/compute-host-and-port opts)
+         :msg-id    (fu/random-uuid)
+         :at        (System/currentTimeMillis)
+         })
+      ))
   (swap! network assoc-in [from :last-seen] (System/currentTimeMillis))
-  (send-host-info from state)
-  )
+  (send-host-info from state))
 
 (defn- send-func-bundles
   "Send a list of the Func bundles to the Runner as well
