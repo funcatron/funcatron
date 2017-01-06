@@ -1,0 +1,10 @@
+= intf: The Interfaces that a Func must implement image:logo2.png[]
+
+== Documentation
+
+* link:apidocs[intf API docs]
+
+== Resources
+
+* link:..[Funcatron Documentation]
+* https://funcatron.org/[Funcatron Home Page]

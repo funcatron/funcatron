@@ -37,7 +37,7 @@ public interface MetaResponse extends Iterable<Map.Entry<String, Object>> {
      * If the response is a large one (bigger than 20K or so), it'll be
      * inefficient to put the response on the response machinery... so return true
      * and the `writeBody` method will be invoked to write the response out of band
-     * @return
+     * @return boolean
      */
     default boolean isLargeBody() {
         return false;
