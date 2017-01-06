@@ -7,6 +7,8 @@ import funcatron.intf.ServiceVendor;
 import funcatron.intf.ServiceVendorBuilder;
 
 import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -65,7 +67,8 @@ public class JDBCServiceVendorBuilder implements ServiceVendorBuilder {
                 try {
                     Class<?> clz = this.getClass().getClassLoader().loadClass((String) classname);
                     logger.log(Level.INFO, () -> "Loaded class " + clz +" for JDBC");
-                } catch (ClassNotFoundException cnf) {
+                    DriverManager.registerDriver((Driver) clz.newInstance());
+                } catch (Exception cnf) {
                     logger.log(Level.WARNING, cnf, () -> "Unable to load DB driver class "+classname);
                 }
             }
