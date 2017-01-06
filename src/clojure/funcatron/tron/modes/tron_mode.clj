@@ -42,6 +42,7 @@
     {:content-type "application/json"}
     {:action    "tron-info"
      :msg-id    (fu/random-uuid)
+     :version (:version fu/version-info)
      :tron-host (fu/compute-host-and-port opts)
      :at        (System/currentTimeMillis)
      })
@@ -76,6 +77,7 @@
       {:action    action
        :tron-host (fu/compute-host-and-port opts)
        :msg-id    (fu/random-uuid)
+       :version (:version fu/version-info)
        :at        (System/currentTimeMillis)
        :host      host
        :basePath  path
@@ -153,6 +155,7 @@
         k
         {:content-type "application/json"}
         {:action      "die"
+         :version (:version fu/version-info)
          :msg-id      (fu/random-uuid)
          :instance-id instance-id
          :at          (System/currentTimeMillis)
@@ -165,6 +168,7 @@
      ^MessageBroker queue where
      {:content-type "application/json"}
      {:action "route"
+      :version (:version fu/version-info)
       :msg-id (fu/random-uuid)
       :routes (or @route-map [])
       :at     (System/currentTimeMillis)
@@ -322,6 +326,13 @@
             :route-map @route-map}
    })
 
+(defn- get-routes
+  "Return current routes"
+  [_ {:keys [ ::route-map]}]
+  {:status 200
+   :body   @route-map
+   })
+
 (defn- return-sha
   "Get the Func bundle with the sha"
   [req {:keys [::bundles]}]
@@ -343,11 +354,12 @@
         (POST "/api/v1/enable" req (enable-func req state))
         (POST "/api/v1/disable" req (disable-func req state))
         (GET "/api/v1/stats" req (get-stats req state))
+        (GET "/api/v1/routes" req (get-routes req state))
         (GET "/api/v1/known_funcs" req (get-known-funcs req state))
         (GET "/api/v1/bundle/:sha" req (return-sha req state))
         (POST "/api/v1/add_func"
               req (upload-func-bundle req state)))
-      wrap-json-response
+      (wrap-json-response :pretty true :escape-non-ascii true)
       rm-json/wrap-json-params
       ))
 
@@ -367,6 +379,7 @@
         from
         {:content-type "application/json"}
         {:action    "resend-awake"
+         :version (:version fu/version-info)
          :tron-host (fu/compute-host-and-port opts)
          :msg-id    (fu/random-uuid)
          :at        (System/currentTimeMillis)
@@ -384,6 +397,7 @@
     destination
     {:content-type "application/json"}
     {:action    "all-bundles"
+     :version (:version fu/version-info)
      :tron-host (fu/compute-host-and-port opts)
      :msg-id    (fu/random-uuid)
      :at        (System/currentTimeMillis)

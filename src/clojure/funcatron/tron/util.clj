@@ -9,7 +9,8 @@
             [taoensso.timbre :as timbre
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
-                     spy get-env]])
+                     spy get-env]]
+            [clojure.java.shell :as shelly])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
@@ -841,3 +842,48 @@
   "A Java BiFunction that takes an InputStream and target class and returns a Jackson read-type"
   (reify BiFunction
     (apply [_ is clz] (.readValue jackson-json ^InputStream is ^Class clz))))
+
+(defn within-classloader
+  "Set the context classloader for execution of the function"
+  [^ClassLoader cl the-fn]
+  (let [cur-cl (-> (Thread/currentThread) .getContextClassLoader)]
+    (try
+      (-> (Thread/currentThread) (.setContextClassLoader cl))
+      (the-fn)
+      (finally (-> (Thread/currentThread) (.setContextClassLoader cur-cl))))))
+
+
+(def version-info
+  (or
+    ;; try getting the uberjar info
+    (try
+      (let [infos (enumeration-seq
+                    (.getResources
+                      (.getClassLoader
+                        (.getClass (fn [])))
+                      "META-INF/maven/funcatron/tron/pom.properties"))]
+        (first
+          (for [i infos]
+            (let [s (.replace ^String (slurp i) "\\n" "")
+                  p (Properties.)]
+              (.load p (StringReader. s))
+              (kebab-keywordize-keys p)
+              ))))
+      (catch Exception e (do
+                           (info e "Failed to load JAR properties")
+                           nil)))
+
+    (try
+      {:version     (nth (read-string (slurp (File. "project.clj"))) 2)
+       :revision    (.trim ^String (:out (shelly/sh "git" "rev-parse" "HEAD")))
+       :group-id    "funcatron",
+       :artifact-id "tron"}
+      (catch Exception e (do
+                           (info e "Failed to load local properties")
+                           nil)))
+
+    ;; no idea
+    {:version "UNKNOWN",
+     :revision "UNKNOWN",
+     :group-id "funcatron",
+     :artifact-id "tron"}))

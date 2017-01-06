@@ -38,11 +38,12 @@
     (swap! stats (fn [m]
                    (->
                      m
-                     (update sha merge-with + res)
+                     (update sha (fn [x]
+                                   (merge-with + x res)))
                      (update {:sha sha
                               :uri (.uri router-msg)
                               :method (.method router-msg)}
-                             merge-with + res))))))
+                             (fn [x] merge-with + x res)))))))
 
 (defn- load-sha-and-then
   "If the SHA of the func bundle is not known, get it from the Tron and then execute the function"
@@ -99,6 +100,7 @@
       (common/tron-queue)
       {:content-type "application/json"}
       {:action "heartbeat"
+       :version (:version fu/version-info)
        :msg-id (fu/random-uuid)
        :from   (::uuid state)
        :type   "runner"
@@ -161,28 +163,35 @@
     sha
     state
     (fn [file]
-      (let [router (jarjar/build-router file props true)
-            queue (fu/route-to-sha host basePath)
-            _ (when-let [info (get @routes queue)]
-                (stop-listening-to state queue info))
-            end-func
-            (shared-b/listen-to-queue
-              message-queue queue
-              (fn [msg]
-                (fu/run-in-pool
-                  (fn [] (handle-http-request
-                           state
-                           queue
-                           router
-                           msg)))))]
-        (swap! routes assoc queue
-               {:end-func end-func
-                :queue    queue
-                :host     host
-                :router   router
-                :path     basePath
-                :sha      sha})
-        (fu/run-in-pool (fn [] (send-ping state)))
+      (try
+        (let [router (jarjar/build-router file props true)
+              queue (fu/route-to-sha host basePath)
+              _ (when-let [info (get @routes queue)]
+                  (stop-listening-to state queue info))
+              end-func
+              (shared-b/listen-to-queue
+                message-queue queue
+                (fn [msg]
+                  (fu/run-in-pool
+                    (fn [] (try (handle-http-request
+                                  state
+                                  queue
+                                  router
+                                  msg)
+                                (catch Exception e (error e (str "Failed to service request on queue " queue)))
+                                )))))]
+          (info (str "Successfully deployed SHA " sha " for queue " queue))
+          (swap! routes assoc queue
+                 {:end-func end-func
+                  :queue    queue
+                  :host     host
+                  :router   router
+                  :path     basePath
+                  :sha      sha})
+          (fu/run-in-pool (fn [] (send-ping state)))
+          )
+        (catch Exception e
+          (error e (str "Failed to start bundle with sha " sha)))
         ))))
 
 (defmethod dispatch-runner-message "disable"
@@ -229,6 +238,7 @@
     {:content-type "application/json"}
     {:action "awake"
      :type   "runner"
+     :version (:version fu/version-info)
      :msg-id (fu/random-uuid)
      :from   (-> state ::uuid)
      :at     (System/currentTimeMillis)
@@ -250,6 +260,7 @@
     (common/tron-queue)
     {:content-type "application/json"}
     {:action "died"
+     :version (:version fu/version-info)
      :msg-id (fu/random-uuid)
      :from   (-> state ::uuid)
      :at     (System/currentTimeMillis)

@@ -17,40 +17,6 @@
 
 (set! *warn-on-reflection* true)
 
-(def version-info
-  (or
-    ;; try getting the uberjar info
-    (try
-      (let [infos (enumeration-seq
-                    (.getResources
-                      (.getClassLoader
-                        (.getClass (fn [])))
-                      "META-INF/maven/funcatron/tron/pom.properties"))]
-        (first
-          (for [i infos]
-            (let [s (.replace ^String (slurp i) "\\n" "")
-                  p (Properties.)]
-              (.load p (StringReader. s))
-              (fu/kebab-keywordize-keys p)
-              ))))
-      (catch Exception e (do
-                           (info e "Failed to load JAR properties")
-                           nil)))
-
-    (try
-      {:version     (nth (read-string (slurp (File. "project.clj"))) 2)
-       :revision    (.trim ^String (:out (shelly/sh "git" "rev-parse" "HEAD")))
-       :group-id    "funcatron",
-       :artifact-id "tron"}
-      (catch Exception e (do
-                           (info e "Failed to load local properties")
-                           nil)))
-
-    ;; no idea
-    {:version "UNKNOWN",
-     :revision "UNKNOWN",
-     :group-id "funcatron",
-     :artifact-id "tron"}))
 
 (defn- ordered-tron-env
   "Return the elements of the map that begin with TRON_ ordered by their number"
@@ -74,12 +40,12 @@
                  (merge d {:hostname_
                            (delay
                              (str @hn " # "
-                                  (:version version-info)
+                                  (:version fu/version-info)
                                   "-"
-                                  (:revision version-info)))})))]})
+                                  (:revision fu/version-info)))})))]})
 
   (info (str "Starting Funcatron. Args: " args))
-  (info (str "Version " version-info))
+  (info (str "Version " fu/version-info))
   (info (str "Env Vars" (System/getenv)))
   (let [clio (cli/parse-opts args the-opts/cli-options)
         clie (cli/parse-opts (ordered-tron-env (System/getenv)) the-opts/cli-options)

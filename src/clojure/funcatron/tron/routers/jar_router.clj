@@ -10,14 +10,14 @@
             [cheshire.core :as json]
             [funcatron.tron.util :as fu])
   (:import (java.util.jar JarFile)
-           (java.io InputStream ByteArrayInputStream)
+           (java.io InputStream)
            (java.net URLClassLoader URL)
-           (java.lang.reflect Method InvocationTargetException)
+           (java.lang.reflect InvocationTargetException)
            (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)
            (java.util Base64 Map)
            (java.util.logging Logger)
-           (java.util.function Function BiFunction)))
+           (java.util.function BiFunction)))
 
 
 (set! *warn-on-reflection* true)
@@ -181,18 +181,22 @@
 (defn- resolve-stuff
   "Given a ::jar-info and swagger, "
   [{:keys [::classloader]} swagger-info]
+  (fu/within-classloader
+    classloader
+    (fn []
+      (let [^String op-id (get swagger-info "operationId")
+            clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.Dispatcher")
+            dispatcher ^BiFunction (.newInstance clz)
+            apply-bi-func ^BiFunction (.apply dispatcher op-id
+                                              (-> swagger-info
+                                                  (assoc "$deserializer" fu/jackson-deserializer)
+                                                  (assoc "$serializer" fu/jackson-serializer)
+                                                  fu/stringify-keys))]
 
-  (let [^String op-id (get swagger-info "operationId")
-        clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.Dispatcher")
-        dispatcher ^BiFunction (.newInstance clz)
-        apply-bi-func ^BiFunction (.apply dispatcher op-id
-                                          (-> swagger-info
-                                              (assoc "$deserializer" fu/jackson-deserializer)
-                                              (assoc "$serializer" fu/jackson-serializer)
-                                              fu/stringify-keys ))]
-
-    (fn [req] (handle-actual-request
-                apply-bi-func req))))
+        (fn [req] (fu/within-classloader
+                    classloader
+                    (fn [] (handle-actual-request
+                             apply-bi-func req))))))))
 
 (defn make-app
   [the-jar]
@@ -210,54 +214,59 @@
 (defn- route-to-jar
   "Routes the message to the JAR file"
   [^Router$Message message the-app log-props reply?]
-  (let [ring-req (fu/make-ring-request message)
-        resp (the-app (assoc
-                        ring-req
-                        ::log-props
-                        (assoc log-props :reply-to (.replyTo message))
-                        ))]
+  (try
+    (let [ring-req (fu/make-ring-request message)
+          resp (the-app (assoc
+                          ring-req
+                          ::log-props
+                          (assoc log-props :reply-to (.replyTo message))
+                          ))]
+      (when (and reply? (.replyTo message))
+        (let [resp (assoc resp :body (or (::byte-body resp) (:body resp)))
+              resp (dissoc resp ::byte-body)
+              body (:body resp)
+              resp
+              (try
+                (assoc resp
+                  :body (cond
+                          (instance? String body)
+                          (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
 
-    (when (and reply? (.replyTo message))
-      (let [resp (assoc resp :body (or (::byte-body resp) (:body resp)))
-            resp (dissoc resp ::byte-body)
-            body (:body resp)
-            resp
-            (try
-              (assoc resp
-                :body (cond
-                        (instance? String body)
-                        (.encodeToString (Base64/getEncoder) (.getBytes ^String body "UTF-8"))
-
-                        (instance? (Class/forName "[B") body)
-                        (String. (.encode (Base64/getEncoder) ^"[B" body) "UTF-8")
+                          (instance? (Class/forName "[B") body)
+                          (String. (.encode (Base64/getEncoder) ^"[B" body) "UTF-8")
 
 
-                        (instance? InputStream body)
-                        (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
+                          (instance? InputStream body)
+                          (.encodeToString (Base64/getEncoder) (IOUtils/toByteArray ^InputStream body))
 
-                        :else
-                        (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
-                        ))
-              (catch Exception e {:status  500
-                                  :headers {"content-type" "text/plain"}
-                                  :body    (.encodeToString (Base64/getEncoder)
-                                                            (.getBytes
-                                                              (exception-to-string e)
-                                                              "UTF-8"))})
-              )]
+                          :else
+                          (.encodeToString (Base64/getEncoder) (.getBytes (json/generate-string body) "UTF-8"))
+                          ))
+                (catch Exception e {:status  500
+                                    :headers {"content-type" "text/plain"}
+                                    :body    (.encodeToString (Base64/getEncoder)
+                                                              (.getBytes
+                                                                (exception-to-string e)
+                                                                "UTF-8"))})
+                )]
 
-        (.sendMessage
-          (.messageBroker (.underlyingMessage message))
-          (.replyQueue message)
-          {:content-type "application/json"}
-          {:action     "answer"
-           :msg-id     (fu/random-uuid)
-           :request-id (.replyTo message)
-           :answer     resp
-           :at         (System/currentTimeMillis)
-           })))
+          (.sendMessage
+            (.messageBroker (.underlyingMessage message))
+            (.replyQueue message)
+            {:content-type "application/json"}
+            {:action     "answer"
+             :msg-id     (fu/random-uuid)
+             :request-id (.replyTo message)
+             :answer     resp
+             :at         (System/currentTimeMillis)
+             })))
 
-    resp
+      resp
+      )
+    (catch Throwable t
+      (do
+        (error t "Massive Failure")
+        (throw t)))
     ))
 
 (defn- initialize-context
@@ -266,19 +275,22 @@
   [{:keys [::classloader]} properties log-props]
   (let [classloader ^ClassLoader classloader
         context-impl-clz (.loadClass classloader "funcatron.intf.impl.ContextImpl")
-        version (try
-                  (let [meth (.getMethod context-impl-clz "getVersion" (make-array Class 0))]
-                    (.invoke meth nil (make-array Object 0))
-                    )
-                  (catch Exception e (do (error e "Couldn't get version")
-                                         "?")))
-        end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
-        init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
-    (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys (or properties {})) classloader (fu/logger-for log-props)]))
 
-    [version (fn [] (.invoke end-life-method nil (make-array Object 0)))]
-    )
-  )
+        ]
+    (fu/within-classloader
+      classloader
+      (fn []
+        (let [version (try
+                        (let [meth (.getMethod context-impl-clz "getVersion" (make-array Class 0))]
+                          (.invoke meth nil (make-array Object 0))
+                          )
+                        (catch Exception e (do (error e "Couldn't get version")
+                                               "?")))
+              end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
+              init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
+          (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys (or properties {})) classloader (fu/logger-for log-props)]))
+          [version (fn [] (fu/within-classloader classloader (fn [] (.invoke end-life-method nil (make-array Object 0)))))]
+          )))))
 
 (defn ^Router build-router
   "Take a JAR file (as a File or String) and create a Router"
