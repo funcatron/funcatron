@@ -8,7 +8,7 @@ scalaVersion := "2.11.8"
 
 resolvers += "Clojars" at "https://clojars.org/repo"
 
-libraryDependencies += "funcatron" % "intf" % "0.2.1"
+libraryDependencies += "funcatron" % "intf" % "0.2.2"
 
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.5"
 
