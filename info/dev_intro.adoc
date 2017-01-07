@@ -1,6 +1,12 @@
 = Funcatron for Developers
+David Pollak <d@funcatron.org>
+v0.2.3, 2017-01-06
+:toc:
 
-Funcatron lets you focus on the business logic of your code. What?
+
+== Introduction
+
+Funcatron lets you focus on the business logic of your code. _What?_
 
 Much of the code you write deals with a cross-section of concerns...
 "`How do I serialize/deserialize the data?`" "`What are the security
