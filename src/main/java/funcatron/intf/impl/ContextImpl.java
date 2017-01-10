@@ -1,15 +1,15 @@
 package funcatron.intf.impl;
 
-import funcatron.intf.Accumulator;
-import funcatron.intf.Context;
-import funcatron.intf.ServiceVendor;
-import funcatron.intf.ServiceVendorBuilder;
+import funcatron.intf.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 
 /**
  * An implementation of Context so the Context Object associated with the classloader can be loaded
@@ -29,23 +29,84 @@ public class ContextImpl implements Context, Accumulator {
 
     private static Map<String, Object> props = new HashMap<>();
 
-    public static void initContext(Map<String, Object> props, ClassLoader loader,final  Logger logger) throws Exception {
-        logger.log(Level.INFO,  () -> "Setting up context with props " + props);
+    private volatile static ClassLoader contextClassloader;
 
-        Thread.currentThread().setContextClassLoader(ContextImpl.class.getClassLoader());
-
-        // try to pre-warm Clojure in this Classloader
-        // Allows Clojure gen-class code to run in this space
-        try {
-            Class<?> c = ContextImpl.class.getClassLoader().loadClass("clojure.java.api.Clojure");
-            ContextImpl.class.getClassLoader().loadClass("clojure.lang.RT");
-        } catch (Throwable t) {
-            // ignore... probably thrown if there's no clojure
+    public static ClassLoader getClassloader() {
+        ClassLoader ret = contextClassloader;
+        if (null == ret) {
+            return ContextImpl.class.getClassLoader();
         }
+        return ret;
+    }
 
-        ContextImpl.props = props;
+    /**
+     * A list of the operations we speak
+     */
+    private static final ConcurrentHashMap<String, BiFunction<Map<String, Object>, Logger, Object>> operations = new ConcurrentHashMap<>();
+
+    static {
+        operations.put("operations", (x, l) -> operations.keySet());
+        operations.put("endLife", (x, l) -> {
+            endLife(l);
+            return null;
+        });
+        operations.put("getClassloader", (x, l) -> getClassloader());
+
+    }
+
+    /**
+     * In order to minimize the classes needed to bridge between a loaded Func Bundle and
+     *
+     * @return
+     */
+    public static Set<String> operationNames() {
+        return operations.keySet();
+    }
+
+    public static void addOperation(String name, BiFunction<Map<String, Object>, Logger, Object> func) {
+        operations.put(name, func);
+    }
+
+    private static final CopyOnWriteArrayList<Function<Logger, Void>> endOfLifeFunctions = new CopyOnWriteArrayList<>();
+
+    public static void addFunctionToEndOfLife(Function<Logger, Void> func) {
+        endOfLifeFunctions.add(func);
+    }
+
+    public static Function<String, BiFunction<Map<String, Object>, Logger, Object>> initContext(Map<String, Object> props, ClassLoader loader, final Logger logger) throws Exception {
+        logger.log(Level.INFO, () -> "Setting up context with props " + props);
+
+        contextClassloader = loader;
+
+
+        ContextImpl.props = Collections.unmodifiableMap(new HashMap<>(props));
+
+
+        ServiceLoader<ClassloaderBuilder> classloaderMagic = ServiceLoader.load(ClassloaderBuilder.class, loader);
+
+        ClassLoader curClassloader = loader;
+        for (ClassloaderBuilder clb : classloaderMagic) {
+            curClassloader = clb.buildFrom(curClassloader);
+        }
+        contextClassloader = curClassloader;
+
+        ServiceLoader.load(OperationInstaller.class, curClassloader).forEach(i -> {
+            try {
+                i.installOperation((name, func) -> {
+                            addOperation(name, func);
+                            return null;
+                        }, s -> operations.get(s),
+                        eol -> {
+                            addFunctionToEndOfLife(eol);
+                            return null;
+                        });
+            } catch (Exception e) {
+                logger.log(Level.WARNING, e, () -> "Failed to install operation");
+            }
+        });
+
         ServiceLoader<ServiceVendorBuilder> builders =
-        ServiceLoader.load(ServiceVendorBuilder.class, loader);
+                ServiceLoader.load(ServiceVendorBuilder.class, curClassloader);
 
         HashMap<String, ServiceVendorBuilder> builderMap = new HashMap<>();
 
@@ -55,27 +116,54 @@ public class ContextImpl implements Context, Accumulator {
 
         builderMap.put(db.forType(), db);
 
-        props.forEach((k, v) -> {if (null != k && k instanceof String && null != v && v instanceof Map) {
-            Map m = (Map) v;
-            Object o = m.get("type");
-            if (null != o && o instanceof String) {
-                logger.log(Level.FINER, () -> "Looking for builder for type: " + o);
-                ServiceVendorBuilder b = builderMap.get(o);
-                if (null != b) {
-                    logger.log(Level.FINER, () -> "Building with props " + m);
-                    Optional<ServiceVendor<?>> opt = b.buildVendor(k, m, logger);
-                    opt.map(vendor -> services.put(k, vendor));
+        props.forEach((k, v) -> {
+            if (null != k && k instanceof String && null != v && v instanceof Map) {
+                Map m = (Map) v;
+                Object o = m.get("type");
+                if (null != o && o instanceof String) {
+                    logger.log(Level.FINER, () -> "Looking for builder for type: " + o);
+                    ServiceVendorBuilder b = builderMap.get(o);
+                    if (null != b) {
+                        logger.log(Level.FINER, () -> "Building with props " + m);
+                        Optional<ServiceVendor<?>> opt = b.buildVendor(k, m, logger);
+                        opt.map(vendor -> services.put(k, vendor));
 
+                    }
                 }
-          }
-        }});
+            }
+        });
+
+        return (name) -> operations.get(name);
     }
 
     /**
      * Release all the resources held by the context
      */
     public static void endLife() {
-        services.entrySet().forEach(a -> a.getValue().endLife());
+        endLife(Logger.getLogger(ContextImpl.class.getName()));
+    }
+
+    /**
+     * Release all the resources held by the context... with a logger
+     */
+    public static void endLife(Logger logger) {
+        if (null == logger) logger = Logger.getLogger(ContextImpl.class.getName());
+        final Logger fl = logger;
+        services.entrySet().forEach(a -> {
+            try {
+                a.getValue().endLife();
+            } catch (Exception e) {
+                fl.log(Level.WARNING, e, () -> "Failed to end resource life");
+            }
+        });
+
+        endOfLifeFunctions.forEach(a -> {
+            try {
+                a.apply(fl);
+            } catch (Exception e) {
+                fl.log(Level.WARNING, e, () -> "Failed to end resource life");
+            }
+        });
     }
 
     private static class ReleasePair<T> {
@@ -177,14 +265,15 @@ public class ContextImpl implements Context, Accumulator {
         Map<String, Object> query = getQueryParams();
         HashMap<String, Object> ret = new HashMap<>();
 
-        path.forEach((k,v) -> ret.put(k,v));
-        query.forEach((k,v) -> ret.put(k,v));
+        path.forEach((k, v) -> ret.put(k, v));
+        query.forEach((k, v) -> ret.put(k, v));
 
         return ret;
     }
 
     /**
      * Get the Swagger-coerced query parameters
+     *
      * @return the swagger-coerced query params
      */
     @Override
@@ -229,6 +318,7 @@ public class ContextImpl implements Context, Accumulator {
 
     /**
      * Return version information so the Runner can do the right thing
+     *
      * @return version information so the Runner can do the right thing
      */
     public static String getVersion() {
@@ -237,22 +327,22 @@ public class ContextImpl implements Context, Accumulator {
 
     @Override
     public <T> void accumulate(T item, ServiceVendor<T> vendor) {
-        getLogger().log(Level.FINER, () -> "Accumulating "+item);
+        getLogger().log(Level.FINER, () -> "Accumulating " + item);
         toTerminate.add(new ReleasePair(item, vendor));
     }
 
     public void finished(boolean success) {
-        getLogger().log(Level.FINER, () ->"Finished "+success+" Notifying "+toTerminate.size());
+        getLogger().log(Level.FINER, () -> "Finished " + success + " Notifying " + toTerminate.size());
         toTerminate.forEach(a -> {
-            // cast to something to avoid type error
-            ReleasePair<Object> b = (ReleasePair<Object>) a;
-            try {
-                getLogger().log(Level.FINER, () -> "Releasing "+b.item);
-                b.vendor.release(b.item, success);
-            } catch (Exception e) {
-                logger.log(Level.WARNING, "Exception releasing " + a.item, e);
-            }
-            }
+                    // cast to something to avoid type error
+                    ReleasePair<Object> b = (ReleasePair<Object>) a;
+                    try {
+                        getLogger().log(Level.FINER, () -> "Releasing " + b.item);
+                        b.vendor.release(b.item, success);
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "Exception releasing " + a.item, e);
+                    }
+                }
         );
     }
 

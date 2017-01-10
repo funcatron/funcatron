@@ -18,6 +18,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -175,26 +176,38 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                     final Func<Object> func = (Func<Object>) c.newInstance();
 
                     final HashMap<Object, Object> ret = new HashMap<>();
-                    Object param = null;
-                    if (null != inputStream) {
-                        Function<InputStream, Object> instDeserializer = null;
 
-                        try {
-                            instDeserializer = func.jsonDecoder();
-                        } catch (UnsupportedOperationException e) {
-                            // ignore ... the implementation didn't get the Java default method... sigh
+                    Callable<Object> resolveParam = () -> {
+                        Object param = null;
+                        if (null != inputStream) {
+                            Function<InputStream, Object> instDeserializer = null;
+
+                            try {
+                                instDeserializer = func.jsonDecoder();
+                            } catch (UnsupportedOperationException e) {
+                                // ignore ... the implementation didn't get the Java default method... sigh
+                            }
+
+                            if (null != instDeserializer) {
+                                param = instDeserializer.apply(inputStream);
+                            } else if (null != basicDeserializer) {
+                                param = basicDeserializer.apply(inputStream);
+                            } else {
+                                param = deserializer.apply(inputStream, paramType);
+                            }
                         }
 
-                        if (null != instDeserializer) {
-                            param = instDeserializer.apply(inputStream);
-                        } else if (null != basicDeserializer) {
-                            param = basicDeserializer.apply(inputStream);
-                        } else {
-                            param = deserializer.apply(inputStream, paramType);
-                        }
-                    }
+                        return param;
+                    };
 
-                    Object retVal = func.apply(param, theContext);
+                    Object retVal = null;
+
+                    if ("get".equals(theContext.getMethod())) retVal = func.get(theContext);
+                    else if ("post".equals(theContext.getMethod())) retVal = func.post(resolveParam.call(), theContext);
+                    else if ("put".equals(theContext.getMethod())) retVal = func.put(resolveParam.call(), theContext);
+                    else if ("patch".equals(theContext.getMethod())) retVal = func.patch(resolveParam.call(), theContext);
+                    else if ("delete".equals(theContext.getMethod())) retVal = func.delete(theContext);
+                    else retVal = func.apply(resolveParam.call(), theContext);
                     boolean allSet = false;
 
                     Function<Object, byte[]> instSerializer = null;
