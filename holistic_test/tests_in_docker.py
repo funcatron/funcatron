@@ -10,6 +10,18 @@ import re
 import time
 import requests
 import atexit
+import sys
+import getopt
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:],"hcv",["server="])
+except getopt.GetoptError:
+    print 'run_tests.sh [-h ][-c] [-v] [--server=http://localhost:8780]'
+    sys.exit(2)
+
+print 'Number of arguments:', len(sys.argv), 'arguments.'
+print 'Argument List:', str(sys.argv)
+
 
 subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
@@ -23,6 +35,23 @@ compile = True  # set to false to speed things up
 
 http_server = 'http://localhost:8680' # might be different for different configs
 # http_server = 'http://localhost:8780'
+
+test_version = True # Make sure all the versions are correct
+
+print "opts ", opts
+
+for opt, arg in opts:
+    if opt == "-c":
+        require_commit = False
+    elif opt == '-h':
+        print 'run_tests.sh [-h ][-c] [-v] [--server=http://localhost:8780]'
+        sys.exit(2)
+    elif opt == "-v":
+        test_version = False
+    elif opt == "--server":
+        http_server = arg
+
+print "Running tests. Check commit: ", require_commit, " Check Version: ", test_version, " server ", http_server
 
 def kill_java():
     subprocess.call(["killall", "java"])
@@ -62,6 +91,9 @@ def parse_xml(xml):
 
 
 def test_pom_deps(intf_ver, mod_name, only_deps=False):
+    if not test_version:
+        return
+
     the_dir = os.getcwd() + '/pom.xml'
     the_file = read_file(the_dir)
     xml = parse_xml(the_file)
@@ -81,6 +113,9 @@ def test_pom_deps(intf_ver, mod_name, only_deps=False):
             sys.exit(1)
 
 def check_gradle_version(ver, name):
+    if not test_version:
+        return
+
     gradle = read_file("build.gradle").splitlines()
     func_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', aline).group(0) for aline in gradle if "funcatron" in aline]
 
@@ -177,14 +212,16 @@ def test_scala(intf_ver):
 
     test_git_status()
 
-    sbt = read_file("build.sbt").splitlines()
+    if test_version:
 
-    has_func = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in sbt if "funcatron" in line]
+        sbt = read_file("build.sbt").splitlines()
 
-    for num in has_func:
-        if num != intf_ver:
-            print "SBT file needs updating from version ", num, " to ", intf_ver
-            sys.exit(1)
+        has_func = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in sbt if "funcatron" in line]
+
+        for num in has_func:
+            if num != intf_ver:
+                print "SBT file needs updating from version ", num, " to ", intf_ver
+                sys.exit(1)
 
     code = subprocess.call(["sbt", "-v", "clean", "assembly"])
     if code != 0:
@@ -226,6 +263,9 @@ def test_groovy(intf_ver):
 ## Front End
 
 def test_frontend_version(intf_ver):
+    if not test_version:
+        return
+
     print "Testing front end version"
     os.chdir("/newdata/frontend")
 
@@ -308,7 +348,7 @@ def test_tron(intf_ver):
 
     proj = re.search('[0-9]+\.[0-9]+\.[0-9]', proj).group(0)
 
-    if proj != intf_ver:
+    if test_version and proj != intf_ver:
         print "Tron is at version ", proj, " which is not compatible with intf ", intf_ver
         sys.exit(1)
 
@@ -381,7 +421,7 @@ def test_clojure_sample(intf_ver):
                  if "funcatron" in aline and not ":url" in aline]
 
     for the_ver in func_line:
-        if the_ver != intf_ver:
+        if test_version and the_ver != intf_ver:
             print "Clojure project.clj file needs updating from version ", num, " to ", ver
             sys.exit(1)
 
