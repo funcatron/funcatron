@@ -202,7 +202,6 @@ The Frontend code may, in the future, look at the `Content-Length` header and
 opt to request a direct connection for large request bodies.
 ====
 
-Dogs and cats can eat catfood!
 
 [plantuml]
 ----
@@ -211,3 +210,148 @@ Dogs and cats can eat catfood!
   message_queue <-- Tron: Route Table
   openresty <-- message_queue: Route Table
 ----
+
+## Runner/Func Bundle JVM lifecycle
+
+Funcatron will support Func Bundles from various languages. JVM-language Func Bundles
+are handled differently than any other Func Bundles.
+
+The Java Virtual Machine has a facility known as https://en.wikipedia.org/wiki/Java_Classloader[Classloaders].
+A Classloader allows loading of a collection of Java classes from a source (JAR file, class file, etc.)
+and have that class isolated from other classes or sets of classes. Most application servers make
+use of Classloaders to allow loading different "`applications`" into the same Java virtual machine
+where each application is linked to the libraries and library versions that it was packaged with.
+
+Funcatron loads JVM-based Func Bundles via a separate Classloader into a Funcatron Runner instance.
+
+In order to service a request, Funcatron needs two basic facilities:
+
+* The Swagger file that defines the REST endpoints
+* The ability to dispatch a specific request to the associated `operationId` for the endpoint/method combination
+
+By default, Funcatron looks through an http://stackoverflow.com/questions/11947037/what-is-an-uber-jar[UberJar]
+for the `funcatron.yaml` or `funcatron.json` file for the Swagger information. However, if you've got a
+https://projects.spring.io/spring-boot/[Spring Boot] application, the Swagger information is derived from
+annotations and dispatch is not on a class basis, but based on the annotations.
+[NOTE]
+====
+We deliberately chose a name different than `swagger.yaml` such that if there was a Swagger file in the JAR,
+it would not conflict with what Funcatron looks for.
+====
+
+Additionally, there may be Func Bundle-level initialization that needs to take place (e.g.,
+https://clojure.org/[Clojure] apps need to load the `RT` class before any dispatch takes place.)
+
+So, Funcatron needs a plugable mechanism for initializing and destroying Classloader-based contexts.
+ Additionally, Funcatron needs to delegate classloading to special "`code weaving`" style classloaders
+ that exist in Spring-based applications. And Funcatron needs to support alternative mechanisms for
+ delivering Swagger files. And Funcatron needs to support alternative `operationId` to function-level
+ dispatch. And while we're at it, why not support full
+ https://github.com/ring-clojure/ring/wiki/Concepts#middleware[Middleware] facilities to wrap
+ the request/response stack?
+
+The Java Virtual Machine has a facility for discovering "`Providers`" of specific
+types of services: https://docs.oracle.com/javase/tutorial/ext/basics/spi.html#the-serviceloader-class[the `ServiceLoader`].
+
+Funcatron makes extensive use of the `ServiceLoader` to support changing default behaviors based
+on the contents of a Func Bundle.
+
+=== Loading a JVM Func Bundle
+
+When a Func Bundle bundle is loaded, a new https://docs.oracle.com/javase/7/docs/api/java/net/URLClassLoader.html[URLClassloader]
+ is created with no parent classloader and just the Func Bundle JAR as a set of classes to load. This
+  results in a Classlaoder that only has access to the classes in the JAR and the Java Virtual Machine base library.
+  The classes in the Java Virtual Machine base library include things like `String` and `Map`.
+
+The new classloader is asked for the `funcatron.intf.impl.ContextImpl` class. The only communication
+ between Funcatron and the Func Bundle is via this class and specifically, the `initContext` static method.
+
+Funcatron invokes the `initContext` method with the Execution Properties, the newly created `Classloader`
+  and `Logger`.
+
+==== Bootstrapping the `ClassLoader`: `ClassloaderProvider`
+
+`initContext` uses the `ServiceLoader` to find all the `ClassloaderProvider` instances. These instances
+are sorted in reverse order based on the `order()` method. This allows providers that need to be
+executed early to be executed first by returning a high value.
+
+The initial `ClassLoader` is passed to the first `ClassloaderProvider` which builds
+a new `ClassLoader` from the initial one and returns it. That process continues for
+all the `ClassloaderProviders`.
+
+The `ClassloaderProvider` is an ideal place to initialize a runtime like Clojure. In this case,
+the Clojure `RT` class would be loaded into the provided `ClassLoader` and the original `ClassLoader`
+would be returned.
+
+The `addEndOfLife` funcation is passed to the `buildFrom` method in `ClassloaderProvider`.
+If the provider allocates any resources that will not be automatically garbage collected,
+the provider can register a function that will be applied when the Func Bundle goes out
+of scope.
+
+==== Adding Operations: OperationProvider
+
+After the `ClassLoader` is computed and we've initialized the execution environment,
+the next phase is to add or change "`operations`".
+
+Operations are a set of functions that can be invoked by the Runner or other facilities
+to either get information from or impact the operation of the Func Bundle.
+
+Operations have a type signature `BiFunction<Map<Object, Object>, Logger, Object>`. They
+are functions that take two parameters: the parameter map and a logger and return something.
+
+Here are the built in operations:
+
+* `operations` -- returns a `Set<String>` of all the named operations. The parameter map and logger are ignored.
+* `getClassloader` -- returns the computed `ClassLoader` for the Func Bundle. The parameter map and logger are ignored.
+* `getSwagger` -- returns the Swagger file or information in a `Map` where the keys are `swagger` which is an
+  object that contains the Swagger information and `type` which is the type of the file.
+  Replace this function if your Func Bundle computes the Swagger based on something other than a file.
+  By default, the `/swagger.yaml` or `/swagger.json` resource is loaded from the JAR file.
+  Understood types are:
+    ** `yaml` -- the `swagger` should be a `String` and it's parsed using a YAML parser.
+    ** `json` -- the `swagger` should be a `String` and it's parsed using a JSON parser.
+    ** `map` -- the `swagger` should be a `Map` and it's passed unchanged.
+* `getVersion` -- queries the `funcatron/intf/MANIFEST.MF` file for the version. Returns a String. If the version
+  is greater than or equal to the Runner's version, the Runner assumes all capabilities that the Runner knows about. If
+  the version is less than the Runner's version, the Runner may change behavior to compensate for older versions.
+  This allows Funcatron clusters to run various different Func Bundles without having to have
+  version equality.
+* `dispatcherFor` -- based on an operationId and other Swagger information, return a
+  `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>` that will service the request.
+  The `$operationId` field in the parameter map *must* be set. Replace this operation if
+  dispatching will happen by mechanism other than Funcatron's built-in class-based dispatcher.
+  For example, a Clojure dispatcher and a Spring Boot dispatcher would replace this operation.
+* `getSerializer` -- Return a `BiFunction<Object, String, byte[]>` if there's a special serializer. This
+  is a handy mechanism for creating a generic serializer. The `Object` is the thing to serialize,
+  `String` is the mime type or blank for JSON, and `byte[]` is the returned serialized bytes. If
+  this operation returns `null`, then use the built in serialization logic.
+* `getDeserializer` -- Return a `BiFunction<InputStream, List<Object>, Object>` where the `InputStream`
+   is the body of the thing to deserialize. The first element in `List<Object>` is the content type which
+   may be null (assume `application/json`) and the second element is the `Class` of the thing to deserializer.
+   Return the deserialized value. If
+   this operation returns `null`, then use the built in deserialization logic.
+* `wrapWithMiddleware` -- take a `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>` and
+  wrap middleware around it, returning a `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>`.
+  The `function` property in the incoming `Map` must be the original `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>`.
+
+==== Adding Services: ServiceVendorProvider
+
+Finally, the all `ServiceVendorProvider` services are loaded and each `ServiceVendorProvider`
+ registers services, such as a Redis provider, with the context.
+
+==== Registering the Middleware
+
+In order to service an incoming request, Funcatron applies the incoming body (an `InputStream`) and
+the request parameters, headers, etc. (the `Map<Object, Object>`) to a `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>`.
+The returned `Map<Object, Object>` is the thing that's returned... that's the answer. It's possible to
+wrap "`middleware`" around the function to either modify the incoming stuff or modify the return value.
+
+Middleware is implemented as a `MiddlewareProvider` and loaded into the Context. Then each of the
+functions generated by `dispatchFor` is wrapped by the middleware.
+
+=== And back again
+
+Once the `ContextImpl.initContext` method is complete, it returns a `Function<String, BiFunction<Map<Object, Object>, Logger, Object>>`
+to the caller. This allows the caller to look up and apply operations. This provides the bridge
+between the Func Runner and the Func Bundle.
+

@@ -14,9 +14,9 @@ import sys
 import getopt
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:],"hcv",["server="])
+    opts, args = getopt.getopt(sys.argv[1:],"hcsv",["server="])
 except getopt.GetoptError:
-    print 'run_tests.sh [-h ][-c] [-v] [--server=http://localhost:8780]'
+    print 'run_tests.sh [-h ][-c] [-v] [-s] [--server=http://localhost:8780]'
     sys.exit(2)
 
 print 'Number of arguments:', len(sys.argv), 'arguments.'
@@ -36,6 +36,8 @@ compile = True  # set to false to speed things up
 http_server = 'http://localhost:8680' # might be different for different configs
 # http_server = 'http://localhost:8780'
 
+skip_scala = False
+
 test_version = True # Make sure all the versions are correct
 
 print "opts ", opts
@@ -43,6 +45,8 @@ print "opts ", opts
 for opt, arg in opts:
     if opt == "-c":
         require_commit = False
+    elif opt == '-s':
+        skip_scala = True
     elif opt == '-h':
         print 'run_tests.sh [-h ][-c] [-v] [--server=http://localhost:8780]'
         sys.exit(2)
@@ -223,6 +227,9 @@ def test_scala(intf_ver):
                 print "SBT file needs updating from version ", num, " to ", intf_ver
                 sys.exit(1)
 
+    if skip_scala:
+        return ""
+
     code = subprocess.call(["sbt", "-v", "clean", "assembly"])
     if code != 0:
         print "Failed to compile sbt"
@@ -231,6 +238,8 @@ def test_scala(intf_ver):
     uuid = upload_and_enable("target/scala-2.11/scala_sample-assembly-1.0.jar", {})
 
     test_http_sample("/sample/scala")
+
+    return uuid
 
 
 ## Java Gradle
@@ -509,6 +518,29 @@ def test_devmode(intf_ver):
     os.kill(tron_pid, 9)
     os.kill(app_pid, 9)
 
+def test_clojure_service(intf_ver):
+    print "Testing Clojure Service"
+
+    os.chdir("/newdata/jvm_services/clojure")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "Clojure Service")
+
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to install Clojure Service"
+        sys.exit(code)
+
+
+
+def test_spring_boot_service(intf_ver):
+    print "Testing Spring Boot Service"
+    ## FIXME
 
 def run_tests():
 
@@ -518,12 +550,19 @@ def run_tests():
     # Test Front end version
     test_frontend_version(intf_ver)
 
+    # Test the jvm_services
+    test_clojure_service(intf_ver)
+    test_spring_boot_service(intf_ver)
+
     # Test other pieces
     test_dev_shim(intf_ver)
     test_starter(intf_ver)
 
     # Test the Tron and start the tron
     [tron_pid, runner_pid] = test_tron(intf_ver)
+
+    # And the Archetype
+    test_archetype(intf_ver)
 
     # now that the Tron is up, let's test the various samples
     test_clojure_sample(intf_ver)
@@ -533,8 +572,6 @@ def run_tests():
     test_kotlin(intf_ver)
     test_java_sample(intf_ver)
 
-    # And the Archetype
-    test_archetype(intf_ver)
 
     os.kill(runner_pid, 9)
     os.kill(tron_pid, 9)
