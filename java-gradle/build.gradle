@@ -30,7 +30,7 @@ dependencies {
     // 'test.useTestNG()' to your build script.
     testCompile 'junit:junit:4.12'
 
-    compile 'funcatron:intf:0.2.3'
+    compile 'funcatron:intf:0.2.5'
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
 }

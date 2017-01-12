@@ -6,15 +6,9 @@
 
 (set! *warn-on-reflection* true)
 
-(gen-class
-  :name funcatron.sample.clojure.SimpleGet
-  :implements [funcatron.intf.Func]
-  :prefix "simple-"
-  )
-
-(defn simple-apply
+(defn simple_get
   "Handle the incoming simple request"
-  [_ _ ^Context c]
+  [_ ^Context c]
   (-> c
       .getLogger
       (.info "In Simple Get... Clojure style"))
@@ -34,15 +28,10 @@
         (.log Level/INFO "Returning" ret))
     ret))
 
-(gen-class
-  :name funcatron.sample.clojure.PostOrDelete
-  :implements [funcatron.intf.Func]
-  :prefix "pod-"
-  )
 
-(defn pod-apply
+(defn post_or_delete
   "Handle the post, delete or other apply"
-  [_ {name "name" age "age"} ^Context c]
+  [{name "name" age "age"} ^Context c]
   (let [^Number cnt (some-> c
                     .getRequestParams
                     ^Map (.get "path")

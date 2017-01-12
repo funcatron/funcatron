@@ -10,7 +10,7 @@ resolvers += "Clojars" at "https://clojars.org/repo"
 
 resolvers += Resolver.mavenLocal
 
-libraryDependencies += "funcatron" % "intf" % "0.2.3"
+libraryDependencies += "funcatron" % "intf" % "0.2.5"
 
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.5"
 

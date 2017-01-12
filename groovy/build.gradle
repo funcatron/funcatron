@@ -32,7 +32,7 @@ dependencies {
     testCompile 'org.spockframework:spock-core:1.0-groovy-2.4'
     testCompile 'junit:junit:4.12'
 
-    compile 'funcatron:intf:0.2.3'
+    compile 'funcatron:intf:0.2.5'
 
     testCompile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
 }
