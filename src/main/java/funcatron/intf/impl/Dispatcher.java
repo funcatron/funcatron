@@ -32,95 +32,6 @@ import java.util.logging.Logger;
  */
 public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>> {
 
-    /**
-     * Slurp an input stream to a byte array... why this isn't part of the JDK is stupid
-     *
-     * @param is the inputstream
-     * @return the resulting byte array
-     */
-    private static byte[] toByteArray(InputStream is) {
-        if (null == is) return new byte[0];
-
-        byte[] buf = new byte[4096];
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        int cnt;
-
-        try {
-            for (cnt = is.read(buf); cnt >= 0; cnt = is.read(buf)) {
-                if (cnt > 0) {
-                    bos.write(buf, 0, cnt);
-                }
-            }
-        } catch (IOException io) {
-            throw new RuntimeException("Failed to read", io);
-        }
-
-        return bos.toByteArray();
-    }
-
-    private static DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-    static {
-        String FEATURE = null;
-        try {
-            // This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
-            // Xerces 2 only - http://xerces.apache.org/xerces2-j/features.html#disallow-doctype-decl
-            FEATURE = "http://apache.org/xml/features/disallow-doctype-decl";
-            dbf.setFeature(FEATURE, true);
-
-            // If you can't completely disable DTDs, then at least do the following:
-            // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-general-entities
-            // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-general-entities
-            // JDK7+ - http://xml.org/sax/features/external-general-entities
-            FEATURE = "http://xml.org/sax/features/external-general-entities";
-            dbf.setFeature(FEATURE, false);
-
-            // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-parameter-entities
-            // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-parameter-entities
-            // JDK7+ - http://xml.org/sax/features/external-parameter-entities
-            FEATURE = "http://xml.org/sax/features/external-parameter-entities";
-            dbf.setFeature(FEATURE, false);
-
-            // Disable external DTDs as well
-            FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd";
-            dbf.setFeature(FEATURE, false);
-
-            // and these as well, per Timothy Morgan's 2014 paper: "XML Schema, DTD, and Entity Attacks" (see reference below)
-            dbf.setXIncludeAware(false);
-            dbf.setExpandEntityReferences(false);
-
-            // And, per Timothy Morgan: "If for some reason support for inline DOCTYPEs are a requirement, then
-            // ensure the entity settings are disabled (as shown above) and beware that SSRF attacks
-            // (http://cwe.mitre.org/data/definitions/918.html) and denial
-            // of service attacks (such as billion laughs or decompression bombs via "jar:") are a risk."
-
-
-        } catch (RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize the XML parser", e);
-
-        }
-    }
-
-    /**
-     * Safely parse the XML
-     *
-     * @param is the inputstream
-     * @return the parsed XML
-     */
-    private static Document documentFromInputStream(InputStream is) {
-        if (null == is) return null;
-
-        try {
-            return dbf.newDocumentBuilder().parse(is);
-        } catch (RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse the XML", e);
-
-        }
-    }
 
     /**
      * Based on the name of a class and other information from the Swagger definition, return a function that takes the
@@ -145,7 +56,7 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                         ((String) k).startsWith("$")) cleanMap.remove(k);
             });
 
-            final Class<Func<?>> c = (Class<Func<?>>) this.getClass().getClassLoader().loadClass(className);
+            final Class<Func<Object>> c = (Class<Func<Object>>) this.getClass().getClassLoader().loadClass(className);
 
             final Class paramType =
                     Arrays.stream(c.getAnnotatedInterfaces()).
@@ -159,144 +70,15 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
                             findFirst().orElse(Object.class);
 
             final Function<InputStream, Object> basicDeserializer = (paramType.isAssignableFrom(byte[].class)) ?
-                    is -> toByteArray(is) :
+                    is -> ContextImpl.toByteArray(is) :
                     paramType.isAssignableFrom(InputStream.class) ?
                             is -> is :
                             paramType.isAssignableFrom(Document.class) ?
-                                    is -> documentFromInputStream(is) :
+                                    is -> ContextImpl.documentFromInputStream(is) :
                                     null;
 
 
-            return (InputStream inputStream, Map<Object, Object> om) -> {
-                Logger theLogger = (Logger) om.get("$logger");
-                if (null == theLogger) theLogger = Logger.getLogger(className);
-                final ContextImpl theContext = new ContextImpl(om, theLogger);
-
-                try {
-                    final Func<Object> func = (Func<Object>) c.newInstance();
-
-                    final HashMap<Object, Object> ret = new HashMap<>();
-
-                    Callable<Object> resolveParam = () -> {
-                        Object param = null;
-                        if (null != inputStream) {
-                            Function<InputStream, Object> instDeserializer = null;
-
-                            try {
-                                instDeserializer = func.jsonDecoder();
-                            } catch (UnsupportedOperationException e) {
-                                // ignore ... the implementation didn't get the Java default method... sigh
-                            }
-
-                            if (null != instDeserializer) {
-                                param = instDeserializer.apply(inputStream);
-                            } else if (null != basicDeserializer) {
-                                param = basicDeserializer.apply(inputStream);
-                            } else {
-                                param = deserializer.apply(inputStream, paramType);
-                            }
-                        }
-
-                        return param;
-                    };
-
-                    Object retVal = null;
-
-                    if ("get".equals(theContext.getMethod())) retVal = func.get(theContext);
-                    else if ("post".equals(theContext.getMethod())) retVal = func.post(resolveParam.call(), theContext);
-                    else if ("put".equals(theContext.getMethod())) retVal = func.put(resolveParam.call(), theContext);
-                    else if ("patch".equals(theContext.getMethod())) retVal = func.patch(resolveParam.call(), theContext);
-                    else if ("delete".equals(theContext.getMethod())) retVal = func.delete(theContext);
-                    else retVal = func.apply(resolveParam.call(), theContext);
-                    boolean allSet = false;
-
-                    Function<Object, byte[]> instSerializer = null;
-
-                    try {
-                        instSerializer = func.jsonEncoder();
-                    } catch (UnsupportedOperationException e) {
-                        // ignore ... the implementation didn't get the Java default method... sigh
-                    }
-
-                    String contentType =  "application/json" ;
-
-                    if (null == retVal) retVal = new byte[0];
-                    else if (retVal instanceof MetaResponse) {
-                        allSet = true;
-                        final MetaResponse mr = (MetaResponse) retVal;
-                        ret.put("body", mr.getBody());
-                        ret.put("status", mr.getResponseCode());
-                        ret.put("headers", mr.getHeaders());
-                    } else if (retVal instanceof Node && null == instSerializer) {
-                        TransformerFactory transformerFactory = TransformerFactory.newInstance();
-                        Transformer transformer = transformerFactory.newTransformer();
-                        DOMSource source = new DOMSource((Node) retVal);
-                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                        StreamResult result = new StreamResult(bos);
-                        transformer.transform(source, result);
-                        retVal = bos.toByteArray();
-                        contentType = "text/xml";
-                    } else if (retVal instanceof byte[] ||
-                            retVal instanceof OutputStream) {
-                        ret.put("body", retVal);
-                    } else {
-
-                        if (null != instSerializer) {
-                            retVal = instSerializer.apply(retVal);
-                        } else {
-                            retVal = serializer.apply(retVal);
-                        }
-                    }
-
-                    String fct = null;
-
-                    try {
-                        fct = func.contentType();
-                    } catch (UnsupportedOperationException e) {
-                        // ignore ... the implementation didn't get the Java default method... sigh
-                    }
-
-                    final String ct2 = fct == null ? contentType : fct;
-
-                    Map<String, Object> someHeaders = new HashMap<>();
-
-                    try {
-                        someHeaders = func.headers();
-                    } catch (UnsupportedOperationException e) {
-                        // ignore ... the implementation didn't get the Java default method... sigh
-                    }
-
-                    int status = 200;
-
-                    try {
-                        status = func.statusCode();
-                    }  catch (UnsupportedOperationException e) {
-                        // ignore ... the implementation didn't get the Java default method... sigh
-                    }
-
-                    // we didnt' get a MetaResponse, so set the return value
-                    if (!allSet) {
-                        ret.put("status", status);
-                        HashMap<String, Object> headers = new HashMap<>(someHeaders);
-                        if (!headers.containsKey("content-type")) {
-                            headers.put("content-type", ct2);
-                        }
-                        ret.put("headers", headers);
-                        ret.put("body", retVal);
-                    }
-
-                    theContext.finished(true);
-
-                    return ret;
-
-                } catch (RuntimeException re) {
-                    theContext.finished(false);
-                    throw re;
-                } catch (Exception e) {
-                    theContext.finished(false);
-                    throw new RuntimeException("Failed to apply function", e);
-                }
-            };
+            return ContextImpl.makeResponseBiFunc(serializer, deserializer, basicDeserializer, className, paramType, c);
         } catch (RuntimeException re) {
             throw re;
         } catch (Exception e) {

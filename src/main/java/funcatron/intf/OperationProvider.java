@@ -7,16 +7,16 @@ import java.util.logging.Logger;
 
 /**
  * Install an operation in the current context.
- *
+ * <p>
  * What's an Operation? It's a way that the Func Runner communicates with the Func Bundle.
- *
+ * <p>
  * What kind of operation would one create or override?
- *
+ * <p>
  * The prototypical operation is "getSwagger". By default, the Swagger file is stored in
  * the funcatron.yml or funcatron.json, but we may want to supply the Swagger information by
  * looking through the Spring Boot annotations instead and get the Swagger info from Spring.
  */
-public interface OperationInstaller {
+public interface OperationProvider extends OrderedProvider {
     /**
      * Install an operation.
      *
@@ -26,8 +26,14 @@ public interface OperationInstaller {
      * @param addEndOfLife Add a function at the end of life. If there's anything allocated by the installation of the
      *                     operation (like creating a JDBC pool), then the operation should be released by the
      *                     end of life function.
+     * @param classLoader  the ClassLoader for the Func Bundle
+     * @param logger       the Logger
      */
-    void installOperation(BiFunction<String, BiFunction<Map<String, Object>, Logger, Object>, Void> addOperation,
-                          Function<String,  BiFunction<Map<String, Object>, Logger, Object>> getOperation,
-                          Function<Function<Logger, Void>, Void> addEndOfLife);
+    void installOperation(BiFunction<String, BiFunction<Map<Object, Object>, Logger, Object>, Void> addOperation,
+                          Function<String, BiFunction<Map<Object, Object>, Logger, Object>> getOperation,
+                          Function<Function<Logger, Void>, Void> addEndOfLife,
+                          ClassLoader classLoader,
+                          Logger logger);
+
+
 }

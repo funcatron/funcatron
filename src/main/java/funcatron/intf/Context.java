@@ -31,6 +31,12 @@ public interface Context {
     String getURI();
 
     /**
+     * Return the Content-Type header value
+     * @return the content type
+     */
+    String contentType();
+
+    /**
      * Get the Swagger-processed parameters. The map contains sub-maps for "query" and "path"
      *
      * @return the request parameters

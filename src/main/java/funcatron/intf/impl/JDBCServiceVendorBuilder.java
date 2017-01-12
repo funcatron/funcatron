@@ -4,7 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import funcatron.intf.Accumulator;
 import funcatron.intf.ServiceVendor;
-import funcatron.intf.ServiceVendorBuilder;
+import funcatron.intf.ServiceVendorProvider;
 
 import java.sql.Connection;
 import java.sql.Driver;
@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 /**
  * The built in JDBC vendor
  */
-public class JDBCServiceVendorBuilder implements ServiceVendorBuilder {
+public class JDBCServiceVendorBuilder implements ServiceVendorProvider {
     /**
      * The string type that this Builder will build a vendor for.
      * Example "database"

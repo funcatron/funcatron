@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 /**
  * Build a service vendor based on type of the data
  */
-public interface ServiceVendorBuilder {
+public interface ServiceVendorProvider {
     /**
      * The string type that this Builder will build a vendor for.
      * Example "database"

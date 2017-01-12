@@ -6,90 +6,89 @@
 
     <groupId>funcatron</groupId>
     <artifactId>intf</artifactId>
-    <version>0.2.3</version>
+    <version>0.2.5</version>
 
     <build>
-    <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.5.1</version>
-            <configuration>
-                <source>1.8</source>
-                <target>1.8</target>
-            </configuration>
-        </plugin>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
 
-        <plugin>
-            <groupId>org.codehaus.gmaven</groupId>
-            <artifactId>gmaven-plugin</artifactId>
-            <version>1.5</version>
-            <executions>
-                <execution>
-                    <phase>validate</phase>
-                    <goals>
-                        <goal>execute</goal>
-                    </goals>
-                    <configuration>
-                        <providerSelection>2.0</providerSelection>
-                        <properties>
-                            <script>git rev-parse HEAD</script>
-                        </properties>
-                        <source>
-                            def command = project.properties.script
-                            def process = command.execute()
-                            process.waitFor()
+            <plugin>
+                <groupId>org.codehaus.gmaven</groupId>
+                <artifactId>gmaven-plugin</artifactId>
+                <version>1.5</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>execute</goal>
+                        </goals>
+                        <configuration>
+                            <providerSelection>2.0</providerSelection>
+                            <properties>
+                                <script>git rev-parse HEAD</script>
+                            </properties>
+                            <source>
+                                def command = project.properties.script
+                                def process = command.execute()
+                                process.waitFor()
 
-                            def describe = process.in.text.trim()
+                                def describe = process.in.text.trim()
 
-                            project.properties.setProperty('gitVersion',describe)
-                        </source>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
-
-
-
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>2.1</version>
-            <configuration>
-                <archive>
-                    <manifest>
-                        <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-                    </manifest>
-                    <manifestEntries>
-                        <GitHeadRev>${gitVersion}</GitHeadRev>
-                    </manifestEntries>
-                </archive>
-            </configuration>
-        </plugin>
+                                project.properties.setProperty('gitVersion', describe)
+                            </source>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
 
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>3.0.1</version>
-            <executions>
-                <execution>
-                    <id>attach-sources</id>
-                    <phase>verify</phase>
-                    <goals>
-                        <goal>jar-no-fork</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <GitHeadRev>${gitVersion}</GitHeadRev>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
 
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>2.10.4</version>
-        </plugin>
 
-    </plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.10.4</version>
+            </plugin>
+
+        </plugins>
     </build>
 
 
