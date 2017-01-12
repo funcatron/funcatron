@@ -157,42 +157,39 @@ public class Register {
      * @return nothing. It's Void
      */
     private static Void invoker(Map<Object, Object> info) {
+
+        final String classname = (String) info.get("class");
+
         try {
             ContextImpl.initContext(getContextProperties(), Register.class.getClassLoader(), logger);
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to initialize Context", e);
-        }
 
-        String classname = (String) info.get("class");
 
-        Map<Object, Object> request = (Map<Object, Object>) info.get("req");
+            Map<Object, Object> request = (Map<Object, Object>) info.get("req");
 
-        try {
-            Dispatcher d = new Dispatcher();
-
-            BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>> applyFunc = d.apply(classname,
-                    new HashMap<Object, Object>((Map<Object, Object>)request.get("swagger")) {{
-                put("$deserializer", new BiFunction<InputStream, Class<?>, Object>() {
-                    @Override
-                    public Object apply(InputStream inputStream, Class<?> aClass) {
-                        try {
-                            return jackson.readValue(inputStream, aClass);
-                        } catch (IOException ioe) {
-                            throw new RuntimeException("Failed to deserialize data", ioe);
-                        }
-                    }
-                });
-                put("$serializer", new Function<Object, byte[]>() {
-                    @Override
-                    public byte[] apply(Object o) {
-                        try {
-                            return jackson.writeValueAsBytes(o);
-                        } catch (JsonProcessingException e) {
-                            throw new RuntimeException("Failed to serialize data", e);
-                        }
-                    }
-                });
-            }});
+            BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>> applyFunc =
+                    ContextImpl.runOperation("dispatcherFor", new HashMap<Object, Object>((Map<Object, Object>)request.get("swagger")) {{
+                        put("$operationId", classname);
+                        put("$deserializer", new BiFunction<InputStream, Class<?>, Object>() {
+                            @Override
+                            public Object apply(InputStream inputStream, Class<?> aClass) {
+                                try {
+                                    return jackson.readValue(inputStream, aClass);
+                                } catch (IOException ioe) {
+                                    throw new RuntimeException("Failed to deserialize data", ioe);
+                                }
+                            }
+                        });
+                        put("$serializer", new Function<Object, byte[]>() {
+                            @Override
+                            public byte[] apply(Object o) {
+                                try {
+                                    return jackson.writeValueAsBytes(o);
+                                } catch (JsonProcessingException e) {
+                                    throw new RuntimeException("Failed to serialize data", e);
+                                }
+                            }
+                        });
+                    }}, logger, BiFunction.class);
 
             final String s = (String) request.get("body");
             InputStream bodyStream = null;
@@ -232,8 +229,8 @@ public class Register {
             } catch (IOException ioe) {
                 logger.log(Level.WARNING, ioe, () -> "Failed to send response");
             }
-
         }
+
         return null;
     }
 
