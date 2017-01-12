@@ -11,6 +11,8 @@
   :manifest
   {"GitHeadRev" ~(fn [x] (some-> (clojure.java.shell/sh "git" "rev-parse" "HEAD") :out .trim))}
 
+  :plugins [[lein-codox "0.10.2"]]
+
   :profiles {
              ;; activated automatically during uberjar
              :uberjar {:aot :all}
