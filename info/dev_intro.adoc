@@ -1,6 +1,6 @@
 = Funcatron for Developers
 David Pollak <d@funcatron.org>
-v0.2.3, 2017-01-06
+v0.2.5, 2017-01-06
 :toc:
 
 
@@ -146,10 +146,10 @@ First, let's start a local version of Funcatron running in a Docker container:
 
 [source,shell]
 ----
-docker run -ti --rm -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.3
+docker run -ti --rm -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.5
 ----
 
-That command tells `docker` to `run` the `funcatron/tron:v0.2.3` container.
+That command tells `docker` to `run` the `funcatron/tron:v0.2.5` container.
 
 We want
 an `-ti` interactive terminal so we can see the logs from Funcatron.
@@ -184,7 +184,7 @@ feature:
 mvn archetype:generate -B \
    -DarchetypeGroupId=funcatron \
    -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.2.3 \
+   -DarchetypeVersion=0.2.5 \
    -DgroupId=my.stellar \
    -DartifactId=thang \
    -Dversion=0.1.0 \
@@ -195,7 +195,7 @@ Or if you're using Windows PowerShell:
 
 [source,powershell]
 ----
-mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.2.3" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" "-DarchetypeRepository=https://clojars.org/repo"
+mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.2.5" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" "-DarchetypeRepository=https://clojars.org/repo"
 ----
 
 
@@ -271,7 +271,7 @@ Let's start by looking at the dev-time code:
 ----
     public static void main(String[] args) throws Exception {
         System.out.println("Starting connection to Funcatron dev server");
-        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.3");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.5");
         System.out.println("Then point your browser to http://localhost:3000/api/sample");
 
         Register.register(funcatronDevHost(), funcatronDevPort(),
