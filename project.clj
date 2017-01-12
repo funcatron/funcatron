@@ -61,7 +61,8 @@
   :min-lein-version "2.7.1"
 
   :repositories {"Maven Central" "https://repo1.maven.org/maven2/"}
-  :plugins [[lein-virgil "0.1.3"]]
+  :plugins [[lein-virgil "0.1.3"]
+            [lein-codox "0.10.2"]]
   :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
   :javac-options ["-target" "1.8" "-source" "1.8"]
