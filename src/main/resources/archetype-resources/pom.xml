@@ -102,7 +102,7 @@
                 <version>1.0.7</version>
                 <configuration>
                     <services>
-                        <param>funcatron.intf.ServiceVendorBuilder</param>
+                        <param>funcatron.intf.ServiceVendorProvider</param>
                     </services>
                 </configuration>
                 <executions>
@@ -149,7 +149,7 @@
         <dependency>
             <groupId>funcatron</groupId>
             <artifactId>devshim</artifactId>
-            <version>0.2.3</version>
+            <version>0.2.5</version>
         </dependency>
 
         <dependency>

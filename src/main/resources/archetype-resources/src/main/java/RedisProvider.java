@@ -2,7 +2,7 @@ package $package;
 
 import funcatron.intf.Accumulator;
 import funcatron.intf.ServiceVendor;
-import funcatron.intf.ServiceVendorBuilder;
+import funcatron.intf.ServiceVendorProvider;
 import redis.clients.jedis.Jedis;
 
 import java.util.Map;
@@ -13,7 +13,7 @@ import java.util.logging.Logger;
  * An example of a provider so the Context can vend instances of
  * things like DB drivers, cache drivers, etc.
  */
-public class RedisProvider implements ServiceVendorBuilder {
+public class RedisProvider implements ServiceVendorProvider {
     /**
      * What's the name of this driver?
      * @return the unique name
