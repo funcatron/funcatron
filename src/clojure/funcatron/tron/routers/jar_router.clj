@@ -8,7 +8,8 @@
             [io.sarnowski.swagger1st.core :as s1st]
             [io.sarnowski.swagger1st.util.security :as s1stsec]
             [cheshire.core :as json]
-            [funcatron.tron.util :as fu])
+            [funcatron.tron.util :as fu]
+            [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.util.jar JarFile)
            (java.io InputStream)
            (java.net URLClassLoader URL)
@@ -17,7 +18,7 @@
            (org.apache.commons.io IOUtils)
            (java.util Base64 Map)
            (java.util.logging Logger)
-           (java.util.function BiFunction)))
+           (java.util.function BiFunction Function)))
 
 
 (set! *warn-on-reflection* true)
@@ -53,7 +54,7 @@
           :args (s/cat :jar-info ::jar-info)
           :ret ::swagger)
 
-(defn get-swagger
+#_(defn get-swagger
   "Take the output from jar-info-from-file and get the swagger definition"
   [jar-info]
   (let [^JarFile jar (::jar jar-info)]
@@ -63,12 +64,12 @@
           :args (s/cat :jar-info ::jar-info)
           :ret ::jar-info)
 
-(defn update-jar-info-with-swagger
-  "Takes the jar-info and adds the parsed swagger information"
-  [jar-info]
-  (let [swagger (get-swagger jar-info)]
-    (assoc jar-info ::swagger swagger)
-    ))
+#_(defn update-jar-info-with-swagger
+    "Takes the jar-info and adds the parsed swagger information"
+    [jar-info]
+    (let [swagger (get-swagger jar-info)]
+      (assoc jar-info ::swagger swagger)
+      ))
 
 (defn- ^String exception-to-string
   "converts an Exception into a String"
@@ -172,26 +173,30 @@
     (catch Exception e
       (do
         (warn e "Failed to service request")
-        {::raw true
-         :status 500
+        {::raw    true
+         :status  500
          :headers {"content-type" "text/plain"}
-         :body (exception-to-string e)}))
+         :body    (exception-to-string e)}))
     ))
 
 (defn- resolve-stuff
   "Given a ::jar-info and swagger, "
-  [{:keys [::classloader]} swagger-info]
+  [{:keys [::classloader ::operations]} swagger-info]
   (fu/within-classloader
     classloader
     (fn []
       (let [^String op-id (get swagger-info "operationId")
-            clz (.loadClass ^ClassLoader classloader "funcatron.intf.impl.Dispatcher")
-            dispatcher ^BiFunction (.newInstance clz)
-            apply-bi-func ^BiFunction (.apply dispatcher op-id
-                                              (-> swagger-info
-                                                  (assoc "$deserializer" fu/jackson-deserializer)
-                                                  (assoc "$serializer" fu/jackson-serializer)
-                                                  fu/stringify-keys))]
+            apply-bi-func ^BiFunction (fu/perform-operation
+                                     classloader
+                                     operations
+                                     "dispatcherFor"
+                                     (merge swagger-info
+                                            {"$operationId" op-id
+                                             "$deserializer" fu/jackson-deserializer
+                                             "$serializer" fu/jackson-serializer})
+                                     (fu/logger-for {})
+                                     )
+            ]
 
         (fn [req] (fu/within-classloader
                     classloader
@@ -269,48 +274,86 @@
         (throw t)))
     ))
 
+(defn- parse-swagger
+  "Okay... we've got Swagger from an unknown source... it's a map of something... turn it into good Swagger"
+  [{ type "type" swagger "swagger" }]
+
+  (case type
+    "map" swagger
+    "json" (s1ctx/load-swagger-definition
+             :json
+             swagger
+             )
+    "yaml" (s1ctx/load-swagger-definition
+             :yaml
+             swagger
+             )
+    )
+
+  )
+
 (defn- initialize-context
   "Okay... given a JAR and a classloader and such, we initialize the ContextImpl object.
   Return the context version and a function that releases the Context's resources"
   [{:keys [::classloader]} properties log-props]
   (let [classloader ^ClassLoader classloader
-        context-impl-clz (.loadClass classloader "funcatron.intf.impl.ContextImpl")
-
-        ]
+        context-impl-clz (.loadClass classloader "funcatron.intf.impl.ContextImpl")]
     (fu/within-classloader
       classloader
       (fn []
-        (let [version (try
-                        (let [meth (.getMethod context-impl-clz "getVersion" (make-array Class 0))]
-                          (.invoke meth nil (make-array Object 0))
-                          )
-                        (catch Exception e (do (error e "Couldn't get version")
-                                               "?")))
-              end-life-method (.getMethod context-impl-clz "endLife" (make-array Class 0))
-              init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))]
-          (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys (or properties {})) classloader (fu/logger-for log-props)]))
-          [version (fn [] (fu/within-classloader classloader (fn [] (.invoke end-life-method nil (make-array Object 0)))))]
+        (let [init-method (.getMethod context-impl-clz "initContext" (into-array Class [Map ClassLoader Logger]))
+              logger (fu/logger-for log-props)
+              operations (.invoke init-method nil (into-array Object [(fu/camel-stringify-keys (or properties {})) classloader logger]))
+              version (fu/perform-operation classloader operations "getVersion" {} logger)
+              my-classloader (fu/perform-operation classloader operations "getClassloader" {} logger)]
+
+          {::version     version
+           ::end-func    (fn [] (fu/within-classloader
+                                  my-classloader
+                                  (fn []
+                                    (fu/perform-operation
+                                      classloader
+                                      operations "endLife" {} logger)
+                                    )))
+           ::logger      logger
+           ::classloader my-classloader
+           ::operations  operations}
+
           )))))
 
 (defn ^Router build-router
   "Take a JAR file (as a File or String) and create a Router"
   ([file properties] (build-router file properties true))
   ([file properties reply?]
-   (let [{:keys [::swagger ::classloader] :as the-jar}
-         (-> file jar-info-from-file update-jar-info-with-swagger)
+   (let [{:keys [::classloader] :as the-jar}
+         (-> file jar-info-from-file)
+
+
+
+         log-props (merge (fu/version-info-from-classloader classloader)
+                          (fu/some-when (:$log-props properties) map?))
+
+         {:keys [::end-func ::operations ::classloader
+                 ::logger ::version]} (initialize-context the-jar properties log-props)
+
+         swagger (parse-swagger (fu/perform-operation classloader operations "getSwagger" {} logger))
+
+         the-jar (merge the-jar
+                        {::swagger     swagger
+                         ::version     version
+                         ::classloader classloader
+                         ::operations  operations})
 
          swagger (fu/keywordize-keys swagger)
          {:keys [host basePath]} swagger
 
-         queue-name (fu/route-to-sha (:host swagger) (:basePath swagger))
+         queue-name (fu/route-to-sha host basePath)
 
          log-props (merge (fu/version-info-from-classloader classloader)
                           {:queue    queue-name,
                            :host     host,
                            :basePath basePath}
                           (fu/some-when (:$log-props properties) map?))
-
-         [_ end-func] (initialize-context the-jar properties log-props)
 
          the-app (make-app the-jar)]
      (reify Router

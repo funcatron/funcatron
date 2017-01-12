@@ -80,7 +80,7 @@
                                            "-"
                                            (URLEncoder/encode sha) ".funcbundle"))]
                   (cio/copy body file)
-                  (when-let [[sha info] (common/get-bundle-info file)]
+                  (when-let [{:keys [sha] :as info} (common/sha-for-file file)]
                     (swap! func-bundles assoc sha info)
                     (do-run file)))
                 (catch Exception e

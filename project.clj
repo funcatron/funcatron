@@ -1,4 +1,4 @@
-(defproject funcatron/tron "0.2.3"
+(defproject funcatron/tron "0.2.5"
   :description "Route request for Funcatron"
   :url "http://funcatron.org"
   :license {:name "Apache 2.0"}
@@ -18,7 +18,7 @@
 
    [http-kit "2.2.0"]
 
-   [ring "1.5.0"]
+   [ring "1.5.1"]
    [com.fasterxml.jackson.core/jackson-databind "2.8.5"]
    [com.fasterxml.jackson.module/jackson-module-parameter-names "2.8.5"]
    [com.fasterxml.jackson.datatype/jackson-datatype-jdk8 "2.8.5"]

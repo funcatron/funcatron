@@ -354,20 +354,20 @@
   ABase64Encoder
   {:base64encode (fn [^InputStream is] (base64encode (second (to-byte-array is))))})
 
-(def funcatron-file-regex
+#_(def funcatron-file-regex
   #"(?:.*\/|^)funcatron\.(json|yaml)$")
 
-(defn- funcatron-file-type
+#_(defn- funcatron-file-type
   "Is the entry a Funcatron definition file"
   [^JarEntry jar-entry]
   (second (re-matches funcatron-file-regex (.getName jar-entry))))
 
-(def ^:private file-type-mapping
+#_(def ^:private file-type-mapping
   {"yaml" :yaml
    "yml"  :yaml
    "json" :json})
 
-(defn get-swagger-from-jar
+#_(defn get-swagger-from-jar
   "Take a JarFile and get the swagger definition"
   [^JarFile jar]
   (let [entries (-> jar .entries enumeration-seq)
@@ -391,7 +391,7 @@
     )
   )
 
-(defn find-swagger-info
+#_(defn find-swagger-info
   "Tries to figure out the file type and then comb through it to figure out the Swagger file and the file type"
   [^File file]
   (or
@@ -887,3 +887,15 @@
      :revision "UNKNOWN",
      :group-id "funcatron",
      :artifact-id "tron"}))
+
+(defn perform-operation
+  "Call a Func Bundle Context operation within the scope of the classloader"
+  [classloader operations opt-name params logger]
+  (within-classloader
+    classloader
+    (fn []
+      (-> ^Function operations
+          ^BiFunction
+          (.apply opt-name)
+          (.apply params logger))))
+  )
