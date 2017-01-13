@@ -9,6 +9,8 @@ subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
 os.environ["LEIN_ROOT"]="true"
 
+repos = ["funcatron", "intf", "starter", "devshim", "tron", "samples", "jvm_services"]
+
 os.chdir("/newdata")
 
 # From http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename
@@ -31,30 +33,48 @@ def spit(file, value):
     with open(file, "w") as text_file:
         text_file.write(value)
 
-files = [f for f in os.listdir(".") if not f.startswith(".") and
-         os.path.isdir(f) and
-         os.path.isdir(f+"/.git")]
+
+def slurp(file):
+    subprocess.call(["ls", "-la"])
+    try:
+        with open(file, "r") as text_file:
+            return text_file.read()
+    except IOError as e:
+        print e
+        return None
 
 cwd = os.getcwd()
 
 # Reset everything to master
-for f in files:
+for f in repos:
     os.chdir(f)
     subprocess.call(["git", "reset", "--hard"])
     subprocess.call(["git", "checkout", "master"])
     os.chdir(cwd)
 
-# look for directories with '.docignore' and don't include them
-files = [f for f in files if not os.path.isfile(f + "/.docignore")]
+ignore_tags = []
+
+os.chdir("funcatron")
+
+ignore_tags_file = slurp(".ignore_tags")
+
+if not ignore_tags_file is None:
+    ignore_tags = ignore_tags_file.splitlines()
+
+os.chdir(cwd)
 
 versions = {}
 
 # look for the tags in each of the repos
-for f in files:
+for f in repos:
     os.chdir(f)
     [code, str] = commands.getstatusoutput("git tag")
     x = str.splitlines()
-    versions[f] = set(x)
+    t_set = set(x)
+    for ignore in ignore_tags:
+        if ignore in t_set:
+            t_set.remove(ignore)
+    versions[f] = t_set
     os.chdir(cwd)
 
 # What are all the versions?
@@ -92,6 +112,15 @@ subprocess.call(["rm", "-rf", "/docout"])
 subprocess.call(["mkdir", "/docout"])
 
 os.chdir("/docout")
+
 for v in verSet:
     os.mkdir(slugify(v))
 
+subprocess.call(["asciidoctor", "-r", "asciidoctor-diagram", "$(", "find", ".", "-name", "'*.adoc'", ")"])
+
+subprocess.call(["rm", "$(", "find", ".", "-name", "'*.adoc'", ")"])
+
+
+os.chdir("/")
+
+subprocess.call(["tar", "-czvf", "/data/doc.tgz", "docout"])
