@@ -1,6 +1,8 @@
 = Funcatron Version $$VER$$
 :toc:
 
+link:../index.html[Up]
+
 == About
 
 About this version
@@ -9,3 +11,4 @@ About this version
 
 $$PROJECTLIST$$
 
+link:../index.html[Up]

@@ -35,7 +35,6 @@ def spit(file, value):
 
 
 def slurp(file):
-    subprocess.call(["ls", "-la"])
     try:
         with open(file, "r") as text_file:
             return text_file.read()
@@ -111,16 +110,68 @@ print byVer
 subprocess.call(["rm", "-rf", "/docout"])
 subprocess.call(["mkdir", "/docout"])
 
+print ""
+print "Outputting the documentation"
+
 os.chdir("/docout")
 
 for v in verSet:
     os.mkdir(slugify(v))
 
-subprocess.call(["asciidoctor", "-r", "asciidoctor-diagram", "$(", "find", ".", "-name", "'*.adoc'", ")"])
+master = slurp("/newdata/funcatron/doc_o_matic/front_master.adoc")
 
-subprocess.call(["rm", "$(", "find", ".", "-name", "'*.adoc'", ")"])
+version_master = slurp("/newdata/funcatron/doc_o_matic/version_master.adoc")
 
+master = master.replace("$$VERSIONLIST$$", "\n".join(["* link:"+ slugify(line)+"/index.html["+line+"]" for line in verSet]))
+
+spit("index.adoc", master)
+
+
+for v in verSet:
+    print "Working version ", v
+    os.chdir("/newdata/funcatron")
+    subprocess.call(["git", "reset", "--hard"])
+    subprocess.call(["git", "checkout", "master"])
+    projects = [p for p in repos if p in byVer[v]]
+    for proj in projects:
+        os.chdir("/newdata/"+proj)
+        subprocess.call(["git", "reset", "--hard", "master"])
+        res = subprocess.call(["git", "checkout", v])
+        if res != 0:
+            print "Failed to checkout branch ",v, " for project ", proj
+            sys.exit(1)
+
+    local_version_master = slurp("/newdata/funcatron/doc_o_matic/version_master.adoc")
+    if local_version_master is None:
+        local_version_master = version_master
+    local_version_master = local_version_master.replace("$$VER$$", v)
+    local_version_master = local_version_master.replace("$$PROJECTLIST$$",
+                                                        "\n".join(["* link:"+ proj+"/index.html["+proj+"]" for
+                                                                   proj in projects]))
+    os.chdir("/docout/"+slugify(v))
+    for proj in projects:
+        os.mkdir(proj)
+    spit("index.adoc", local_version_master)
+
+print ""
+print "Done spitting out the projects... now to asciidoctor them"
+
+os.chdir("/docout")
+
+os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc")')
+
+os.system("rm $(find . -name '*.adoc')")
+
+
+print ""
+print "Finished... making tarball"
 
 os.chdir("/")
 
-subprocess.call(["tar", "-czvf", "/data/doc.tgz", "docout"])
+subprocess.call(["tar", "-czf", "/data/doc.tgz", "docout"])
+
+stat_info = os.stat('/data/funcatron')
+uid = stat_info.st_uid
+gid = stat_info.st_gid
+
+os.chown("/data/doc.tgz", uid, gid)
