@@ -1,0 +1,11 @@
+= Funcatron Version $$VER$$
+:toc:
+
+== About
+
+About this version
+
+== Projects
+
+$$PROJECTLIST$$
+
