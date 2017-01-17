@@ -1,5 +1,4 @@
-== Funcatron
-
+== Funcatron image:artwork/40x40.png[logo]
 
 Serverless Java (and Clojure and Scala) functions
 on your Mesos or Kubernetes cluster.

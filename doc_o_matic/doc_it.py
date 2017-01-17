@@ -131,6 +131,15 @@ def mkdir_p(path):
         else:
             raise
 
+def path_and_file(file):
+    """
+    Split a file into a path and a filename
+    :param file: the filename
+    :return: [path, filename]
+    """
+    split = re.split("/", file)
+    return "/".join(split[:-1]), split[-1]
+
 def split_list(the_func, the_list):
     """
     Splits a list into two... one that matches the function, the other that doesn't
@@ -159,6 +168,8 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
     :return:
     """
     os.chdir(source_dir)
+    to_copy = slurp(".doccopy") or ""
+
     files = find_all_doc_files(".")
     fm = find_frontmatter(files, default_frontmatter)
     fm = fm.replace("$$PROJ$$", proj_name.title())
@@ -168,6 +179,12 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
     files = filter(lambda x: x[1] not in ["frontmatter.adoc"], files)
 
     os.chdir(dest_dir)
+
+    for cp in to_copy:
+        path, file = path_and_file(cp)
+        mkdir_p(path)
+        subprocess.call(["cp", source_dir + "/" + cp, cp])
+
     for dir, name, contents in files:
         mkdir_p(dir)
         spit(os.path.join(dir, name), contents)
