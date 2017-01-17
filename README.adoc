@@ -1,0 +1,29 @@
+== Funcatron
+
+
+Serverless Java (and Clojure and Scala) functions
+on your Mesos or Kubernetes cluster.
+
+### Status
+
+https://github.com/dpp[@dpp] just started this project... not
+much to see here.
+
+### Directory Layout
+
+* `/docker` Various https://docker.com[Docker] related stuff
+* `/info` Project Documentation
+* `/scripts` Various scripts to run/setup/whatever
+
+
+### Communications
+
+https://gitter.im/funcatron/exchange[Join the chat on Gitter]
+
+https://twitter.com/funcatron[Twitter]
+
+https://groups.io/g/funcatron[Groups.io mailing list]
+
+
+
+(c) 2016 by David Pollak and those listed in the link:./contributors.html[contributors.md] file

@@ -131,6 +131,23 @@ def mkdir_p(path):
         else:
             raise
 
+def split_list(the_func, the_list):
+    """
+    Splits a list into two... one that matches the function, the other that doesn't
+    :param the_func: the test function
+    :param the_list: the input lsit
+    :return: the first list matches the predicate, the second does
+    """
+    yes, no = [], []
+
+    for x in the_list:
+        if the_func(x):
+            yes.append(x)
+        else:
+            no.append(x)
+
+    return yes, no
+
 def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
     """
     Do all the frontmatter stuff for a source and dest dir
@@ -145,6 +162,9 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
     files = find_all_doc_files(".")
     fm = find_frontmatter(files, default_frontmatter)
     fm = fm.replace("$$PROJ$$", proj_name.title())
+
+    readme, files = split_list(lambda x: x[0] == "." and x[1].lower() == "readme.adoc", files)
+
     files = filter(lambda x: x[1] not in ["frontmatter.adoc"], files)
 
     os.chdir(dest_dir)
@@ -152,10 +172,16 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
         mkdir_p(dir)
         spit(os.path.join(dir, name), contents)
 
+    readme_text = "Project Information"
+
+    if readme:
+        readme_text = readme[0][2]
+
     spit("index.adoc",
     fm.replace("$$DOCLINKS$$",
     "\n".join(["* link:"+os.path.join(dir, end_with_html(file))+"["+slugified_to_nice(os.path.join(dir, file))+"]" for
-               dir, file, q in files])))
+               dir, file, q in files])).
+         replace("$$README$$", readme_text))
 
 cwd = os.getcwd()
 
