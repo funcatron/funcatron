@@ -4,13 +4,13 @@ import os
 import subprocess
 import commands
 import re
+import errno
 
 subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
-os.environ["LEIN_ROOT"]="true"
+os.environ["LEIN_ROOT"] = "true"
 
 repos = ["funcatron", "intf", "starter", "devshim", "tron", "samples", "jvm_services"]
-
 
 # Funcatron
 ## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
@@ -42,6 +42,7 @@ repos = ["funcatron", "intf", "starter", "devshim", "tron", "samples", "jvm_serv
 
 os.chdir("/newdata")
 
+
 # From http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename
 def slugify(value):
     """
@@ -51,6 +52,7 @@ def slugify(value):
     value = re.sub('[^\w\s-]', '', value).strip().lower()
     value = re.sub('[-\s]+', '-', value)
     return value
+
 
 def spit(file, value):
     """
@@ -68,14 +70,90 @@ def slurp(file):
         with open(file, "r") as text_file:
             return text_file.read()
     except IOError as e:
-        print e
         return None
 
-def find_all_doc_files():
+
+def find_all_doc_files(root_dir):
     """
     In the current directory, return all the 
+    :return: a list of all the documentation files in the directories
+    """
+    return [[dir, x, slurp(os.path.join(dir, x))] for
+            dir, sub, files in os.walk(root_dir) for
+            x in files
+            if (x not in (slurp(dir + "/" + ".docignore") or "")) and
+            (x.endswith(".md") or x.endswith(".adoc"))]
+
+
+def find_frontmatter(doc_files, generic):
+    """
+    Given all the doc files, find the frontmatter.adoc file and return its contents or
+    return the generic file
+    :param doc_files: the list of files from find_all_doc_files
+    :param generic: the generic frontmatter
     :return:
     """
+    fm = [x for x in doc_files if x[1] == 'frontmatter.adoc']
+    ret = None
+    if fm:
+        x = fm[0]
+        ret = slurp(os.path.join(x[0], x[1]))
+
+    return ret or generic
+
+
+def slugified_to_nice(name):
+    """
+    Take a slugified filename like "dev_info.adoc" and turn it into a nice
+    string like "Dev Info"
+    :param name: the slugified thing
+    :return: a nicer version
+    """
+    return re.sub("[./\-_]", " ", re.sub("\.[^ .]*$", "", name)).lower().strip().title()
+
+def end_with_html(name):
+    """
+    change the file extension to .html
+    :param name: the thing with a file extension
+    :return: the file.html
+    """
+    return re.sub("\.[^ .]*$", "", name) + ".html"
+
+# http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
+    """
+    Do all the frontmatter stuff for a source and dest dir
+
+    :param proj_name: The name of the project
+    :param source_dir: where to gather info
+    :param dest_dir: where to spit out the files
+    :param default_frontmatter: the default frontmatter file
+    :return:
+    """
+    os.chdir(source_dir)
+    files = find_all_doc_files(".")
+    fm = find_frontmatter(files, default_frontmatter)
+    fm = fm.replace("$$PROJ$$", proj_name.title())
+    files = filter(lambda x: x[1] not in ["frontmatter.adoc"], files)
+
+    os.chdir(dest_dir)
+    for dir, name, contents in files:
+        mkdir_p(dir)
+        spit(os.path.join(dir, name), contents)
+
+    spit("index.adoc",
+    fm.replace("$$DOCLINKS$$",
+    "\n".join(["* link:"+os.path.join(dir, end_with_html(file))+"["+slugified_to_nice(os.path.join(dir, file))+"]" for
+               dir, file, q in files])))
 
 cwd = os.getcwd()
 
@@ -166,23 +244,24 @@ generic_multilevel_frontmatter = slurp("/newdata/funcatron/doc_o_matic/generic_m
 
 master = slurp("/newdata/funcatron/doc_o_matic/front_master.adoc")
 
-master = master.replace("$$VERSIONLIST$$", "\n".join(["* link:"+ slugify(line)+"/index.html["+line+"]" for line in verSet]))
+master = master.replace("$$VERSIONLIST$$",
+                        "\n".join(["* link:" + slugify(line) + "/index.html[" + line + "]" for line in verSet]))
 
 spit("index.adoc", master)
 
-
 for v in verSet:
     print "Working version ", v
+    slug_v = slugify(v)
     os.chdir("/newdata/funcatron")
     subprocess.call(["git", "reset", "--hard"])
     subprocess.call(["git", "checkout", "master"])
     projects = [p for p in repos if p in byVer[v]]
     for proj in projects:
-        os.chdir("/newdata/"+proj)
+        os.chdir("/newdata/" + proj)
         subprocess.call(["git", "reset", "--hard", "master"])
         res = subprocess.call(["git", "checkout", v])
         if res != 0:
-            print "Failed to checkout branch ",v, " for project ", proj
+            print "Failed to checkout branch ", v, " for project ", proj
             sys.exit(1)
 
     local_version_master = slurp("/newdata/funcatron/doc_o_matic/version_master.adoc")
@@ -190,22 +269,31 @@ for v in verSet:
         local_version_master = version_master
     local_version_master = local_version_master.replace("$$VER$$", v)
     local_version_master = local_version_master.replace("$$PROJECTLIST$$",
-                                                        "\n".join(["* link:"+ proj+"/index.html["+proj+"]" for
+                                                        "\n".join(["* link:" + proj + "/index.html[" + proj + "]" for
                                                                    proj in projects]))
-    os.chdir("/docout/"+slugify(v))
+    os.chdir("/docout/" + slug_v)
     for proj in projects:
         os.mkdir(proj)
+
     spit("index.adoc", local_version_master)
+
+    for proj in projects:
+        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter)
 
 print ""
 print "Done spitting out the projects... now to asciidoctor them"
 
 os.chdir("/docout")
 
-os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc")  $(find . -name "*.md") ')
+os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc") ')
+
+for dir, sub, files in os.walk("."):
+    for file in files:
+        if file.endswith(".md"):
+            subprocess.call(["pandoc", "-f", "markdown_github", "-s", "-o", os.path.join(dir, end_with_html(file)),
+            os.path.join(dir, file)])
 
 os.system("rm $(find . -name '*.adoc') $(find . -name '*.md') ")
-
 
 print ""
 print "Finished... making tarball"

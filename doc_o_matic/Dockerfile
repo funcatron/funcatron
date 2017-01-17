@@ -10,5 +10,6 @@ RUN wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
 RUN yum update -y && \
     yum install -y maven gradle sbt
 
-RUN yum install -y git
+RUN yum install -y git pandoc
+
 
