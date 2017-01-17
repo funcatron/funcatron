@@ -157,7 +157,7 @@ def split_list(the_func, the_list):
 
     return yes, no
 
-def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
+def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default_multilevel_frontmatter):
     """
     Do all the frontmatter stuff for a source and dest dir
 
@@ -165,6 +165,7 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
     :param source_dir: where to gather info
     :param dest_dir: where to spit out the files
     :param default_frontmatter: the default frontmatter file
+    :param default_multilevel_frontmatter: the default frontmatter for multilevel projects
     :return:
     """
     os.chdir(source_dir)
@@ -324,7 +325,7 @@ for v in verSet:
     spit("index.adoc", local_version_master)
 
     for proj in projects:
-        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter)
+        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter)
 
 print ""
 print "Done spitting out the projects... now to asciidoctor them"
