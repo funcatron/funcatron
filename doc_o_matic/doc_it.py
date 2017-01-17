@@ -11,6 +11,35 @@ os.environ["LEIN_ROOT"]="true"
 
 repos = ["funcatron", "intf", "starter", "devshim", "tron", "samples", "jvm_services"]
 
+
+# Funcatron
+## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+
+# intf
+## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+## run JavaDocs and link to front matter doc
+
+# Starter
+## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+
+# Devshim
+## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+## run JavaDocs and link to front matter doc
+
+# Tron
+## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+## run codox and link to front matter doc
+
+# Samples
+## Front matter that links to each sample. For each Sample:
+### Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+### run JavaDocs and link to front matter doc
+
+# jvm_services
+## Front matter that links to each sample. For each Sample:
+### Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
+### run JavaDocs and link to front matter doc
+
 os.chdir("/newdata")
 
 # From http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename
@@ -41,6 +70,12 @@ def slurp(file):
     except IOError as e:
         print e
         return None
+
+def find_all_doc_files():
+    """
+    In the current directory, return all the 
+    :return:
+    """
 
 cwd = os.getcwd()
 
@@ -101,10 +136,15 @@ for ver in verSet:
         if ver == 'master' or ver in v:
             lst.append(k)
 
+print "Version"
 print versions
 
+print ""
+print "Version Set"
 print verSet
 
+print ""
+print "By Version"
 print byVer
 
 subprocess.call(["rm", "-rf", "/docout"])
@@ -118,9 +158,13 @@ os.chdir("/docout")
 for v in verSet:
     os.mkdir(slugify(v))
 
-master = slurp("/newdata/funcatron/doc_o_matic/front_master.adoc")
-
 version_master = slurp("/newdata/funcatron/doc_o_matic/version_master.adoc")
+
+generic_frontmatter = slurp("/newdata/funcatron/doc_o_matic/generic_frontmatter.adoc")
+
+generic_multilevel_frontmatter = slurp("/newdata/funcatron/doc_o_matic/generic_multilevel_frontmatter.adoc")
+
+master = slurp("/newdata/funcatron/doc_o_matic/front_master.adoc")
 
 master = master.replace("$$VERSIONLIST$$", "\n".join(["* link:"+ slugify(line)+"/index.html["+line+"]" for line in verSet]))
 
@@ -158,9 +202,9 @@ print "Done spitting out the projects... now to asciidoctor them"
 
 os.chdir("/docout")
 
-os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc")')
+os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc")  $(find . -name "*.md") ')
 
-os.system("rm $(find . -name '*.adoc')")
+os.system("rm $(find . -name '*.adoc') $(find . -name '*.md') ")
 
 
 print ""

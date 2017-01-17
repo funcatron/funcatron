@@ -1,0 +1,14 @@
+= Funcatron Sub-project $$PROJ$$
+:toc:
+
+link:../index.html[Up]
+
+== About
+
+About this version
+
+== Documentation
+
+$$DOCLINKS$$
+
+link:../index.html[Up]
