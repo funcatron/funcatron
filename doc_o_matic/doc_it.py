@@ -109,6 +109,8 @@ def slugified_to_nice(name):
     :param name: the slugified thing
     :return: a nicer version
     """
+    name = re.sub("\.\/info\/", "", name)
+    name = re.sub("\.\/doc\/", "", name)
     return re.sub("[./\-_]", " ", re.sub("\.[^ .]*$", "", name)).lower().strip().title()
 
 def end_with_html(name):
@@ -286,6 +288,9 @@ print "Done spitting out the projects... now to asciidoctor them"
 os.chdir("/docout")
 
 os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc") ')
+
+print ""
+print "And running Markdown..."
 
 for dir, sub, files in os.walk("."):
     for file in files:

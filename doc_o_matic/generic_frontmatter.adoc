@@ -5,7 +5,7 @@ link:../index.html[Up]
 
 == About
 
-About this version
+$$README$$
 
 == Documentation
 
