@@ -180,7 +180,8 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter):
 
     os.chdir(dest_dir)
 
-    for cp in to_copy:
+    for cp in to_copy.splitlines():
+        print "cp is ", cp
         path, file = path_and_file(cp)
         mkdir_p(path)
         subprocess.call(["cp", source_dir + "/" + cp, cp])
@@ -330,7 +331,7 @@ print "Done spitting out the projects... now to asciidoctor them"
 
 os.chdir("/docout")
 
-os.system('asciidoctor -r asciidoctor-diagram $(find . -name "*.adoc") ')
+os.system('asciidoctor -a source-highlighter=pygments -r asciidoctor-diagram $(find . -name "*.adoc") ')
 
 print ""
 print "And running Markdown..."
