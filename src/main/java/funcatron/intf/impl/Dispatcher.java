@@ -39,7 +39,7 @@ public class Dispatcher implements BiFunction<String, Map<Object, Object>, BiFun
      *
      * @param className the OperationId from the Swagger file
      * @param objectMap the rest of the Swagger file plus some other stuff
-     * @return BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>
+     * @return `BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>`
      */
     @Override
     public BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>> apply(final String className, final Map<Object, Object> objectMap) {

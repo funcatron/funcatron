@@ -32,7 +32,7 @@ public interface Func<Request> {
      *
      * @param req the incoming request. `null` if the request is a GET or DELETE
      *
-     * @param context
+     * @param context the context of the function application
      *
      * @throws Exception if there's a problem. A 500 will be returned to the caller
      *

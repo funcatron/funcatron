@@ -22,7 +22,7 @@ public interface ServiceVendor<T> {
     /**
      * Is the class of a given type? For example `ofType(java.sql.Connection.class)`
      * to test for JDBC
-     * @param clz
+     * @param clz the class to test the instance against
      * @return boolean
      */
     default boolean ofType(Class<?> clz) {
@@ -47,8 +47,8 @@ public interface ServiceVendor<T> {
      * Release the resource at the end of a Func execution. Depending on `success`,
      * the resource may be released in different ways (e.g., database commit vs. database rollback)
      * @param item the item to release
-     * @param success
-     * @throws Exception
+     * @param success true if the function executed successfully and the transaction should be committed. false on an exception
+     * @throws Exception if the release operation throws an exception
      */
     void release(T item, boolean success) throws Exception;
 }

@@ -6,7 +6,7 @@ package funcatron.intf;
 public interface OrderedProvider {
     /**
      * Return the order in which the Providers should be executed
-     * @return
+     * @return the order in which the provider will be layered
      */
     default int order() {return 0;}
 }

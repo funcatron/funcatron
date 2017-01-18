@@ -264,6 +264,8 @@ public class ContextImpl implements Context, Accumulator {
 
     /**
      * Release all the resources held by the context... with a logger
+     *
+     * @param logger the Logger to use to log information
      */
     public static void endLife(Logger logger) {
         if (null == logger) logger = Logger.getLogger(ContextImpl.class.getName());
@@ -720,6 +722,7 @@ public class ContextImpl implements Context, Accumulator {
     /**
      * Return version information so the Runner can do the right thing
      *
+     * @param logger the Logger to use to log information
      * @return version information so the Runner can do the right thing
      */
     public static String getVersion(Logger logger) {
