@@ -1,0 +1,23 @@
+## Tron
+
+
+Tron is the brains and the brawn for Funcatron.
+
+The "`Tron`" module knows about the cluster and allocates work to the "`Runners`".
+
+The "`Runners`" dequeue requests from the message queue, service the requests, and
+post responses.
+
+
+
+### Contributing
+
+Please see link:contributing.html[CONTRIBUTING] for details on
+how to make a contribution.
+
+### Licenses and Support
+
+Funcatron is licensed under an Apache 2 license.
+
+Support is available from the project's founder,
+mailto:feeder.of.the.bears@gmail.com[David Pollak].
