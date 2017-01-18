@@ -10,7 +10,8 @@
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
-            [clojure.java.shell :as shelly])
+            [clojure.java.shell :as shelly]
+            [clojure.spec :as s])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
@@ -54,6 +55,8 @@
 (defn walk
   "Walk Clojure data structures and 'do the right thing'"
   [element-f key-f data]
+  {:pre [(s/valid? fn? element-f) (s/valid? fn? key-f) (s/valid? any? data)]
+   :post [(s/valid? any? %)]}
   (let [m (element-f data)
         f (partial walk element-f key-f)]
     (cond
