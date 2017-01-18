@@ -1,9 +1,7 @@
-= Funcatron Sub-project $$PROJ$$
+= Funcatron sub-project: $$PROJ$$
 :toc:
 
 link:../index.html[Up]
-
-== About
 
 $$README$$
 

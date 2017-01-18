@@ -5,6 +5,7 @@ import subprocess
 import commands
 import re
 import errno
+import sys
 
 subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
@@ -157,7 +158,37 @@ def split_list(the_func, the_list):
 
     return yes, no
 
-def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default_multilevel_frontmatter):
+def run_javadocs(source_dir, dest_dir, version):
+    os.chdir(source_dir)
+    code = subprocess.call(["mvn", "clean"])
+    if code != 0:
+        return None
+
+    code = subprocess.call(["mvn", "-Dmaven.javadoc.failOnError=false", "javadoc:javadoc"])
+    if code != 0:
+        return None
+
+    subprocess.call(["cp", "-r", "target/site/apidocs", dest_dir])
+
+    return ["API Docs", "apidocs/index.html"]
+
+
+def run_codox(source_dir, dest_dir, version):
+    os.chdir(source_dir)
+    code = subprocess.call(["lein", "do", "clean,", "codox"])
+    if code != 0:
+        print "Failed to do Codox"
+        return None
+
+    subprocess.call(["cp", "-r", "target/base+system+user+dev/doc", dest_dir])
+
+    return ["API Docs", "doc/index.html"]
+
+project_rules = {"intf": [run_javadocs],
+                 "devshim": [run_javadocs],
+                 "tron": [run_codox]}
+
+def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default_multilevel_frontmatter, version):
     """
     Do all the frontmatter stuff for a source and dest dir
 
@@ -182,7 +213,6 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default
     os.chdir(dest_dir)
 
     for cp in to_copy.splitlines():
-        print "cp is ", cp
         path, file = path_and_file(cp)
         mkdir_p(path)
         subprocess.call(["cp", source_dir + "/" + cp, cp])
@@ -191,16 +221,31 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default
         mkdir_p(dir)
         spit(os.path.join(dir, name), contents)
 
-    readme_text = "Project Information"
+    readme_text = """
+    == Project Info...
+
+    Project Information... and when the README.md is renamed README.adoc, this will be populated
+
+    """
 
     if readme:
         readme_text = readme[0][2]
 
+    link_list = [[slugified_to_nice(os.path.join(dir, file)), os.path.join(dir, end_with_html(file))] for dir, file, q in files]
+
+    rules = project_rules.get(proj_name, [])
+    for func in rules:
+        info = func(source_dir, dest_dir, version)
+        if info:
+            link_list.insert(0, info)
+
+    os.chdir(dest_dir)
+
     spit("index.adoc",
     fm.replace("$$DOCLINKS$$",
-    "\n".join(["* link:"+os.path.join(dir, end_with_html(file))+"["+slugified_to_nice(os.path.join(dir, file))+"]" for
-               dir, file, q in files])).
+    "\n".join(["* link:"+link+"["+name+"]" for  name, link in link_list])).
          replace("$$README$$", readme_text))
+
 
 cwd = os.getcwd()
 
@@ -325,7 +370,7 @@ for v in verSet:
     spit("index.adoc", local_version_master)
 
     for proj in projects:
-        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter)
+        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter, v)
 
 print ""
 print "Done spitting out the projects... now to asciidoctor them"

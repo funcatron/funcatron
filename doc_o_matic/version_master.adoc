@@ -1,4 +1,4 @@
-= Funcatron Version $$VER$$
+= Funcatron version/tag: _$$VER$$_
 :toc:
 
 link:../index.html[Up]
