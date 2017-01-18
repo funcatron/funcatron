@@ -12,7 +12,7 @@ post responses.
 
 ### Contributing
 
-Please see link:contributing.html[CONTRIBUTING] for details on
+Please see link:CONTRIBUTING.html[CONTRIBUTING] for details on
 how to make a contribution.
 
 ### Licenses and Support
