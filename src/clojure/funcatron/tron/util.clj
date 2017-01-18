@@ -90,19 +90,19 @@
   )
 
 (defn camel-stringify-keys
-  "Recursively transforms all map keys from keywords to strings."
+  "Recursively transforms all map keys from keywords to camel strings."
   ([m] (camel-stringify-keys identity m))
   ([f m] (walk f csk/->camelCaseString m))
   )
 
 (defn keywordize-keys
-  "Recursively transforms all map keys from keywords to strings."
+  "Recursively transforms all map keys from strings to keywords."
   ([m] (keywordize-keys identity m))
   ([f m] (walk f string-to-kwd m))
   )
 
 (defn kebab-keywordize-keys
-  "Recursively transforms all map keys from keywords to strings."
+  "Recursively transforms all map keys from strings to kebab keywords."
   ([m] (kebab-keywordize-keys identity m))
   ([f m] (walk f csk/->kebab-case-keyword m))
   )
