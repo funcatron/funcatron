@@ -5,8 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>funcatron</groupId>
-    <artifactId>clojure-service</artifactId>
+    <artifactId>spring_boot</artifactId>
     <version>0.2.6</version>
+
+    <scm>
+        <connection>scm:git:https://github.com/funcatron/jvm_services.git</connection>
+        <url>https://github.com/funcatron/jvm_services.git</url>
+    </scm>
 
     <build>
         <plugins>
@@ -42,28 +47,9 @@
 
                                 def describe = process.in.text.trim()
 
-                                project.properties.setProperty('gitVersion', describe)
+                                project.properties.setProperty('gitVersion',describe)
                             </source>
                         </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>eu.somatik.serviceloader-maven-plugin</groupId>
-                <artifactId>serviceloader-maven-plugin</artifactId>
-                <version>1.0.7</version>
-                <configuration>
-                    <services>
-                        <param>funcatron.intf.ClassloaderProvider</param>
-                        <param>funcatron.intf.OperationProvider</param>
-                    </services>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>generate</goal>
-                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -86,60 +72,45 @@
                 </configuration>
             </plugin>
 
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.4</version>
-            </plugin>
-
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>clojars</id>
+            <name>Clojars</name>
+            <url>https://clojars.org/repo</url>
+        </repository>
+    </repositories>
+
 
     <dependencies>
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger2</artifactId>
+            <version>2.6.1</version>
+        </dependency>
+
         <dependency>
             <groupId>funcatron</groupId>
             <artifactId>intf</artifactId>
             <version>0.2.6</version>
         </dependency>
 
+
+
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>1.4.3.RELEASE</version>
         </dependency>
 
         <dependency>
-            <groupId>org.clojure</groupId>
-            <artifactId>clojure</artifactId>
-            <version>1.8.0</version>
-            <scope>provided</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>1.4.3.RELEASE</version>
         </dependency>
     </dependencies>
 
-    <distributionManagement>
-        <repository>
-            <id>clojars</id>
-            <name>Clojars repository</name>
-            <url>https://clojars.org/repo</url>
-        </repository>
-    </distributionManagement>
 
 </project>
