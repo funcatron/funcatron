@@ -10,6 +10,10 @@ ${DIR}/../scripts/start_frontend.sh
 
 docker build -t funcatron/holistic:latest .
 
-docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest /usr/bin/run_tests.py $@
+if [[ "--shell" == "$1" ]]; then
+  docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest
+else
+  docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest /usr/bin/run_tests.py $@
+fi
 
 echo $?

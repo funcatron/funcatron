@@ -412,6 +412,29 @@ def test_java_sample(intf_ver):
 
     test_http_sample("/sample/java")
 
+## Java Spring Boot Sample
+def test_spring_boot_sample(intf_ver):
+    print "Testing java spring boot sample"
+
+    os.chdir("/newdata/samples/java-spring")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "Java Spring boot sample", True)
+
+    if compile:
+        code = subprocess.call(["mvn", "clean", "package"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to package Java spring boot sample"
+        sys.exit(code)
+
+    upload_and_enable("target/java_spring_sample-0.1-SNAPSHOT.jar", {"foo": "bar"})
+
+    test_http_sample("/greeting")
+
 ## Clojure Sample
 def test_clojure_sample(intf_ver):
     print "Testing Clojure sample"
@@ -540,7 +563,21 @@ def test_clojure_service(intf_ver):
 
 def test_spring_boot_service(intf_ver):
     print "Testing Spring Boot Service"
-    ## FIXME
+
+    os.chdir("/newdata/jvm_services/spring_boot")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "Spring Boot Service")
+
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to install Spring Boot Service"
+        sys.exit(code)
 
 def run_tests():
 
@@ -565,6 +602,7 @@ def run_tests():
     test_archetype(intf_ver)
 
     # now that the Tron is up, let's test the various samples
+    test_spring_boot_sample(intf_ver)
     test_clojure_sample(intf_ver)
     test_scala(intf_ver)
     test_java_gradle(intf_ver)
