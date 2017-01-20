@@ -61,18 +61,18 @@ public class ContextImpl implements Context, Accumulator {
     private static final ConcurrentHashMap<String, BiFunction<Map<Object, Object>, Logger, Object>> operations = new ConcurrentHashMap<>();
 
     static {
-        operations.put("operations", (x, l) -> operations.keySet());
-        operations.put("endLife", (x, l) -> {
+        operations.put(Constants.OperationsConst, (x, l) -> operations.keySet());
+        operations.put(Constants.EndLifeConst, (x, l) -> {
             endLife(l);
             return null;
         });
-        operations.put("getClassloader", (x, l) -> getClassloader());
-        operations.put("getSwagger", (x, l) -> getSwagger(l));
-        operations.put("getVersion", (x, l) -> getVersion(l));
-        operations.put("dispatcherFor", (x, l) -> dispatcherFor(x, l));
-        operations.put("getSerializer", (x, l) -> null);
-        operations.put("getDeserializer", (x, l) -> null);
-        operations.put("wrapWithMiddleware", (x, l) -> wrapWithMiddleware((BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>) x.get("function")));
+        operations.put(Constants.GetClassloaderConst, (x, l) -> getClassloader());
+        operations.put(Constants.GetSwaggerConst, (x, l) -> getSwagger(l));
+        operations.put(Constants.GetVersionConst, (x, l) -> getVersion(l));
+        operations.put(Constants.DispatcherForConst, (x, l) -> dispatcherFor(x, l));
+        operations.put(Constants.GetSerializerConst, (x, l) -> null);
+        operations.put(Constants.GetDeserializerConst, (x, l) -> null);
+        operations.put(Constants.WrapWithMiddlewareConst, (x, l) -> wrapWithMiddleware((BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>>) x.get("function")));
     }
 
     /**
@@ -130,7 +130,7 @@ public class ContextImpl implements Context, Accumulator {
         return null;
     }
 
-    public static Object dispatcherFor(Map<Object, Object> info, Logger l) {
+    public static BiFunction<InputStream, Map<Object, Object>, Map<Object, Object>> dispatcherFor(Map<Object, Object> info, Logger l) {
         Dispatcher disp = new Dispatcher();
         return wrapWithMiddleware(disp.apply((String) info.get("$operationId"), info));
     }
@@ -297,7 +297,7 @@ public class ContextImpl implements Context, Accumulator {
         Callable<Object> resolveParam = () -> {
 
             BiFunction<InputStream, List<Object>, Object> contextDeserializer =
-                    runOperation("getDeserializer",
+                    runOperation(Constants.GetDeserializerConst,
                     new HashMap<>(), logger, BiFunction.class);
 
             Object param = null;
@@ -405,13 +405,13 @@ public class ContextImpl implements Context, Accumulator {
                 retVal instanceof OutputStream) {
             ret.put("body", retVal);
         } else {
-            Function<Object, byte[]> contextSerializer =
-                    runOperation("getSerializer",
-                            altResponseInfo, logger, Function.class);
+            BiFunction<Object,String, byte[]> contextSerializer =
+                    runOperation(Constants.GetSerializerConst,
+                            altResponseInfo, logger, BiFunction.class);
             if (null != instSerializer) {
                 retVal = instSerializer.apply(retVal);
             } else if (null != contextSerializer) {
-                retVal = contextSerializer.apply(retVal);
+                retVal = contextSerializer.apply(retVal, contentType);
             } else {
                 retVal = serializer.apply(retVal);
             }
