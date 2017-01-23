@@ -1,4 +1,4 @@
-(ns funcatron.tron.util-test
+(ns funcatron.tron.spec-testing
   (:require
     [clojure.test :refer [deftest testing are is run-tests]]
     [clojure.spec.test :as stest]))
