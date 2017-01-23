@@ -10,7 +10,7 @@ To use the archetype:
 mvn archetype:generate  \
    -DarchetypeGroupId=funcatron \
    -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.2.5 \
+   -DarchetypeVersion=0.2.6 \
    -DgroupId=my.stellar \
    -DartifactId=thang \
    -DarchetypeRepository=https://clojars.org/repo
@@ -19,7 +19,7 @@ mvn archetype:generate  \
 To run the Funcatron dev server:
 
 ```
-docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.5
+docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.6
 ```
 
 To run your project code:
