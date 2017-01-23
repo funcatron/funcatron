@@ -11,7 +11,8 @@
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
             [clojure.java.shell :as shelly]
-            [clojure.spec :as s])
+            [clojure.spec :as s]
+            [clojure.spec.test :as stest])
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
@@ -55,8 +56,6 @@
 (defn walk
   "Walk Clojure data structures and 'do the right thing'"
   [element-f key-f data]
-  {:pre [(s/valid? fn? element-f) (s/valid? fn? key-f) (s/valid? any? data)]
-   :post [(s/valid? any? %)]}
   (let [m (element-f data)
         f (partial walk element-f key-f)]
     (cond
@@ -74,17 +73,25 @@
   )
 
 
-
+(s/fdef kwd-to-string
+  :args (s/cat :kw? keyword?)
+  :ret string?)
 (defn kwd-to-string
-  "Converts a keyword to a String"
+  "Converts a keyword to a nsless String"
   [kw?]
-  (if (keyword? kw?) (name kw?) kw?)
-  )
+  (if (keyword? kw?) (name kw?) kw?))
 
+(stest/instrument 'kwd-to-string)
+
+(s/fdef string-to-kwd
+  :args (s/cat :s? string?)
+  :ret keyword?)
 (defn string-to-kwd
   "Converts a String to a Keyword"
   [s?]
   (if (string? s?) (keyword s?) s?))
+
+(stest/instrument 'string-to-kwd)
 
 (defn stringify-keys
   "Recursively transforms all map keys from keywords to strings."
