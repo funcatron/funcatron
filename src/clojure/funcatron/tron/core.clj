@@ -17,6 +17,9 @@
 
 (set! *warn-on-reflection* true)
 
+(s/fdef ordered-tron-env
+  :args (s/cat :m map?)
+  :ret vector?)
 
 (defn- ordered-tron-env
   "Return the elements of the map that begin with TRON_ ordered by their number"
@@ -28,6 +31,8 @@
     (sort-by first)
     (map second)
     (into [])))
+
+(stest/instrument 'ordered-tron-env)
 
 (defn -main
   "The uberjar entrypoint"
