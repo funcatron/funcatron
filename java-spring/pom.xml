@@ -107,7 +107,7 @@
                 </configuration>
             </plugin>
 
-            <!--
+<!--
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.0.0</version>
@@ -137,9 +137,8 @@
                         </goals>
                     </execution>
                 </executions>
-
             </plugin>
-        -->
+-->
 
         </plugins>
     </build>
@@ -198,6 +197,12 @@
             <groupId>funcatron</groupId>
             <artifactId>spring_boot</artifactId>
             <version>0.2.6</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>1.4.3.RELEASE</version>
         </dependency>
     </dependencies>
 

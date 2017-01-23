@@ -1,11 +1,11 @@
-(defproject clojure_sample "0.2.5"
+(defproject clojure_sample "0.2.6"
   :description "Clojure Funcatron sample"
   :url "http://funcatron.org"
   :license {:name "Apache 2.0"}
   :dependencies [
                  [org.clojure/clojure "1.8.0"]
-                 [funcatron/intf "0.2.5"]
-                 [funcatron/clojure-service "0.2.5"]
+                 [funcatron/intf "0.2.6"]
+                 [funcatron/clojure-service "0.2.6"]
                  ]
 
   :manifest
