@@ -11,12 +11,12 @@
             [funcatron.tron.util :as fu]
             [io.sarnowski.swagger1st.context :as s1ctx])
   (:import (java.util.jar JarFile)
-           (java.io InputStream)
+           (java.io InputStream File)
            (java.net URLClassLoader URL)
            (java.lang.reflect InvocationTargetException)
            (funcatron.abstractions Router Router$Message)
            (org.apache.commons.io IOUtils)
-           (java.util Base64 Map)
+           (java.util Base64 Map List)
            (java.util.logging Logger)
            (java.util.function BiFunction Function)))
 
@@ -40,12 +40,56 @@
                       )
           :ret ::jar-info)
 
+(defn ^ClassLoader build-classloader-from-file
+  "Spring Boot does some gnarly stuff with classloading out of an uber-jar of its own
+  making... so we need to see if we've got a Spring Boot style jar and build a classloader
+  based on that JAR. It's a huge hack, but Spring is a huge deal... so..."
+  [^File the-file]
+  (let [base-classloader (URLClassLoader. (into-array URL [(-> the-file .toURI .toURL)]) nil nil)]
+    (try
+      (let [cl base-classloader
+            ;; load a bunch of Spring classes
+            arch-clz (.loadClass cl "org.springframework.boot.loader.archive.Archive")
+            jac (.loadClass cl "org.springframework.boot.loader.archive.JarFileArchive")
+            jar-launch-clz (.loadClass cl "org.springframework.boot.loader.JarLauncher")
+            launcher-clz (.loadClass cl "org.springframework.boot.loader.Launcher")
+
+            ;; get constructors
+            jar-launch-con (.getDeclaredConstructor jar-launch-clz (into-array Class [arch-clz]))
+            _ (.setAccessible jar-launch-con true)
+
+            ;; and some methods
+            get-cp-arch (.getDeclaredMethod launcher-clz "getClassPathArchives" (into-array Class []))
+            _ (.setAccessible get-cp-arch true)
+
+            create-cl-meth (.getDeclaredMethod launcher-clz "createClassLoader" (into-array Class [List]))
+            _ (.setAccessible create-cl-meth true)
+
+            ;; build a JarFileArchive
+            con (.getConstructor jac (into-array [File]))
+            jar-archive (.newInstance con (into-array Object [the-file]))
+
+            ;; build a JarLauncher
+            jar-launcher (.newInstance jar-launch-con (into-array Object [jar-archive]))
+
+            ;; get the class path archives (the jars within the jar)
+            cp-arch (.invoke get-cp-arch jar-launcher (into-array Object []))
+
+            ;; and call createClassLoader with the jars within the jar
+            cl ^ClassLoader (.invoke create-cl-meth jar-launcher (into-array Object [cp-arch]))
+            ]
+        cl
+        )
+      ;; if we fail, just punt and return the original classloader
+      (catch Exception _ base-classloader)
+      )))
+
 (defn jar-info-from-file
   "Take a file object and turn it into a combo classloader and JarFile"
   [item]
   (let [file (clojure.java.io/file item)]
     {::jar         (JarFile. file)
-     ::classloader (URLClassLoader. (into-array URL [(-> file .toURI .toURL)]) nil nil)
+     ::classloader (build-classloader-from-file file)
      ::uuid        (fu/random-uuid)
      }
     ))

@@ -449,11 +449,14 @@
   (fu/run-in-pool
     (fn []
       (let [body (.body msg)
-            body (fu/keywordize-keys body)]
-        (try
-          (trace (str "Got message. Action " (:action body) " from " (:from body)))
-          (dispatch-tron-message body msg state)
-          (catch Exception e (error e (str "Failed to dispatch message: " body))))))))
+            body (fu/keywordize-keys body)
+            at (:at body)]
+        ;; deal with messages less than 30 minutes old
+        (when (> at (- (System/currentTimeMillis) (* 1000 15 30)))
+          (try
+            (trace (str "Got message. Action " (:action body) " from " (:from body)))
+            (dispatch-tron-message body msg state)
+            (catch Exception e (error e (str "Failed to dispatch message: " body)))))))))
 
 (defn- build-handler-func
   [state]
