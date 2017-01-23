@@ -187,14 +187,18 @@ public class ContextImpl implements Context, Accumulator {
         List<ClassloaderProvider> classloaderMagic = toSortedList(ServiceLoader.load(ClassloaderProvider.class, loader));
 
 
-        ClassLoader curClassloader = loader;
+        Thread.currentThread().setContextClassLoader(contextClassloader);
+
+        ClassLoader curClassloader = contextClassloader;
         for (ClassloaderProvider clb : classloaderMagic) {
             curClassloader = clb.buildFrom(curClassloader, eol -> {
                 addFunctionToEndOfLife(eol);
                 return null;
             }, logger);
+            contextClassloader = curClassloader;
+            Thread.currentThread().setContextClassLoader(curClassloader);
         }
-        contextClassloader = curClassloader;
+
 
         toSortedList(ServiceLoader.load(OperationProvider.class, curClassloader)).forEach(i -> {
             try {
