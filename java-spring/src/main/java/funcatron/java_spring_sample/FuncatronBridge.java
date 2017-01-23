@@ -1,11 +1,11 @@
 package funcatron.java_spring_sample;
 
 import funcatron.service.spring_boot.SpringBootWrapper;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.web.AnnotationConfigWebContextLoader;
+
 
 /**
- * Bridges Spring to Funcation
+ * Bridges Spring to Funcation. You must include a file like this in your project as
+ * Spring's maven packaging doesn't pick up the services from included projects.
  */
 
 public class FuncatronBridge extends SpringBootWrapper {

@@ -1,5 +1,9 @@
 package funcatron.java_spring_sample;
 
+
+/**
+ * Look... it's a PoJo
+ */
 public class Greeting {
 
     private final long id;

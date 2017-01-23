@@ -1,0 +1,48 @@
+= Java Funcatron Example wrapping a Spring Boot app
+
+This is a simple https://projects.spring.io/spring-boot/[Spring Boot]
+app that's wrapped up into a Func Bundle
+
+To build a Funcatron deployable JAR file, type:
+
+```
+mvn clean package
+```
+
+The compiled JAR file can be found at
+`target/java_spring_sample-0.1-SNAPSHOT.jar`.
+
+To upload the build to your Funcatron cluster:
+
+```shell
+wget -O - --post-file=target/java_spring_sample-0.1-SNAPSHOT.jar \
+     http://<TRON_HOST>:<TRON_PORT>/api/v1/add_func
+```
+
+== What do you have to do to wrap a Spring Boot app?
+
+1. Make sure you annotate you `Application` class with `@EnableSwagger2`.
+2. Include a file like `FuncatronBridge.java` that tell Funcatron where to find things.
+2. Include a file like `MyMockServer.java` that mocks the HTTP server
+4. Include the following in your Maven file: +
+
+         <dependency>
+             <groupId>funcatron</groupId>
+             <artifactId>intf</artifactId>
+             <version>0.2.6</version>
+         </dependency>
+
+         <dependency>
+             <groupId>funcatron</groupId>
+             <artifactId>spring_boot</artifactId>
+             <version>0.2.6</version>
+         </dependency>
+
+         <dependency>
+             <groupId>org.springframework.boot</groupId>
+             <artifactId>spring-boot-starter-test</artifactId>
+             <version>1.4.3.RELEASE</version>
+         </dependency>
+
+That's about it. Funcatron should find and dispatch requests properly with
+this information.

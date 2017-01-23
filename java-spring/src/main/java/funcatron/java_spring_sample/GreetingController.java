@@ -1,19 +1,16 @@
 package funcatron.java_spring_sample;
 
-import io.swagger.models.Swagger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import springfox.documentation.service.Documentation;
-import springfox.documentation.spring.web.DocumentationCache;
-import springfox.documentation.spring.web.json.JsonSerializer;
-import springfox.documentation.spring.web.plugins.Docket;
-import springfox.documentation.swagger2.mappers.ServiceModelToSwagger2Mapper;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
+
+
+/**
+ * Just a plain old Spring app
+ */
 
 @RestController
 public class GreetingController {
