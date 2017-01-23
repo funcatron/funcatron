@@ -16,4 +16,4 @@
                          (:total ~'result)))))
              nses)))
 
-(check-nses ['funcatron.tron.core 'funcatron.tron.util])
+(check-nses ['funcatron.tron.util])
