@@ -24,6 +24,7 @@ print 'Argument List:', str(sys.argv)
 
 
 subprocess.call(["rm", "-rf", "/newdata"])
+subprocess.call(["rm", "-rf", "/root/funcatron_bundles"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
 os.environ["LEIN_ROOT"]="true"
 

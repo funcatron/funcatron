@@ -11,7 +11,7 @@ RUN wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y maven python-pip vim && \
+    apt-get install -y maven python-pip vim emacs && \
     apt remove -y openjdk-7-jre-headless openjdk-7-jre
 
 RUN pip install requests
