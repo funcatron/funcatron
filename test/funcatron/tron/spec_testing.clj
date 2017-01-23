@@ -6,13 +6,13 @@
 (set! *warn-on-reflection* true)
 
 (defn check-ns [ns]
-  (-> ns stest/enumerate-namespace stest/check stest/summerize-results))
+  (-> ns stest/enumerate-namespace stest/check stest/summarize-results))
 
 (defmacro check-nses [nses]
   `(deftest spec-testing
      ~@ (map (fn [ns]
                `(is (let [~'result (check-ns ~ns)]
-                      (= (:check-passede ~'result)
+                      (= (:check-passed ~'result)
                          (:total ~'result)))))
              nses)))
 
