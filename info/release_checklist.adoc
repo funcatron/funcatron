@@ -1,0 +1,76 @@
+= Release Checklist
+
+To do a Funcatron release, do what's in this document
+
+- [ ] Run `funcatron/doc_o_matic/pull_all.sh` to make sure you've got the latest code.
+- [ ] Look for references to the last release using something like +
+      `grep -l '0\.2\.5' $(find . -type f) 2> /dev/null | grep -v '\.git'`
+- [ ] Explicitly look in the following for the old version: +
+      `funcatron/scripts/start.json` +
+      `funcatron/info/architecture_strategy.adoc` +
+      `funcatron/info/dev_intro.adoc`
+- [ ] Run the holistic test: +
+      `cd funcatron/holistic_test/` +
+      `./run_tests.sh` +
+      The result should be: +
+```
+          *********
+          Successfully Ran All Tests!
+
+          0
+```
+
+- [ ] For each directory, do the appropriate deploy, tag, push:
+- [ ] `intf` +
+  `mvn deploy` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+- [ ] `devshim` +
+  `mvn deploy` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+- [ ] `starter` +
+  `mvn deploy` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+- [ ] `jvm_services` +
+  `cd clojure` +
+  `mvn deploy` +
+  `cd ../spring_boot` +
+  `mvn deploy` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+- [ ] `samples` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+- [ ] `frontend` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+
+- [ ] `funcatron` +
+  `git tag` __version__ +
+  `git push --tag` +
+  `git push`
+
+
+- [ ] Build and public documentation:
+* `cd funcatron/doc_o_matic`
+* `./build_docs.sh`
+* Wait for the docs to be built
+* in `/tmp` untar the `doc.tgz` file which should be in the parent directory of the `funcatron` project: +
+   `tar -xzvf ~/proj/parent_of_funcatron/doc.tgz`
+* Publish the files in `/tmp/docout` onto the https://funcatron.org site
+
+- [ ] Tweet something fun!
+   

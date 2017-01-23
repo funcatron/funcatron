@@ -6,6 +6,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 docker build -t funcatron/doc-o-matic:latest . || exit 1
 
-docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/doc-o-matic:latest
+docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/doc-o-matic:latest /usr/bin/doc_it.py
 
 echo $?
