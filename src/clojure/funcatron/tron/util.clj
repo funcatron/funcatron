@@ -12,7 +12,7 @@
                      spy get-env]]
             [clojure.java.shell :as shelly]
             [clojure.spec :as s]
-            [clojure.spec.test :as stest])
+            )
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
@@ -81,8 +81,6 @@
   [kw?]
   (if (keyword? kw?) (name kw?) kw?))
 
-(stest/instrument 'kwd-to-string)
-
 (s/fdef string-to-kwd
   :args (s/cat :s? string?)
   :ret keyword?)
@@ -90,8 +88,6 @@
   "Converts a String to a Keyword"
   [s?]
   (if (string? s?) (keyword s?) s?))
-
-(stest/instrument 'string-to-kwd)
 
 (defn stringify-keys
   "Recursively transforms all map keys from keywords to strings."
