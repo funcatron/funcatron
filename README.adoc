@@ -10,6 +10,10 @@ post responses.
 
 
 
+### Usage
+
+`make up` to build and launch docker image.
+
 ### Contributing
 
 Please see link:CONTRIBUTING.html[CONTRIBUTING] for details on
