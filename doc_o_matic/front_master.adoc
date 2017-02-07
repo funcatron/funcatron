@@ -13,7 +13,7 @@ Serverless on Your Cluster:
 _Funcatron let's you deploy serverless on any cloud provider or in your
 private cloud. Focus on the functions, avoid vendor lock-in._
 
-This document sets out the goals for the [Funcatron](http://funcatron.org) project.
+This document sets out the goals for the http://funcatron.org[Funcatron] project.
 
 ### What's Funcatron
 
