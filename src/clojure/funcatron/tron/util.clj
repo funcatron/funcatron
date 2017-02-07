@@ -10,7 +10,9 @@
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
                      spy get-env]]
-            [clojure.java.shell :as shelly])
+            [clojure.java.shell :as shelly]
+            [clojure.spec :as s]
+            )
   (:import (cheshire.prettyprint CustomPrettyPrinter)
            (java.util Base64 Map Map$Entry List UUID Properties)
            (org.apache.commons.io IOUtils)
@@ -71,13 +73,17 @@
   )
 
 
-
+(s/fdef kwd-to-string
+  :args (s/cat :kw? keyword?)
+  :ret string?)
 (defn kwd-to-string
-  "Converts a keyword to a String"
+  "Converts a keyword to a nsless String"
   [kw?]
-  (if (keyword? kw?) (name kw?) kw?)
-  )
+  (if (keyword? kw?) (name kw?) kw?))
 
+(s/fdef string-to-kwd
+  :args (s/cat :s? string?)
+  :ret keyword?)
 (defn string-to-kwd
   "Converts a String to a Keyword"
   [s?]

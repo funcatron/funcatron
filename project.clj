@@ -46,14 +46,17 @@
 
    [camel-snake-kebab "0.4.0"]
 
-   [com.novemberain/langohr "3.6.1"]]
+   [com.novemberain/langohr "3.6.1"]
+   
+   ]
 
   :manifest
   {"GitHeadRev" ~(fn [x] (some-> (clojure.java.shell/sh "git" "rev-parse" "HEAD") :out .trim))}
 
   :profiles
   {:dev     {:dependencies [[ring/ring-devel "1.5.0"]
-                            [javax.servlet/servlet-api "2.5"]]}
+                            [javax.servlet/servlet-api "2.5"]
+                            [org.clojure/test.check "0.9.0"]]}
    :uberjar {:aot :all}
    }
 
@@ -68,4 +71,7 @@
   :javac-options ["-target" "1.8" "-source" "1.8"]
   :main funcatron.tron.core
   :target-path "target/%s"
+  
+  ;; So we wont hit the issue github.com/technomancy/leiningen/issues/2173
+  :monkeypatch-clojure-test false
   )
