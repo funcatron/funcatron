@@ -73,4 +73,4 @@ To do a Funcatron release, do what's in this document
 * Publish the files in `/tmp/docout` onto the https://funcatron.org site
 
 - [ ] Tweet something fun!
-   
+

@@ -70,8 +70,6 @@
                     "network": "BRIDGE",
                     "portMappings": [
                         { "containerPort": 3000, "name": "http",
-                          "hostPort": 0, "protocol": "tcp" },
-                        { "containerPort": 54657, "name": "devshim",
                           "hostPort": 0, "protocol": "tcp" }],
                     "parameters": [
                         { "key": "env", "value": "TRON_1=--runner" }
