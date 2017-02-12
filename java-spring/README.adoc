@@ -19,6 +19,14 @@ wget -O - --post-file=target/java_spring_sample-0.1-SNAPSHOT.jar \
      http://<TRON_HOST>:<TRON_PORT>/api/v1/add_func
 ```
 
+[WARNING]
+====
+This is the command to upload to a Mesos or Kubernetes cluster.
+This is **NOT** the command to associate your development-time code with "`devmode`" or "`devshim`".
+To use "`devmode`" or "`devshim`", you have to use `Register.register(...)` to connect to
+a "`devmode`"
+====
+
 == What do you have to do to wrap a Spring Boot app?
 
 1. Make sure you annotate you `Application` class with `@EnableSwagger2`.
@@ -46,3 +54,47 @@ wget -O - --post-file=target/java_spring_sample-0.1-SNAPSHOT.jar \
 
 That's about it. Funcatron should find and dispatch requests properly with
 this information.
+
+== So... here's how to run the app with the devshim
+
+```java
+/**
+ * Just a plain old Spring app... but make sure you include the {@code @EnableSwagger2}
+ * annotation to hook up SpringFox and generate Swagger
+ */
+@SpringBootApplication
+@EnableSwagger2
+public class Application {
+
+    public static void main(String[] args) throws Exception {
+        SpringApplication sa = new SpringApplication(Application.class);
+
+        sa.run(args);
+
+
+        // Now that we've got the app running... start the whole funcatron stuff
+        ContextImpl.initContext(new HashMap<>(),
+                Application.class.getClassLoader(),
+                Logger.getAnonymousLogger());
+
+        // Using SpringFox, get the Swagger
+        Map swagger = ContextImpl.runOperation(Constants.GetSwaggerConst,
+                new HashMap<>(),
+                Logger.getAnonymousLogger(), Map.class);
+
+        // write it to a temp file
+        File tmpFile = File.createTempFile("funcatron_swagger_", ".txt");
+        tmpFile.createNewFile();
+        FileOutputStream fos = new FileOutputStream(tmpFile);
+        fos.write(swagger.get("swagger").toString().getBytes("UTF-8"));
+        fos.flush();
+        fos.close();
+
+        // delete the temp file on exit
+        tmpFile.deleteOnExit();
+
+        // register with the devshim
+        Register.register(tmpFile);
+    }
+}
+```
