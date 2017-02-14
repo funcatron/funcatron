@@ -1,7 +1,14 @@
 = Funcatron
 :toc:
 
+== Quick Starts
+
+link:/master/funcatron/info/spring_boot.html[Spring Boot Quickstart].
+
+link:/master/funcatron/info/dev_intro.html[Lambda-style Quickstart].
+
 == About
+
 
 Serverless on Your Cluster:
 
