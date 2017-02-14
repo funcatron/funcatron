@@ -15,6 +15,29 @@ private cloud. Focus on the functions, avoid vendor lock-in._
 
 This document sets out the goals for the http://funcatron.org[Funcatron] project.
 
+### Getting Started w/Spring Boot
+
+If you've already got a https://spring.io/guides/gs/spring-boot/[Spring Boot]
+app and you want to run it in Funcatron... you're in luck. Add a few dependencies
+and 2 classes to your existing Spring Boot app and you're good to go.
+The link:/master/funcatron/info/spring_boot.html[Spring Boot Quickstart]
+gets you started... quickly.
+
+And check out the link:/master/funcatron/info/architecture_strategy.html[Architecture
+Strategy] for a deeper dive into Funcatron.
+
+### Getting Started Lambda-style
+
+"`Lambdas`" are small units of computing... Funcations. Funcatron
+supports writing small funcations, associating them with REST endpoints,
+and autoscaling. The
+link:/master/funcatron/info/dev_intro.html[Developer Intro] to
+Funcatron walks you through building Funcatron bundles Lambda-style.
+
+And check out the link:/master/funcatron/info/architecture_strategy.html[Architecture
+Strategy] for a deeper dive into Funcatron.
+
+
 ### What's Funcatron
 
 Amazon's https://aws.amazon.com/lambda/[Lambda] popularized
