@@ -13,7 +13,7 @@
       .getLogger
       (.info "In Simple Get... Clojure style"))
   (let [num (some-> c
-                    .getRequestInfo
+                    .getMergedParams
                     (.get "num"))
         num-map (if num {"num" num} {})
         ret (merge
