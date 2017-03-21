@@ -50,7 +50,7 @@ public abstract class SpringBootWrapper implements OperationProvider {
      */
     public abstract Class<?>[] classList();
 
-    private WebApplicationContext applicationContext;
+    private static WebApplicationContext applicationContext = null;
 
     private static class SwaggerFinder {
         @Autowired
@@ -203,41 +203,57 @@ return builder.build();
         return this::serviceRequest;
     }
 
+    private static final Object syncObj = new Object();
+    private static Map<Object, Object> swaggerObject = null;
+
     @Override
     public void installOperation(BiFunction<String, BiFunction<Map<Object, Object>, Logger, Object>, Void> addOperation,
                                  Function<String, BiFunction<Map<Object, Object>, Logger, Object>> findOperation,
                                  Function<Function<Logger, Void>, Void> function1, ClassLoader classLoader, Logger logger) {
 
-        BiFunction<Void, Logger, Void> originalEndLife =
-                Constants.ConvertEndLifeFunc.apply(findOperation.apply(Constants.EndLifeConst));
+        synchronized (syncObj) {
+            if (applicationContext != null) return;
 
-        SpringApplication sa = new SpringApplication(classList());
-
-        WebApplicationContext ac = (WebApplicationContext) sa.run();
-
-        this.applicationContext = ac;
-
-        addOperation.apply(Constants.GetSwaggerConst, (x, logger2) -> {
-            HashMap<Object, Object> ret = new HashMap<>();
-
-            ret.put("type", "json");
-            SwaggerFinder gc = new SwaggerFinder();
-            autowire(gc);
-
-            ret.put("swagger", gc.dumpSwagger());
-
-            return ret;
-        });
-
-        addOperation.apply(Constants.DispatcherForConst, (info, logger2) -> metaService(info, logger2));
+            BiFunction<Void, Logger, Void> originalEndLife =
+                    Constants.ConvertEndLifeFunc.apply(findOperation.apply(Constants.EndLifeConst));
 
 
-        addOperation.apply(Constants.EndLifeConst, (x, logger2) -> {
-            ((ConfigurableApplicationContext) ac).close();
-            originalEndLife.apply(null, logger2);
-            return null;
-        });
+            WebApplicationContext ac = ContextImpl.runOperation("spring_app", new HashMap<>(), logger, WebApplicationContext.class);
 
+            if (null == ac) {
+                SpringApplication sa = new SpringApplication(classList());
+                ac =  (WebApplicationContext) sa.run();
+            }
+
+            applicationContext = ac;
+
+            addOperation.apply(Constants.GetSwaggerConst, (x, logger2) -> {
+                synchronized (syncObj) {
+                    if (null != swaggerObject) return swaggerObject;
+
+                    HashMap<Object, Object> ret = new HashMap<>();
+
+                    ret.put("type", "json");
+                    SwaggerFinder gc = new SwaggerFinder();
+                    autowire(gc);
+
+                    ret.put("swagger", gc.dumpSwagger());
+
+                    swaggerObject = ret;
+
+                    return ret;
+                }
+            });
+
+            addOperation.apply(Constants.DispatcherForConst, (info, logger2) -> metaService(info, logger2));
+
+
+            addOperation.apply(Constants.EndLifeConst, (x, logger2) -> {
+                ((ConfigurableApplicationContext) applicationContext).close();
+                originalEndLife.apply(null, logger2);
+                return null;
+            });
+        }
 
     }
 }

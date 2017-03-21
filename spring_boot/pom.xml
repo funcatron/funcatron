@@ -6,7 +6,7 @@
 
     <groupId>funcatron</groupId>
     <artifactId>spring_boot</artifactId>
-    <version>0.2.6</version>
+    <version>0.2.6a</version>
 
     <scm>
         <connection>scm:git:https://github.com/funcatron/jvm_services.git</connection>
@@ -54,7 +54,18 @@
                 </executions>
             </plugin>
 
-
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
