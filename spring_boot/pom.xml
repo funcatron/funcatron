@@ -6,7 +6,7 @@
 
     <groupId>funcatron</groupId>
     <artifactId>spring_boot</artifactId>
-    <version>0.2.6a</version>
+    <version>0.2.6b</version>
 
     <scm>
         <connection>scm:git:https://github.com/funcatron/jvm_services.git</connection>

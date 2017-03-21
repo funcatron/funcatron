@@ -52,6 +52,8 @@ public abstract class SpringBootWrapper implements OperationProvider {
 
     private static WebApplicationContext applicationContext = null;
 
+    private volatile static String basePath = "/";
+
     private static class SwaggerFinder {
         @Autowired
         private DocumentationCache documentationCache;
@@ -67,9 +69,12 @@ public abstract class SpringBootWrapper implements OperationProvider {
                 String groupName = Docket.DEFAULT_GROUP_NAME;
                 Documentation documentation = documentationCache.documentationByGroup(groupName);
                 if (documentation == null) {
-                    return null;
+                    if (documentationCache.all().isEmpty()) return "{}";
+                    documentation = documentationCache.all().values().stream().findFirst().get();
                 }
                 Swagger swagger = mapper.mapDocumentation(documentation);
+
+                basePath = swagger.getBasePath();
 
                 return jsonSerializer.toJson(swagger).value();
             } catch (RuntimeException re) {
@@ -102,6 +107,10 @@ return builder.build();
         try {
             String method = (String) req.get("request-method");
             String uri = (String) req.get("uri");
+
+            if (!"/".equals(basePath) && uri.startsWith(basePath)) {
+                uri = uri.substring(basePath.length());
+            }
 
             switch (method) {
                 case "get":
