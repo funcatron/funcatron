@@ -1,4 +1,4 @@
-= A Unified Container
+# A Unified Container
 
 * Nginx/OpenResty
 * RabbitMQ
@@ -6,3 +6,13 @@
 * Runner
 
 This container is a mini version of what will run on K8s or Mesos.
+
+To run the _all-in-one_:
+
+```
+docker run -ti --rm -p 8480:80 -p 3000:3000 funcatron/allinone
+```
+
+You will be able to see content at http://localhost:8480 and you can
+use the Funcatron REST API at http://localhost:3000.
+
