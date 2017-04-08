@@ -1,0 +1,8 @@
+= A Unified Container
+
+* Nginx/OpenResty
+* RabbitMQ
+* Tron
+* Runner
+
+This container is a mini version of what will run on K8s or Mesos.
