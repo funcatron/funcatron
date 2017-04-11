@@ -20,8 +20,8 @@
         },
         {
             "id": "/funcatron/tron",
-            "cpus": 2.0,
-            "mem": 2048,
+            "cpus": 1.0,
+            "mem": 768,
              "container": {
                 "type": "DOCKER",
                 "docker": {
@@ -61,8 +61,8 @@
 
         {
             "id": "/funcatron/runner",
-            "cpus": 2.0,
-            "mem": 2048,
+            "cpus": 1.0,
+            "mem": 768,
              "container": {
                 "type": "DOCKER",
                 "docker": {

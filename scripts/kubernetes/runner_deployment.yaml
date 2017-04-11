@@ -1,0 +1,27 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: funcatron-runner
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: funcatron-runner
+    spec:
+      containers:
+        - name: runner
+          resources:
+            requests:
+              cpu: 1.0
+              memory: 768Mi
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          image: funcatron/tron:v0.2.6
+          args:
+            - --runner
+            - --rabbit_host
+            - funcatron-rabbit

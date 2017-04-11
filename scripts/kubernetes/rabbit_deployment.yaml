@@ -1,0 +1,27 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: funcatron-rabbit
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: funcatron-rabbit
+    spec:
+      containers:
+        - name: rabbit
+          resources:
+            requests:
+              cpu: 0.5
+              memory: 256Mi
+          imagePullPolicy: Always
+          image: byteflair/rabbitmq-stomp
+          ports:
+            - name: stomp
+              containerPort: 61613
+            - name: rabbit
+              containerPort: 5672
+            - name: rabbitadm
+              containerPort: 15672
