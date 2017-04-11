@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funcatron-tron
+  labels:
+    app: funcatron-tron
+spec:
+  ports:
+    - name: http
+      port: 3000
+    - name: devshim
+      port: 54657
+  type: ClusterIP
+  selector:
+    app: funcatron-tron

@@ -1,0 +1,23 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: funcatron-frontend
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: funcatron-frontend
+    spec:
+      containers:
+        - name: frontend
+          resources:
+            requests:
+              cpu: 0.4
+              memory: 256Mi
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+          image: funcatron/frontend:v0.2.6

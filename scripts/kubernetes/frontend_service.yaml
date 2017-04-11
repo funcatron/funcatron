@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funcatron-frontend
+  labels:
+    app: funcatron-frontend
+spec:
+  ports:
+    - name: http
+      port: 80
+  type: LoadBalancer
+  selector:
+    app: funcatron-frontend
