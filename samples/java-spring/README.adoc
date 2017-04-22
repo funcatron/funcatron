@@ -1,0 +1,126 @@
+= Java Funcatron Example wrapping a Spring Boot app
+
+This is a simple https://projects.spring.io/spring-boot/[Spring Boot]
+app that's wrapped up into a Func Bundle
+
+To build a Funcatron deployable JAR file, type:
+
+```
+mvn clean package
+```
+
+The compiled JAR file can be found at
+`target/java_spring_sample-0.1-SNAPSHOT.jar`.
+
+To upload the build to your Funcatron _cluster_ running on Mesos:
+
+```shell
+wget -O - --post-file=target/java_spring_sample-0.1-SNAPSHOT.jar \
+     http://<TRON_HOST>:<TRON_PORT>/api/v1/add_func
+```
+
+[WARNING]
+====
+This is the command to upload to a Mesos or Kubernetes cluster.
+This is **NOT** the command to associate your development-time code with "`devmode`" or "`devshim`".
+To use "`devmode`" or "`devshim`", you have to use `Register.register(...)` to connect to
+a "`devmode`"
+====
+
+== What do you have to do to wrap a Spring Boot app?
+
+1. Make sure you annotate you `Application` class with `@EnableSwagger2`.
+2. Include a file like `FuncatronBridge.java` that tell Funcatron where to find things.
+2. Include a file like `MyMockServer.java` that mocks the HTTP server
+4. Include the following in your Maven file: +
+
+         <dependency>
+             <groupId>funcatron</groupId>
+             <artifactId>intf</artifactId>
+             <version>0.2.6</version>
+         </dependency>
+
+         <dependency>
+             <groupId>funcatron</groupId>
+             <artifactId>spring_boot</artifactId>
+             <version>0.2.6</version>
+         </dependency>
+
+         <dependency>
+             <groupId>funcatron</groupId>
+             <artifactId>devshim</artifactId>
+             <version>0.2.6</version>
+         </dependency>
+
+         <dependency>
+             <groupId>org.springframework.boot</groupId>
+             <artifactId>spring-boot-starter-test</artifactId>
+             <version>1.4.3.RELEASE</version>
+         </dependency>
+
+That's about it. Funcatron should find and dispatch requests properly with
+this information.
+
+== So... here's how to run the app with the devshim
+
+What's "`devshim`"? It's the development-time connection between your running app (which can be running in
+your IDE and have breakpoints) and a very slimmed down Funcatron HTTP front-end. Doing super-fast
+turn-around (compile and go or even live development) is simple with "`devshim`".
+
+You have to do two things... fire up a "`devmode`" version of Funcatron and `Register` your app with the
+local, not clustered, version of Funcation.
+
+Add this to your Spring Boot app... you start the Spring Boot app normally, then create a Funcatron "`Context`",
+get the Swagger information, and then `Register` with the "`devmode`" Funcatron instance.
+
+```java
+/**
+ * Just a plain old Spring app... but make sure you include the {@code @EnableSwagger2}
+ * annotation to hook up SpringFox and generate Swagger
+ */
+@SpringBootApplication
+@EnableSwagger2
+public class Application {
+
+    public static void main(String[] args) throws Exception {
+        SpringApplication sa = new SpringApplication(Application.class);
+
+        sa.run(args);
+
+
+        // Now that we've got the app running... start the whole funcatron stuff
+        ContextImpl.initContext(new HashMap<>(),
+                Application.class.getClassLoader(),
+                Logger.getAnonymousLogger());
+
+        // Using SpringFox, get the Swagger
+        Map swagger = ContextImpl.runOperation(Constants.GetSwaggerConst,
+                new HashMap<>(),
+                Logger.getAnonymousLogger(), Map.class);
+
+        // write it to a temp file
+        File tmpFile = File.createTempFile("funcatron_swagger_", ".txt");
+        tmpFile.createNewFile();
+        FileOutputStream fos = new FileOutputStream(tmpFile);
+        fos.write(swagger.get("swagger").toString().getBytes("UTF-8"));
+        fos.flush();
+        fos.close();
+
+        // delete the temp file on exit
+        tmpFile.deleteOnExit();
+
+        // register with the devshim
+        Register.register(tmpFile);
+    }
+}
+```
+
+Next, fire up a "`devmode`" Funcatron instance with:
+
+    docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.6
+    
+When you run your app and call the `Register.register(...)` method, your app will connect to the Funcatron
+instance and you'll be able to make `http` requests on `http://localhost:3000/`. Those requests will
+be forwarded to your app. If you run your app in debug mode in your IDE, you can set breakpoints in
+your running app and see what's going on.
+

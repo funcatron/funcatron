@@ -1,0 +1,129 @@
+swagger: "2.0"
+info:
+  version: 0.1.0
+  title: Funcatron Java Sample Built with Gradle
+  description: A simple Funcatron example in Java
+  contact:
+    name: Funcmaster D
+    url: https://funcatron.org
+  license:
+    name: Apache 2.0
+basePath: /sample/java_gradle
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /simple:
+    get:
+      description: |
+        Returns a simple JSON data structure
+      operationId: funcatron.sample.java_gradle.SimpleGet
+      responses:
+        "200":
+          description: simple response
+          schema:
+            $ref: '#/definitions/Simple'
+
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /simple/{num}:
+    get:
+      description: |
+        Returns a simple JSON data structure
+      operationId: funcatron.sample.java_gradle.SimpleGet
+      parameters:
+        - name: num
+          in: path
+          description: a number
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: simple response
+          schema:
+            $ref: '#/definitions/Simple'
+
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /change/{cnt}:
+    post:
+      description: Returns a user based on a single ID, if the user does not have access to the pet
+      operationId: funcatron.sample.java_gradle.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: number of Data to return
+          required: true
+          type: integer
+          format: int64
+        - name: data
+          in: body
+          description: The data
+          required: true
+          schema:
+            $ref: '#/definitions/Data'
+      responses:
+        "200":
+          description: Repeats the posted data cnt times
+          type: array
+          items:
+            $ref: '#/definitions/Data'
+    delete:
+      description: returns a deleted record
+      operationId: funcatron.sample.java_gradle.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: some random number
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: thing deleted
+          schema:
+            $ref: '#/definitions/Data'
+    get:
+      description: trigger and error
+      operationId: funcatron.sample.java_gradle.PostOrDelete
+      parameters:
+        - name: cnt
+          in: path
+          description: some random number
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: thing deleted
+          schema:
+            $ref: '#/definitions/Data'
+        default:
+           description: Error
+definitions:
+  Simple:
+    required:
+      - time
+      - bools
+      - numero
+    properties:
+      query-params:
+        type: object
+      time:
+        type: string
+      bools:
+        type: boolean
+      numero:
+        type: number
+  Data:
+    required:
+      - name
+      - age
