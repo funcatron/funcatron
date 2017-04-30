@@ -11,7 +11,8 @@ subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["cp", "-r", "/data", "/newdata"])
 os.environ["LEIN_ROOT"] = "true"
 
-repos = ["funcatron", "intf", "starter", "devshim", "tron", "samples", "jvm_services"]
+repos = [ # "funcatron",
+          "intf", "starter", "devshim", "tron", "samples", "jvm_services"]
 
 # Funcatron
 ## Find all .md and .adoc documents, Change slugified names (e.g., dev_intro) into better names (e.g., Dev Intro) and link from a front-matter doc to each of the docs
@@ -76,7 +77,7 @@ def slurp(file):
 
 def find_all_doc_files(root_dir):
     """
-    In the current directory, return all the 
+    In the current directory, return all the
     :return: a list of all the documentation files in the directories
     """
     return [[dir, x, slurp(os.path.join(dir, x))] for
@@ -249,12 +250,12 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default
 
 cwd = os.getcwd()
 
-# Reset everything to master
-for f in repos:
-    os.chdir(f)
-    subprocess.call(["git", "reset", "--hard"])
-    subprocess.call(["git", "checkout", "master"])
-    os.chdir(cwd)
+print cwd, " is cwd"
+
+os.chdir("funcatron")
+subprocess.call(["git", "reset", "--hard"])
+subprocess.call(["git", "checkout", "master"])
+os.chdir(cwd)
 
 ignore_tags = []
 
@@ -267,25 +268,20 @@ if not ignore_tags_file is None:
 
 os.chdir(cwd)
 
-versions = {}
+# look for the tags in the repo
+os.chdir("funcatron")
+[code, str] = commands.getstatusoutput("git tag")
+x = str.splitlines()
+t_set = set(x)
+for ignore in ignore_tags:
+   if ignore in t_set:
+       t_set.remove(ignore)
 
-# look for the tags in each of the repos
-for f in repos:
-    os.chdir(f)
-    [code, str] = commands.getstatusoutput("git tag")
-    x = str.splitlines()
-    t_set = set(x)
-    for ignore in ignore_tags:
-        if ignore in t_set:
-            t_set.remove(ignore)
-    versions[f] = t_set
-    os.chdir(cwd)
+versions = t_set
+os.chdir(cwd)
 
 # What are all the versions?
-verSet = set([])
-
-for v in versions.values():
-    verSet |= v
+verSet = versions
 
 verSet = list(verSet)
 
@@ -296,26 +292,12 @@ verSet.reverse()
 
 verSet.insert(0, "master")
 
-# Now, figure out all the repos that have a particular version
-byVer = {}
-
-for ver in verSet:
-    lst = []
-    byVer[ver] = lst
-    for [k, v] in versions.items():
-        if ver == 'master' or ver in v:
-            lst.append(k)
-
 print "Version"
 print versions
 
 print ""
 print "Version Set"
 print verSet
-
-print ""
-print "By Version"
-print byVer
 
 subprocess.call(["rm", "-rf", "/docout"])
 subprocess.call(["mkdir", "/docout"])
@@ -347,14 +329,7 @@ for v in verSet:
     os.chdir("/newdata/funcatron")
     subprocess.call(["git", "reset", "--hard"])
     subprocess.call(["git", "checkout", "master"])
-    projects = [p for p in repos if p in byVer[v]]
-    for proj in projects:
-        os.chdir("/newdata/" + proj)
-        subprocess.call(["git", "reset", "--hard", "master"])
-        res = subprocess.call(["git", "checkout", v])
-        if res != 0:
-            print "Failed to checkout branch ", v, " for project ", proj
-            sys.exit(1)
+    projects = [p for p in repos]
 
     local_version_master = slurp("/newdata/funcatron/doc_o_matic/version_master.adoc")
     if local_version_master is None:
@@ -370,7 +345,7 @@ for v in verSet:
     spit("index.adoc", local_version_master)
 
     for proj in projects:
-        emit_proj_info(proj, "/newdata/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter, v)
+        emit_proj_info(proj, "/newdata/funcatron/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter, v)
 
 print ""
 print "Done spitting out the projects... now to asciidoctor them"
