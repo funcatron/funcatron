@@ -25,7 +25,7 @@ print 'Argument List:', str(sys.argv)
 
 subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["rm", "-rf", "/root/funcatron_bundles"])
-subprocess.call(["cp", "-r", "/data", "/newdata"])
+subprocess.call(["cp", "-r", "/data/funcatron", "/newdata/"])
 os.environ["LEIN_ROOT"]="true"
 
 require_commit = True # set to False if we're in a development cycle
@@ -130,7 +130,10 @@ def check_gradle_version(ver, name):
             sys.exit(1)
 
 def test_http_sample(base_url_path):
+    print "About to test sample"
     answer = requests.get(http_server + base_url_path + "/simple")
+
+    print "Status code: ", answer.status_code
 
     if answer.status_code != 200 or len(answer.json()["time"]) < 5:
         print "Got a bad answer from our app ", answer.status_code
@@ -185,7 +188,7 @@ def compile_gradle(base_url_path, props = {}):
 
 ### Begin actual code
 def test_intf():
-    os.chdir('/newdata/intf')
+    os.chdir('/newdata/funcatron/intf')
 
     print("testing and installing intf")
 
@@ -213,7 +216,7 @@ def test_intf():
 def test_scala(intf_ver):
     print "Checking Scala sample"
 
-    os.chdir("/newdata/samples/scala")
+    os.chdir("/newdata/funcatron/samples/scala")
 
     test_git_status()
 
@@ -248,7 +251,7 @@ def test_scala(intf_ver):
 def test_java_gradle(intf_ver):
     print "Checking Java Gradle sample"
 
-    os.chdir("/newdata/samples/java-gradle")
+    os.chdir("/newdata/funcatron/samples/java-gradle")
 
     test_git_status()
 
@@ -262,7 +265,7 @@ def test_java_gradle(intf_ver):
 def test_groovy(intf_ver):
     print "Checking Groovy sample"
 
-    os.chdir("/newdata/samples/groovy")
+    os.chdir("/newdata/funcatron/samples/groovy")
 
     test_git_status()
 
@@ -277,7 +280,7 @@ def test_frontend_version(intf_ver):
         return
 
     print "Testing front end version"
-    os.chdir("/newdata/frontend")
+    os.chdir("/newdata/funcatron/frontend")
 
     test_git_status()
 
@@ -293,7 +296,7 @@ def test_frontend_version(intf_ver):
 def test_kotlin(intf_ver):
     print "Checking Kotlin sample"
 
-    os.chdir("/newdata/samples/kotlin")
+    os.chdir("/newdata/funcatron/samples/kotlin")
 
     test_git_status()
 
@@ -305,7 +308,7 @@ def test_kotlin(intf_ver):
 def test_dev_shim(intf_ver):
     print "Testing DevShim"
 
-    os.chdir("/newdata/devshim")
+    os.chdir("/newdata/funcatron/devshim")
 
     test_git_status()
 
@@ -323,19 +326,19 @@ def test_dev_shim(intf_ver):
 def test_starter(intf_ver):
     print "Testing starter project"
 
-    os.chdir("/newdata/starter")
+    os.chdir("/newdata/funcatron/starter")
 
     test_git_status()
 
     test_pom_deps(intf_ver, "starter")
 
 
-    os.chdir("/newdata/starter/src/main/resources/archetype-resources")
+    os.chdir("/newdata/funcatron/starter/src/main/resources/archetype-resources")
 
     test_pom_deps(intf_ver, "starter archetype pom", only_deps=True)
 
 
-    os.chdir("/newdata/starter")
+    os.chdir("/newdata/funcatron/starter")
 
 
     if compile:
@@ -350,7 +353,7 @@ def test_starter(intf_ver):
 def test_tron(intf_ver):
     print "Testing tron"
 
-    os.chdir("/newdata/tron")
+    os.chdir("/newdata/funcatron/tron")
 
     test_git_status()
 
@@ -394,7 +397,7 @@ def test_tron(intf_ver):
 def test_java_sample(intf_ver):
     print "Testing java sample"
 
-    os.chdir("/newdata/samples/java")
+    os.chdir("/newdata/funcatron/samples/java")
 
     test_git_status()
 
@@ -417,7 +420,7 @@ def test_java_sample(intf_ver):
 def test_spring_boot_sample(intf_ver):
     print "Testing java spring boot sample"
 
-    os.chdir("/newdata/samples/java-spring")
+    os.chdir("/newdata/funcatron/samples/java-spring")
 
     test_git_status()
 
@@ -432,6 +435,8 @@ def test_spring_boot_sample(intf_ver):
         print "Failed to package Java spring boot sample"
         sys.exit(code)
 
+    print "About to upload and enable sprint boot app"
+
     upload_and_enable("target/java_spring_sample-0.1-SNAPSHOT.jar", {"foo": "bar"})
 
     test_http_sample("/greeting")
@@ -440,7 +445,7 @@ def test_spring_boot_sample(intf_ver):
 def test_clojure_sample(intf_ver):
     print "Testing Clojure sample"
 
-    os.chdir("/newdata/samples/clojure")
+    os.chdir("/newdata/funcatron/samples/clojure")
 
     test_git_status()
 
@@ -525,7 +530,7 @@ def test_devmode(intf_ver):
     os.chdir("/newdata/thang")
 
     print "Firing up tron in dev mode"
-    tron_pid = subprocess.Popen(["java", "-jar", "/newdata/tron/target/uberjar/tron-" + intf_ver +
+    tron_pid = subprocess.Popen(["java", "-jar", "/newdata/funcatron/tron/target/uberjar/tron-" + intf_ver +
                                  "-standalone.jar", "--devmode"]).pid
     time.sleep(5)
 
@@ -545,7 +550,7 @@ def test_devmode(intf_ver):
 def test_clojure_service(intf_ver):
     print "Testing Clojure Service"
 
-    os.chdir("/newdata/jvm_services/clojure")
+    os.chdir("/newdata/funcatron/jvm_services/clojure")
 
     test_git_status()
 
@@ -565,7 +570,7 @@ def test_clojure_service(intf_ver):
 def test_spring_boot_service(intf_ver):
     print "Testing Spring Boot Service"
 
-    os.chdir("/newdata/jvm_services/spring_boot")
+    os.chdir("/newdata/funcatron/jvm_services/spring_boot")
 
     test_git_status()
 
