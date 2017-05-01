@@ -45,6 +45,7 @@
                                   (:revision fu/version-info)))})))]})
 
   (info (str "Starting Funcatron. Args: " args))
+  (info (str "Started At " (java.util.Date.)))
   (info (str "Version " fu/version-info))
   (info (str "Env Vars" (System/getenv)))
   (let [clio (cli/parse-opts args the-opts/cli-options)
