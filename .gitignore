@@ -5,4 +5,10 @@
 *~
 
 *`
+
+# Intellij
+*.iml
 .idea/
+
+# Mac
+.DS_Store
