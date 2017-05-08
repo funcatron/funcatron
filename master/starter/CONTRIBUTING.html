@@ -1,0 +1,62 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="contributing">Contributing</h1>
+<p>Contributions are welcome!</p>
+<p>Contributions can be bug reports, feature requests, testing and documentation<br />
+in addition to code. Please see the github guide on<br />
+<a href="https://help.github.com/categories/collaborating-on-projects-using-issues-and-pull-requests/">Collaborating on projects using issues and pull requests</a> for details.</p>
+<p>Contributions to this project are accepted on an<br />
+<a href="https://opensource.com/law/11/7/trouble-harmony-part-1">&quot;inbound=outbound&quot;</a> basis.<br />
+That means that you agree that your contributions are made under the<br />
+same license as the license for this project, the <a href="http://opensource.org/licenses/Apache-2.0">Apache License 2.0</a> <a href="LICENSE" class="uri">LICENSE</a></p>
+<p>To make this understanding explicit -- and for you to assert<br />
+that you have the right to make the contribution -- commits must be<br />
+signed off indicating acceptance of the<br />
+<a href="http://developercertificate.org/">Developer Certificate of Origin 1.1</a> <a href="DCO" class="uri">DCO</a></p>
+<p>A nice explanation of the DCO has been provided by<br />
+<a href="http://www.red-bean.com/kfogel/">Karl Fogel</a><br />
+in his excellent book <a href="http://producingoss.com/en/contributor-agreements.html#developer-certificate-of-origin">Producing Open Source Software</a>.</p>
+<p>An explanation of the &quot;sign-off&quot; procedure is given by<br />
+<a href="https://en.wikipedia.org/wiki/Linus_Torvalds">Linus Torvalds</a> in <a href="https://github.com/torvalds/linux/blob/master/Documentation/SubmittingPatches#L409">Linux</a>.</p>
+<h2 id="contribution-workflow">Contribution Workflow</h2>
+<p>This is an overview of the contribution workflow:</p>
+<ul>
+<li>Fork the repository on Github</li>
+<li>Create a topic branch from where you want to base your work (usually the master branch)</li>
+<li>Check the formatting rules from existing code (no trailing whitespace, mostly default indentation)</li>
+<li>Ensure any new code is well-tested, and if possible, any issue fixed is covered by one or more new tests</li>
+<li>Make commits to your branch using the following guidelines:</li>
+<li>Start with a subject line (beginning with a capital, ending without a period, no more than 50 characters)</li>
+<li>Use the imperative mood in the subject line: &quot;Add x&quot;, &quot;Fix y&quot;, &quot;Support z&quot;, &quot;Remove x&quot;</li>
+<li>Wrap the body at 72 characters</li>
+<li>Use the body to explain what and why vs. how</li>
+<li>Finish the commit message with the sign off: <code>Signed-off-by: Your Name &lt;me@e.mail&gt;</code></li>
+<li>Push your code to your fork of the repository</li>
+<li>Make a Pull Request</li>
+</ul>
+<h2 id="verified-commits-with-gpg">Verified commits with GPG</h2>
+<p>Verifying commits is not essential for contributions to this project,<br />
+but for those motivated to add additional security it is important<br />
+to know that Github now <a href="https://github.com/blog/2144-gpg-signature-verification">supports GPG signature verification</a>.</p>
+<p>Using GPG is a complex subject. Here are some pointers for further information:</p>
+<ul>
+<li><a href="https://help.riseup.net/en/security/message-security/openpgp/best-practices">OpenPGP Best Practices</a></li>
+<li><a href="https://wiki.debian.org/Keysigning">Debian Keysigning HOWTO</a></li>
+<li>If you create a new key please ensure that the RSA key length is at least<br />
+4096 bits and configured for <a href="https://www.debian-administration.org/users/dkg/weblog/48">SHA-2</a></li>
+<li>If you use <strong>caff</strong> (from <a href="https://packages.debian.org/sid/signing-party">signing-party</a>) to sign and distrubute signatures please verify that the <em>separate</em> <a href="https://github.com/tmarble/kspsig">caff configuration is accurate</a>.</li>
+</ul>
+<p>You can export your GPG public key to a file for use with Github as follows<br />
+(assuming your GPG key id is 0xCAFED00D):</p>
+<pre><code>gpg --output 0xCAFED00D.asc --armor --export-options export-clean,export-minimal --export 0xCAFED00D</code></pre>
+<p>Simply paste the contents of that file in the <strong>SSH and GPG keys</strong> section of your <a href="https://help.github.com/articles/adding-a-new-gpg-key-to-your-github-account/">Github settings</a>.</p>
+</body>
+</html>

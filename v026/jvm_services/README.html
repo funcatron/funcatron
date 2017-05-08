@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="funcatron-services">Funcatron Services</h1>
+<p>Code in Funcatron is deployed as a &quot;Func Bundle&quot;... a single<br />
+file that contains the entire collection of pieces to run the<br />
+services.</p>
+<p>For services that run inside the Java Virtual Machine, there may<br />
+be special wrappers to get the services to run correctly with<br />
+Funcatron.</p>
+<p>For example, Clojure services need the <code>RT.class</code> loaded to initialize<br />
+the Clojure runtime and Clojure dispatches on a package/function<br />
+basis rather than a classname basis.</p>
+<p>Another example is being able to wrap a Spring Boot application<br />
+as a Func Bundle so existing Spring apps can simply be wrapped<br />
+and run.</p>
+<h2 id="contributing">Contributing</h2>
+<p>Please see <a href="https://github.com/funcatron/tron/blob/master/CONTRIBUTING.md">CONTRIBUTING</a> for details on<br />
+how to make a contribution.</p>
+<h2 id="licenses-and-support">Licenses and Support</h2>
+<p>Funcatron is licensed under an Apache 2 license.</p>
+<p>Support is available from the project's founder,<br />
+<script type="text/javascript">
+<!--
+h='&#x67;&#x6d;&#x61;&#x69;&#108;&#46;&#x63;&#x6f;&#x6d;';a='&#64;';n='&#102;&#x65;&#x65;&#100;&#x65;&#114;&#46;&#x6f;&#102;&#46;&#116;&#104;&#x65;&#46;&#98;&#x65;&#x61;&#114;&#x73;';e=n+a+h;
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+'&#68;&#x61;&#118;&#x69;&#100;&#32;&#80;&#x6f;&#108;&#108;&#x61;&#x6b;'+'<\/'+'a'+'>');
+// -->
+</script><noscript>&#68;&#x61;&#118;&#x69;&#100;&#32;&#80;&#x6f;&#108;&#108;&#x61;&#x6b;&#32;&#40;&#102;&#x65;&#x65;&#100;&#x65;&#114;&#46;&#x6f;&#102;&#46;&#116;&#104;&#x65;&#46;&#98;&#x65;&#x61;&#114;&#x73;&#32;&#x61;&#116;&#32;&#x67;&#x6d;&#x61;&#x69;&#108;&#32;&#100;&#x6f;&#116;&#32;&#x63;&#x6f;&#x6d;&#x29;</noscript>.</p>
+</body>
+</html>

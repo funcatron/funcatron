@@ -1,0 +1,26 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="clojure-funcatron-example">Clojure Funcatron Example</h1>
+<p>This is a simple Clojure project built with <a href="http://leiningen.org/"><code>lein</code></a></p>
+<p>To build a Funcatron deployable JAR file, type:</p>
+<pre><code>lein do clean, test, uberjar</code></pre>
+<p>Those commands tell lein to clean any artifacts, compile, test,<br />
+and build an <a href="http://asymmetrical-view.com/2010/06/08/building-standalone-jars-wtih-leiningen.html">uberjar</a><br />
+of the compiled Clojure code as well as all the dependencies.</p>
+<p>The compiled JAR file can be found at<br />
+<code>target/target/clojure_sample-0.1.0-SNAPSHOT-standalone.jar</code>.</p>
+<p>To upload the build to your Funcatron cluster:</p>
+<pre class="shell"><code>wget -O - --post-file=target/clojure_sample-0.1.0-SNAPSHOT-standalone.jar \
+     http://&lt;TRON_HOST&gt;:&lt;TRON_PORT&gt;/api/v1/add_func</code></pre>
+<p>See <a href="https://blog.goodstuff.im/funcatron_mesos_now#upload-and-enable-the-code">this blog post</a><br />
+for more information on how to upload and enable Func Bundles.</p>
+</body>
+</html>

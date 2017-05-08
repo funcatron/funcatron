@@ -1,0 +1,158 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="messages-sent-over-the-message-bus">Messages sent over the Message Bus</h1>
+<p>The Tron and Runners and other parts of the Funcatron system<br />
+operate by sending messages to each other over a message bus.</p>
+<p>The message bus may be on RabbitMQ, Kafka, Redis, etc.</p>
+<h2 id="tron-to-runner">Tron to Runner</h2>
+<h3 id="associate-queue-with-func-bundle">Associate Queue with Func Bundle</h3>
+<pre class="$clojure"><code>{:action &quot;enable&quot;
+  :msg-id UUID-string
+  :from UUID-String
+  :tron-host (fu/compute-host-and-port opts)
+  :at currentTimeMillis
+  :props map-of-properties
+  :sha func-bundle-sha
+}</code></pre>
+<h3 id="send-a-list-of-all-known-bundles-to-the-runner">Send a list of all known bundles to the Runner</h3>
+<h3 id="disassociate-queue-with-func-bundle">Disassociate Queue with Func Bundle</h3>
+<pre class="$clojure"><code>{:action &quot;disable&quot;
+  :msg-id UUID-string
+  :from UUID-String
+  :tron-host (fu/compute-host-and-port opts)
+  :at currentTimeMillis
+  :sha func-bundle-sha
+}</code></pre>
+<h3 id="host-information">Host Information</h3>
+<p>Tell the Runners where to find a Tron</p>
+<pre class="$clojure"><code>{:action      &quot;tron-info&quot;
+ :msg-id      (fu/random-uuid)
+ :tron-host   {:host hostname :port port}
+ :at          (System/currentTimeMillis)
+}
+</code></pre>
+<h3 id="list-of-all-func-bundles">List of all Func bundles</h3>
+<pre class="$clojure"><code>{:action  &quot;all-bundles&quot;
+ :tron-host {:host hostname :port port}
+ :msg-id  (fu/random-uuid)
+ :at      (System/currentTimeMillis)
+ :bundles [{:sha k :host host :path basePath}]
+ }
+</code></pre>
+<h2 id="runner-to-tron">Runner to Tron</h2>
+<h3 id="awake">Awake</h3>
+<pre><code>{:action &quot;awake&quot;
+ :type &quot;runner&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="died">Died</h3>
+<pre><code>{:action &quot;died&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="statistics">Statistics</h3>
+<h3 id="ack-associatedisassociate">Ack Associate/Disassociate</h3>
+<pre><code>{:action &quot;ack&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :ack-id UUID-string
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="heartbeat">Heartbeat</h3>
+<pre><code>{:action &quot;heartbeat&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h2 id="frontend-to-tron">Frontend to Tron</h2>
+<h3 id="awake-1">Awake</h3>
+<pre><code>{:action &quot;awake&quot;
+ :type &quot;frontend&quot;
+ :msg-id UUID-string
+ :instance-id Unique-id
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="died-1">Died</h3>
+<pre><code>{:action &quot;died&quot;
+ :type &quot;frontend&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="heartbeat-1">Heartbeat</h3>
+<pre><code>{:action &quot;heartbeat&quot;
+ :msg-id UUID-string
+ :from UUID-String
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="ack-update-routing">Ack Update Routing</h3>
+<h2 id="tron-to-frontend">Tron to Frontend</h2>
+<h3 id="update-routing">Update routing</h3>
+<p>Sends the routing table, in the order the routes should be consulted<br />
+to the frontend</p>
+<pre><code>{:action &quot;route&quot;
+ :msg-id UUID-string
+ :routes [{:host hostname :path path :queue queue-name}]
+ :at currentTimeMillis
+ }</code></pre>
+<h3 id="die">Die</h3>
+<p>In dev mode, there may be multiple threads for the same Nginx<br />
+instance because in dev mode, modules are all reloaded on each<br />
+request.</p>
+<p>If the Tron receives multiple &quot;awake&quot; messages, it sends a &quot;die&quot;<br />
+message to all Frontend instances from the same <code>instance-id</code> that<br />
+are the most recent &quot;awake&quot; sender. A frontend instance<br />
+that receives &quot;die&quot; should stop contacting the Tron.</p>
+<pre><code>{:action &quot;die&quot;
+ :msg-id UUID-string
+ :instance-id instance-id-String
+ :at     (System/currentTimeMillis)
+ }</code></pre>
+<h2 id="frontend-to-runner">Frontend to Runner</h2>
+<h3 id="service-request">Service Request</h3>
+<pre><code>{:headers http-request-headers
+ :action &quot;service&quot;
+ :method request_method 
+ :uri-args uri-args
+ :host ngx.var.host
+ :content-type ngx.var.content_type
+ :remote-addr ngx.var.remote_addr
+ :server-protocol ngx.var.server_protocol
+ :server-port ngx.var.server_port
+ :server-addr ngx.var.server_addr
+ :remote-port ngx.var.remote_port
+ :request-uri ngx.var.request_uri
+ :request-id ngx.var.request_id
+ :args ngx.var.args
+ :remote-user ngx.var.remote_user
+ :request ngx.var.request
+ :http-referer ngx.var.http_referer
+ :http-user-agent ngx.var.http_user_agent
+ :scheme ngx.var.scheme
+ :uri ngx.var.uri
+ :reply-to the_target_id_for_answer
+ :reply-queue the_queue_to_post_answer_to
+ :body-base64-encoded true
+ :body request-body}</code></pre>
+<h2 id="runner-to-frontend">Runner to Frontend</h2>
+<h3 id="result-of-servicing-request">Result of Servicing Request</h3>
+<pre><code>{:action &quot;answer&quot;
+ :msg-id UUID-string
+ :request-id UUID-string
+ :answer {:headers [[String, String]] :status http-status-code :body base64str}
+ :at currentTimeMillis
+ }</code></pre>
+</body>
+</html>

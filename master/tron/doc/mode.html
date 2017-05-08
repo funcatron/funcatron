@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="different-modes-from-tron">Different modes from Tron</h1>
+<p>Initially, I (@dpp) was initially planning to have separate packages<br />
+for each Funcatron run-time mode... but that's looking less and less<br />
+valuable as it means packaging up a ton of Docker containers, etc.</p>
+<p>So, here are the various run modes for Tron:</p>
+<ul>
+<li>&quot;Dev Mode&quot; -- Stand-alone... web server on one side and connection to the &quot;shim&quot; on the other.<br />
+Used during desktop development.</li>
+<li>&quot;Runner Mode&quot; -- The cluster &quot;Runner&quot; that dequeues requests and passes them to the appropriate Func bundle</li>
+<li>&quot;Manager Mode&quot; -- aka &quot;Tron Mode&quot; Monitors Runners and talks to the substrate to launch more Runners.<br />
+Tells Runners which<br />
+queues to listen to and which Func bundles are associated with which queues.</li>
+</ul>
+<h2 id="dev-mode">Dev Mode</h2>
+<p>This is the simplest mode. If the <code>--devmode</code> flag is passed to the Tron<br />
+uberjar on start-up, the Tron instance goes into Dev Mode.</p>
+<p>A web server fires up at port 3000 (or <code>--web_port</code>) and<br />
+waits for HTTP request. Also, listens at port 54657 (or <code>--shim_port</code>) for a<br />
+connection from the <a href="https://github.com/funcatron/devshim">Dev Shim</a> which will<br />
+send the Swagger file to the Tron instance which defines routes.</p>
+<p>Incoming<br />
+HTTP requests will be processed based on the Swagger routing. For requests<br />
+that match the routing, a message will be sent to the shim which will<br />
+invoke a named class (based on the <code>operationId</code> field in the Swagger definition)<br />
+and return the value to the Tron instance. The Tron instance will wait for<br />
+up to <code>--dev_request_timeout</code> seconds (default 60) for an answer,<br />
+then the Tron instance will respond to the HTTP request with the result<br />
+or a 500.</p>
+<h2 id="tron-mode">Tron Mode</h2>
+<p>There is one &quot;Tron&quot; instance per cluster. The <code>--tron</code> flag puts the Tron<br />
+into Tron Mode.</p>
+<p>The Tron instance fires up an administrative HTTP instance at port 3000 (or <code>--web_port</code>)<br />
+and waits for posts at <code>/api/v1/add_func</code> to upload new Func bundles. <code>/api/v1/actions</code><br />
+for enabling/disabling Func Bundles. And <code>GET</code> <code>/api/v1/stats</code> to get statistics for<br />
+the cluster.</p>
+<p>Func Bundles are uploaded to the Tron (there's only one Tron per cluster)<br />
+and the Tron looks through the Func Bundle (currently an <a href="http://imagej.net/Uber-JAR">UberJar</a>,<br />
+but PEX bundles and JavaScript bundlers in the future) and finds the Swagger file (named<br />
+<code>funcatron.json</code>, <code>funcatron.yml</code>, or <code>funcatron.yaml</code>) and uses that file to determine<br />
+the routing.</p>
+<p>Routing is based on Swagger's <code>host</code> and <code>basePath</code> fields. The <code>host</code> and <code>basePath</code><br />
+fields <strong>must</strong> be unique for all Func Bundles.</p>
+<p>The Tron communicates with other parts of the system via the message queue.<br />
+Tron will listen for messages on the <code>for_tron</code> queue (modifiable with the <code>--tron_queue</code> option).</p>
+<p>Each other part of the system notifies the Tron that it's available and heart-beats with<br />
+the Tron via the Tron's queue. Each part of the system creates a randomly named queue to<br />
+receive messages from the Tron instance.</p>
+<h2 id="runner-mode">Runner Mode</h2>
+<p>Funcatron on a cluster has different pieces that each scale independently.<br />
+The &quot;Runner&quot; actually runs the code in the Func bundles.</p>
+<p>The <code>--runner</code> flag puts the Tron instance into Runner mode.</p>
+<p>So... how does<br />
+the Runner learn of the Func bundles?</p>
+<h1 id="messages">Messages</h1>
+<p>Here are the messages to/from Tron:</p>
+</body>
+</html>

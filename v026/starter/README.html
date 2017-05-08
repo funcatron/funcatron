@@ -1,0 +1,41 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="starter-maven-archetype-for-funcatron">Starter Maven Archetype for Funcatron</h1>
+<p>A <a href="http://maven.apache.org/">Maven</a> <a href="http://maven.apache.org/components/archetype/maven-archetype-plugin/">Archetype</a><br />
+that makes it super easy for a Java developer to get started with<br />
+Funcatron.</p>
+<p>To use the archetype:</p>
+<pre><code>mvn archetype:generate  \
+   -DarchetypeGroupId=funcatron \
+   -DarchetypeArtifactId=starter \
+   -DarchetypeVersion=0.3.0-SNAPSHOT \
+   -DgroupId=my.stellar \
+   -DartifactId=thang \
+   -DarchetypeRepository=https://clojars.org/repo</code></pre>
+<p>To run the Funcatron dev server:</p>
+<pre><code>docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest</code></pre>
+<p>To run your project code:</p>
+<pre><code>mvn compile exec:java</code></pre>
+<p>Then point your browser to <a href="http://localhost:3000/api/sample" class="uri">http://localhost:3000/api/sample</a></p>
+<h2 id="contributing">Contributing</h2>
+<p>Please see <a href="https://github.com/funcatron/tron/blob/master/CONTRIBUTING.md">CONTRIBUTING</a> for details on<br />
+how to make a contribution.</p>
+<h2 id="licenses-and-support">Licenses and Support</h2>
+<p>Funcatron is licensed under an Apache 2 license.</p>
+<p>Support is available from the project's founder,<br />
+<script type="text/javascript">
+<!--
+h='&#102;&#x75;&#110;&#x63;&#x61;&#116;&#114;&#x6f;&#110;&#46;&#x6f;&#114;&#x67;';a='&#64;';n='&#102;&#x75;&#110;&#x63;&#x6d;&#x61;&#x73;&#116;&#x65;&#114;&#x2d;&#100;';e=n+a+h;
+document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+'&#68;&#x61;&#118;&#x69;&#100;&#32;&#80;&#x6f;&#108;&#108;&#x61;&#x6b;'+'<\/'+'a'+'>');
+// -->
+</script><noscript>&#68;&#x61;&#118;&#x69;&#100;&#32;&#80;&#x6f;&#108;&#108;&#x61;&#x6b;&#32;&#40;&#102;&#x75;&#110;&#x63;&#x6d;&#x61;&#x73;&#116;&#x65;&#114;&#x2d;&#100;&#32;&#x61;&#116;&#32;&#102;&#x75;&#110;&#x63;&#x61;&#116;&#114;&#x6f;&#110;&#32;&#100;&#x6f;&#116;&#32;&#x6f;&#114;&#x67;&#x29;</noscript>.</p>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="stuff-to-dothink-about">Stuff to do/think about</h1>
+<p>Funcatron is a complex system that needs to be highly available,<br />
+rolling upgradeable, and generally &quot;just work&quot;. This document contains<br />
+some of the stuff to think about.</p>
+<h2 id="versioning-messages">Versioning messages</h2>
+<p>Messages -- how can we version message between Funcatron elements (current elements: Frontend, Tron, Runner)?</p>
+<h2 id="where-to-store-uploaded-files">Where to store uploaded files</h2>
+<p>All Funcatron elements run in ephemeral Docker containers...</p>
+<p>Where do we store uploaded Func bundles?</p>
+<ul>
+<li>Every node stores all the known bundles and<br />
+when the Tron fires up, it asks for all the bundles?</li>
+<li>Some shared filesystem?</li>
+</ul>
+<h2 id="what-about-large-http-request-bodies">What about large HTTP request bodies</h2>
+<p>Shared filesystem again?</p>
+<p>Or HTTP direct connection?</p>
+<h2 id="and-large-http-responses">And large HTTP responses?</h2>
+<p>Shared filesystem?</p>
+<p>HTTP direct connection?</p>
+<p>Could something like <a href="https://openresty.org/en/dynamic-routing-based-on-redis.html">Dynamic Routing</a> work?</p>
+<p>And how would that impact using queue depth to choose<br />
+how to fire up new Runners?</p>
+</body>
+</html>

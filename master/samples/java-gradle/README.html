@@ -1,0 +1,28 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="java-funcatron-example-using-gradle">Java Funcatron Example using Gradle</h1>
+<p>This is a simple Java project built with <a href="https://gradle.org/"><code>gradle</code></a></p>
+<p>To build a Funcatron deployable JAR file, type:</p>
+<pre><code>gradle clean
+gradle shadowJar</code></pre>
+<p>Those commands tell gradle to clean any artifacts, compile,<br />
+and build an <a href="https://github.com/johnrengelman/shadow">ShadowJar</a><br />
+of the compiled Java code as well as all the dependencies.</p>
+<p>The compiled JAR file can be found at<br />
+<code>build/libs/java-gradle-all.jar</code>.</p>
+<p>To upload the build to your Funcatron cluster:</p>
+<pre class="shell"><code>wget -O - --post-file=build/libs/java-gradle-all.jar \
+     http://&lt;TRON_HOST&gt;:&lt;TRON_PORT&gt;/api/v1/add_func</code></pre>
+<p>See <a href="https://blog.goodstuff.im/funcatron_mesos_now#upload-and-enable-the-code">this blog post</a><br />
+for more information on how to upload and enable Func Bundles.</p>
+<pre class="shell"><code> curl -H &quot;Content-Type: application/json&quot; -d &#39;{&quot;sha&quot;:&quot;JAVA_GRADLE_SHA&quot;, &quot;props&quot;: {&quot;key&quot;: &quot;value&quot;}}&#39; -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/enable</code></pre>
+</body>
+</html>
