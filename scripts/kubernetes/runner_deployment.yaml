@@ -20,7 +20,7 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-          image: funcatron/tron:v0.2.6
+          image: funcatron/tron:latest
           args:
             - --runner
             - --rabbit_host

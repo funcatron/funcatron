@@ -1,10 +1,10 @@
-(defproject funcatron/tron "0.2.6"
+(defproject funcatron/tron "0.3.0-SNAPSHOT"
   :description "Route request for Funcatron"
   :url "http://funcatron.org"
   :license {:name "Apache 2.0"}
 
   :dependencies
-  [[org.clojure/clojure "1.9.0-alpha14"]
+  [[org.clojure/clojure "1.9.0-alpha16"]
    [cheshire "5.6.3"]
    ;; https://mvnrepository.com/artifact/io.sarnowski/swagger1st
    [org.zalando/swagger1st "0.24.0"]

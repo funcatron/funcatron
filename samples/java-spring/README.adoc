@@ -37,19 +37,19 @@ a "`devmode`"
          <dependency>
              <groupId>funcatron</groupId>
              <artifactId>intf</artifactId>
-             <version>0.2.6</version>
+             <version>0.3.0-SNAPSHOT</version>
          </dependency>
 
          <dependency>
              <groupId>funcatron</groupId>
              <artifactId>spring_boot</artifactId>
-             <version>0.2.6</version>
+             <version>0.3.0-SNAPSHOT</version>
          </dependency>
 
          <dependency>
              <groupId>funcatron</groupId>
              <artifactId>devshim</artifactId>
-             <version>0.2.6</version>
+             <version>0.3.0-SNAPSHOT</version>
          </dependency>
 
          <dependency>
@@ -117,7 +117,7 @@ public class Application {
 
 Next, fire up a "`devmode`" Funcatron instance with:
 
-    docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:v0.2.6
+    docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest
     
 When you run your app and call the `Register.register(...)` method, your app will connect to the Funcatron
 instance and you'll be able to make `http` requests on `http://localhost:3000/`. Those requests will

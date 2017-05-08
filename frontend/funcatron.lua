@@ -20,7 +20,7 @@ end
 
 funcatron.random = random
 
-funcatron.version = '0.2.6'
+funcatron.version = '0.3.0-SNAPSHOT'
 
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 

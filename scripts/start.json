@@ -35,7 +35,7 @@
                     "parameters": [
                         { "key": "env", "value": "TRON_1=--tron" }
                     ],
-                    "image": "funcatron/tron:v0.2.6"
+                    "image": "funcatron/tron:latest"
                 }
             },
             "dependencies": ["/funcatron/rabbit"]
@@ -53,7 +53,7 @@
                     "portMappings": [
                         { "containerPort": 80, "name": "http", "hostPort": 0}
                     ],
-                    "image": "funcatron/frontend:v0.2.6"
+                    "image": "funcatron/frontend:latest"
                 }
             },
             "dependencies": ["/funcatron/rabbit", "/funcatron/tron"]
@@ -74,7 +74,7 @@
                     "parameters": [
                         { "key": "env", "value": "TRON_1=--runner" }
                     ],
-                    "image": "funcatron/tron:v0.2.6"
+                    "image": "funcatron/tron:latest"
                 }
             },
             "dependencies": ["/funcatron/rabbit", "/funcatron/tron"]

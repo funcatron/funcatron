@@ -22,7 +22,7 @@ spec:
               containerPort: 3000
             - name: devshim
               containerPort: 54657
-          image: funcatron/tron:v0.2.6
+          image: funcatron/tron:latest
           args:
             - --tron
             - --rabbit_host

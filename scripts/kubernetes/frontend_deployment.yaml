@@ -22,4 +22,4 @@ spec:
           ports:
             - name: http
               containerPort: 80
-          image: funcatron/frontend:v0.2.6
+          image: funcatron/frontend:latest
