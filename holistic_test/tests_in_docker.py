@@ -77,6 +77,7 @@ def test_git_status():
     str_lines = str.splitlines()
 
     if len(str_lines) > 1 or not str.startswith('## master...origin/master'):
+        print str
         print "repository must be on master and fully committed"
         sys.exit(1)
 
