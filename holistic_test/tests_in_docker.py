@@ -548,6 +548,12 @@ def test_devmode(intf_ver):
     time.sleep(5)
     answer = requests.get("http://localhost:3000/api/sample")
 
+    ## Retry if the app didn't get built in 5 seconds
+    if answer.status_code == 404:
+        print "Got a 404... sleeping and trying again"
+        time.sleep(15)
+        answer = requests.get("http://localhost:3000/api/sample")
+
     if answer.status_code != 200 or len(answer.json()["name"]) < 5:
         print "Got a bad answer from our dev-time app ", answer.status_code
         sys.exit(1)
