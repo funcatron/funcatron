@@ -11,9 +11,17 @@ ${DIR}/../scripts/start_frontend.sh
 docker build -t funcatron/holistic:latest .
 
 if [[ "--shell" == "$1" ]]; then
-  docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest || exit 1
+    docker run -ti --rm \
+           -e TRAVIS_SECURE_ENV_VARS="$TRAVIS_SECURE_ENV_VARS" \
+           -e SONATYPE_USERNAME="$SONATYPE_USERNAME" \
+           -e SONATYPE_PASSWORD="$SONATYPE_PASSWORD" \
+           --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest || exit 1
 else
-  docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest /usr/bin/run_tests.py $@ || exit 1
+    docker run -ti --rm  \
+           -e TRAVIS_SECURE_ENV_VARS="$TRAVIS_SECURE_ENV_VARS" \
+           -e SONATYPE_USERNAME="$SONATYPE_USERNAME" \
+           -e SONATYPE_PASSWORD="$SONATYPE_PASSWORD" \
+           --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/holistic:latest /usr/bin/run_tests.py $@ || exit 1
 fi
 
 echo $?

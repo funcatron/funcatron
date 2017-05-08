@@ -12,6 +12,9 @@ import requests
 import atexit
 import sys
 import getopt
+import sys
+import os.path
+import xml.dom.minidom
 
 try:
     opts, args = getopt.getopt(sys.argv[1:],"hcsv",["server="])
@@ -636,9 +639,125 @@ def run_tests():
 
     test_devmode(intf_ver)
 
+
+def do_deploy_to_maven():
+    if os.environ["TRAVIS_SECURE_ENV_VARS"] == "false":
+        print "no secure env vars available, skipping deployment"
+        return
+
+    homedir = os.path.expanduser("~")
+
+    m2 = xml.dom.minidom.parse(homedir + '/.m2/settings.xml')
+    settings = m2.getElementsByTagName("settings")[0]
+
+    serversNodes = settings.getElementsByTagName("servers")
+    if not serversNodes:
+        serversNode = m2.createElement("servers")
+        settings.appendChild(serversNode)
+    else:
+        serversNode = serversNodes[0]
+
+    sonatypeServerNode = m2.createElement("server")
+    sonatypeServerId = m2.createElement("id")
+    sonatypeServerUser = m2.createElement("username")
+    sonatypeServerPass = m2.createElement("password")
+
+    idNode = m2.createTextNode("ossrh")
+    userNode = m2.createTextNode(os.environ["SONATYPE_USERNAME"])
+    passNode = m2.createTextNode(os.environ["SONATYPE_PASSWORD"])
+
+    sonatypeServerId.appendChild(idNode)
+    sonatypeServerUser.appendChild(userNode)
+    sonatypeServerPass.appendChild(passNode)
+
+    sonatypeServerNode.appendChild(sonatypeServerId)
+    sonatypeServerNode.appendChild(sonatypeServerUser)
+    sonatypeServerNode.appendChild(sonatypeServerPass)
+
+    serversNode.appendChild(sonatypeServerNode)
+
+    m2Str = m2.toxml()
+    f = open(homedir + '/.m2/mySettings.xml', 'w')
+    f.write(m2Str)
+    f.close()
+
+    code = 0
+
+    os.chdir('/newdata/funcatron/intf')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying intf"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
+    os.chdir('/newdata/funcatron/devshim')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying devshim"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
+    os.chdir('/newdata/funcatron/starter')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying starter"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
+    os.chdir('/newdata/funcatron/jvm_services/clojure/')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying clojure service"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
+    os.chdir('/newdata/funcatron/jvm_services/spring_boot')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying spring boot service"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
 run_tests()
 
 print ""
 print "*********"
 print "Successfully Ran All Tests!"
 print ""
+
+do_deploy_to_maven()
