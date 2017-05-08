@@ -24,6 +24,7 @@ print 'Argument List:', str(sys.argv)
 
 
 subprocess.call(["rm", "-rf", "/newdata"])
+subprocess.call(["mkdir", "/newdata"])
 subprocess.call(["rm", "-rf", "/root/funcatron_bundles"])
 subprocess.call(["cp", "-r", "/data/funcatron", "/newdata/"])
 os.environ["LEIN_ROOT"]="true"
@@ -122,7 +123,7 @@ def check_gradle_version(ver, name):
         return
 
     gradle = read_file("build.gradle").splitlines()
-    func_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', aline).group(0) for aline in gradle if "funcatron" in aline]
+    func_line = [re.search('[0-9]+\.[0-9]+\.[0-9](-SNAPSHOT)?', aline).group(0) for aline in gradle if "funcatron" in aline]
 
     for the_ver in func_line:
         if the_ver != ver:
@@ -224,7 +225,7 @@ def test_scala(intf_ver):
 
         sbt = read_file("build.sbt").splitlines()
 
-        has_func = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in sbt if "funcatron" in line]
+        has_func = [re.search('[0-9]+\.[0-9]+\.[0-9](-SNAPSHOT)?', line).group(0) for line in sbt if "funcatron" in line]
 
         for num in has_func:
             if num != intf_ver:
@@ -286,7 +287,7 @@ def test_frontend_version(intf_ver):
 
     fel = read_file("funcatron.lua").splitlines()
 
-    ver_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', line).group(0) for line in fel if line.startswith("funcatron.version")][0]
+    ver_line = [re.search('[0-9]+\.[0-9]+\.[0-9](-SNAPSHOT)?', line).group(0) for line in fel if line.startswith("funcatron.version")][0]
 
     if ver_line != intf_ver:
         print "Frontend wrong version ", ver_line
@@ -359,7 +360,7 @@ def test_tron(intf_ver):
 
     proj = read_file('project.clj').splitlines()[0]
 
-    proj = re.search('[0-9]+\.[0-9]+\.[0-9]', proj).group(0)
+    proj = re.search('[0-9]+\.[0-9]+\.[0-9](-SNAPSHOT)?', proj).group(0)
 
     if test_version and proj != intf_ver:
         print "Tron is at version ", proj, " which is not compatible with intf ", intf_ver
@@ -455,7 +456,7 @@ def test_clojure_sample(intf_ver):
         print "Clojure project.clj file needs proper version set"
         sys.exit(1)
 
-    func_line = [re.search('[0-9]+\.[0-9]+\.[0-9]', aline).group(0) for aline in proj_clj
+    func_line = [re.search('[0-9]+\.[0-9]+\.[0-9](-SNAPSHOT)?', aline).group(0) for aline in proj_clj
                  if "funcatron" in aline and not ":url" in aline]
 
     for the_ver in func_line:

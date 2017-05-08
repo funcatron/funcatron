@@ -4,7 +4,7 @@
   :license {:name "Apache 2.0"}
 
   :dependencies
-  [[org.clojure/clojure "1.9.0-alpha16"]
+  [[org.clojure/clojure "1.9.0-alpha14"]
    [cheshire "5.6.3"]
    ;; https://mvnrepository.com/artifact/io.sarnowski/swagger1st
    [org.zalando/swagger1st "0.24.0"]
@@ -47,7 +47,7 @@
    [camel-snake-kebab "0.4.0"]
 
    [com.novemberain/langohr "3.6.1"]
-   
+
    ]
 
   :manifest
@@ -71,7 +71,7 @@
   :javac-options ["-target" "1.8" "-source" "1.8"]
   :main funcatron.tron.core
   :target-path "target/%s"
-  
+
   ;; So we wont hit the issue github.com/technomancy/leiningen/issues/2173
   :monkeypatch-clojure-test false
   )
