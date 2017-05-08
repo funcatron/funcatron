@@ -386,9 +386,9 @@ def test_tron(intf_ver):
 
     runner_pid =  subprocess.Popen(["java", "-jar", "target/uberjar/tron-" + proj + "-standalone.jar", "--runner"]).pid
 
-    print "Sleeping for 15 seconds to allow the Tron and the Runner to start"
+    print "Sleeping for 30 seconds to allow the Tron and the Runner to start"
     # wait for everything to wake up
-    time.sleep(15)
+    time.sleep(30)
 
     data = requests.get('http://localhost:3000/api/v1/stats')
 
