@@ -1,0 +1,6 @@
+sudo: required
+
+services:
+  - docker
+
+script: cd holistic_test && ./run_tests.sh
