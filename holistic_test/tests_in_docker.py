@@ -137,6 +137,12 @@ def test_http_sample(base_url_path):
 
     print "Status code: ", answer.status_code
 
+    if answer.status_code == 500:
+        print "Trying one more time..."
+        answer = requests.get(http_server + base_url_path + "/simple")
+        print "Status code (#2): ", answer.status_code
+
+
     if answer.status_code != 200 or len(answer.json()["time"]) < 5:
         print "Got a bad answer from our app ", answer.status_code
         sys.exit(1)
