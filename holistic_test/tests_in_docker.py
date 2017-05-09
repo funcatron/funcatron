@@ -702,7 +702,7 @@ def do_deploy_to_maven():
 
     if "SNAPSHOT" in intf_ver:
         print "Deploying intf"
-        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
 
     if code != 0:
         sys.exit(code)
@@ -716,7 +716,7 @@ def do_deploy_to_maven():
 
     if "SNAPSHOT" in intf_ver:
         print "Deploying devshim"
-        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
 
     if code != 0:
         sys.exit(code)
@@ -730,7 +730,7 @@ def do_deploy_to_maven():
 
     if "SNAPSHOT" in intf_ver:
         print "Deploying starter"
-        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
 
     if code != 0:
         sys.exit(code)
@@ -744,7 +744,7 @@ def do_deploy_to_maven():
 
     if "SNAPSHOT" in intf_ver:
         print "Deploying clojure service"
-        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
 
     if code != 0:
         sys.exit(code)
@@ -758,7 +758,7 @@ def do_deploy_to_maven():
 
     if "SNAPSHOT" in intf_ver:
         print "Deploying spring boot service"
-        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "~/.m2/mySettings.xml"])
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
 
     if code != 0:
         sys.exit(code)
