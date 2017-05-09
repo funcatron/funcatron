@@ -30,6 +30,9 @@ subprocess.call(["rm", "-rf", "/newdata"])
 subprocess.call(["mkdir", "/newdata"])
 subprocess.call(["rm", "-rf", "/root/funcatron_bundles"])
 subprocess.call(["cp", "-r", "/data/funcatron", "/newdata/"])
+subprocess.call(["mkdir", "/root/.m2"])
+
+
 os.environ["LEIN_ROOT"]="true"
 
 require_commit = True # set to False if we're in a development cycle
@@ -647,6 +650,11 @@ def do_deploy_to_maven():
 
     homedir = os.path.expanduser("~")
 
+    if not os.path.isfile(homedir + '/.m2/settings.xml'):
+        f = open(homedir + '/.m2/settings.xml', 'w')
+        f.write("<settings></settings>")
+        f.close()
+
     m2 = xml.dom.minidom.parse(homedir + '/.m2/settings.xml')
     settings = m2.getElementsByTagName("settings")[0]
 
@@ -680,6 +688,8 @@ def do_deploy_to_maven():
     f = open(homedir + '/.m2/mySettings.xml', 'w')
     f.write(m2Str)
     f.close()
+
+    print "Wrote My Settings"
 
     code = 0
 
