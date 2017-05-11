@@ -24,4 +24,4 @@ https://groups.io/g/funcatron[Groups.io mailing list]
 
 
 
-(c) 2016-17 by David Pollak and those listed in the link:./contributors.html[contributors.md] file
+(c) 2016-17 by David Pollak and those listed in the link:./contributors.md[contributors.md] file
