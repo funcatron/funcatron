@@ -12,3 +12,5 @@
 
 # Mac
 .DS_Store
+
+.asciidoctor
