@@ -301,5 +301,5 @@
   []
   (reset! end-server (fu/start-http-server @the-opts/command-line-options #'http-handler))
   (setup (or (-> @the-opts/command-line-options :options :shim_port) 54657))
-  (info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3000")
+  (info "Your Funcatron Dev Server is running. Point your dev-shim at port 54657 and your browser at http://localhost:3001")
   )

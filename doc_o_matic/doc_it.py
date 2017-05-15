@@ -165,9 +165,15 @@ def run_javadocs(source_dir, dest_dir, version):
     if code != 0:
         return None
 
+    code = subprocess.call(["mvn", "install"])
+    if code != 0:
+        print "Failed to install ", source_dir
+        exit(code)
+
     code = subprocess.call(["mvn", "-Dmaven.javadoc.failOnError=false", "javadoc:javadoc"])
     if code != 0:
-        return None
+        print "Failed to do JavaDocs"
+        exit(code)
 
     subprocess.call(["cp", "-r", "target/site/apidocs", dest_dir])
 
@@ -179,7 +185,7 @@ def run_codox(source_dir, dest_dir, version):
     code = subprocess.call(["lein", "do", "clean,", "codox"])
     if code != 0:
         print "Failed to do Codox"
-        return None
+        exit(code)
 
     subprocess.call(["cp", "-r", "target/base+system+user+dev/doc", dest_dir])
 

@@ -146,7 +146,7 @@ First, let's start a local version of Funcatron running in a Docker container:
 
 [source,shell]
 ----
-docker run -ti --rm -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest
+docker run -ti --rm -e TRON_1=--devmode -p 3001:3001 -p 54657:54657 funcatron/tron:latest
 ----
 
 That command tells `docker` to `run` the `funcatron/tron:latest` container.
@@ -158,10 +158,10 @@ an `-ti` interactive terminal so we can see the logs from Funcatron.
 instance at the end of execution.
 
 `-e TRON_1=--devmode` tells Funcatron to run in developer mode where HTTP requests to
-port 3000 are run through the Funcatron code and forwarded to a developer "`shim`"
+port 3001 are run through the Funcatron code and forwarded to a developer "`shim`"
 connected via port 54657.
 
-`-p 3000:3000 -p 54657:54657` exposes the container's port on `localhost`.
+`-p 3001:3001 -p 54657:54657` exposes the container's port on `localhost`.
 
 A couple of notes. This is a stripped down version of Funcatron that __only__ routes
 HTTP requests to the development time code. It does not host Func Bundles. It does
@@ -170,7 +170,7 @@ Also, the "`shim`" port speaks a very dumb protocol. Don't try to `curl` to it o
 anything else with it. Why a dumb protocol? Because we wanted to have as small a footprint
 as possible for the code that runs in your application.
 
-Test to see if Funcation is running by pointing your browser to http://localhost:3000 .
+Test to see if Funcation is running by pointing your browser to http://localhost:3001 .
 You should see a message like: `No Swagger Defined. Unable to route request`. This
 is because there's no application connected to Funcatron. So... let's create an app.
 
@@ -187,15 +187,14 @@ mvn archetype:generate -B \
    -DarchetypeVersion=0.3.0-SNAPSHOT \
    -DgroupId=my.stellar \
    -DartifactId=thang \
-   -Dversion=0.1.0 \
-   -DarchetypeRepository=https://clojars.org/repo
+   -Dversion=0.1.0 
 ----
 
 Or if you're using Windows PowerShell:
 
 [source,powershell]
 ----
-mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.3.0-SNAPSHOT" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" "-DarchetypeRepository=https://clojars.org/repo"
+mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.3.0-SNAPSHOT" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" 
 ----
 
 
@@ -204,7 +203,7 @@ Things you'll change for your project: `-DgroupId=` and `-DartifactId`.
 Once you have the project created, `cd` into the project directory and
 type `mvn compile exec:java`.
 
-Once the code is running, you'll be able to browse to http://localhost:3000/api/sample
+Once the code is running, you'll be able to browse to http://localhost:3001/api/sample
 and see data.
 
 Yay!
@@ -271,8 +270,8 @@ Let's start by looking at the dev-time code:
 ----
     public static void main(String[] args) throws Exception {
         System.out.println("Starting connection to Funcatron dev server");
-        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest");
-        System.out.println("Then point your browser to http://localhost:3000/api/sample");
+        System.out.println("run the Funcatron dev server with: docker run -ti --rm  -e TRON_1=--devmode -p 3001:3001 -p 54657:54657 funcatron/tron:latest");
+        System.out.println("Then point your browser to http://localhost:3001/api/sample");
 
         Register.register(funcatronDevHost(), funcatronDevPort(),
                 new File("src/main/resources/funcatron.yaml"),
@@ -557,10 +556,10 @@ What's "the rest"?
   OAuth rules, etc.) are properly enforced.
 * In production, wires up the front end web servers to respond to requests.
 * In development mode, presents a UI to test out the API endpoints at
-  http://localhost:3000/ui/
+  http://localhost:3001/ui/
 
 So, let's see some of the Swagger magic in action. Point your browser to
-http://localhost:3000/ui/ then click through "default" and "POST". Cool.
+http://localhost:3001/ui/ then click through "default" and "POST". Cool.
 You can try out a `POST` from your browser.
 
 Next, let's update the `funcatron.yaml` file. Replace the `post:` line

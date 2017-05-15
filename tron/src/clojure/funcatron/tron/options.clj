@@ -13,6 +13,11 @@
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
 
+   [nil "--dev_web_port PORT" "Web Server Port number for dev mode server (default 3001)"
+    ;; :default 3001
+    :parse-fn #(Integer/parseInt %)
+    :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
+
    [nil "--web_host ADDRESS" "Web Server host name"
     ;; :default
     #_(try

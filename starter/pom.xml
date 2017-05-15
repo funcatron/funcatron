@@ -7,15 +7,6 @@
     <name>Funcatron - starter</name>
     <url>http://maven.apache.org</url>
 
-
-    <repositories>
-        <repository>
-            <id>clojars</id>
-            <name>Clojars</name>
-            <url>https://clojars.org/repo</url>
-        </repository>
-    </repositories>
-
     <distributionManagement>
         <snapshotRepository>
             <id>ossrh</id>

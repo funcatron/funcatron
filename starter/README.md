@@ -12,14 +12,13 @@ mvn archetype:generate  \
    -DarchetypeArtifactId=starter \
    -DarchetypeVersion=0.3.0-SNAPSHOT \
    -DgroupId=my.stellar \
-   -DartifactId=thang \
-   -DarchetypeRepository=https://clojars.org/repo
+   -DartifactId=thang
 ```
 
 To run the Funcatron dev server:
 
 ```
-docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest
+docker run -ti --rm  -e TRON_1=--devmode -p 3001:3001 -p 54657:54657 funcatron/tron:latest
 ```
 
 To run your project code:
@@ -29,7 +28,7 @@ mvn compile exec:java
 ```
 
 
-Then point your browser to [http://localhost:3000/api/sample](http://localhost:3000/api/sample)
+Then point your browser to [http://localhost:3001/api/sample](http://localhost:3001/api/sample)
 
 
 ## Contributing

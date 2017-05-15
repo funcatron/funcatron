@@ -129,12 +129,12 @@
         </plugins>
     </build>
 
-
     <repositories>
         <repository>
-            <id>clojars</id>
-            <name>Clojars</name>
-            <url>https://clojars.org/repo</url>
+            <id>snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
         </repository>
     </repositories>
 

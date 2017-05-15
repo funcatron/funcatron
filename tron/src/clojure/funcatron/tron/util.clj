@@ -294,6 +294,11 @@
   [opts]
   (boolean (-> opts :options :runner)))
 
+(defn dev-mode?
+  "Calculates if we're in Dev mode from options"
+  [opts]
+  (boolean (-> opts :options :devmode)))
+
 (defn ^IFn start-http-server
   "Starts a http-kit server with the options specified in command line options. `function` is the Ring handler.
   Returns the Stop Server function"
@@ -301,9 +306,23 @@
   (kit/run-server
     function
     {:max-body (* 256 1024 1024)                            ;; 256mb max size
-     :port     (or
-                 (-> opts :options :web_port)
-                 (if (runner-mode? opts) 4000 3000))}))
+     :port     (cond
+                 (runner-mode? opts)
+                 (or
+                   (-> opts :options :web_port)
+                   4000)
+
+                 (dev-mode? opts)
+                 (or
+                   (-> opts :options :dev_web_port)
+                   (-> opts :options :web_port)
+                   3001)
+
+                 :else
+                 (or
+                   (-> opts :options :web_port)
+                   4000))
+     }))
 
 (defprotocol CalcSha256
   "Calculate the SHA for something"
@@ -599,10 +618,7 @@
   [opts]
   (boolean (-> opts :options :tron)))
 
-(defn dev-mode?
-  "Calculates if we're in Dev mode from options"
-  [opts]
-  (boolean (-> opts :options :devmode)))
+
 
 
 (defn compute-host-and-port

@@ -117,10 +117,10 @@ public class Application {
 
 Next, fire up a "`devmode`" Funcatron instance with:
 
-    docker run -ti --rm  -e TRON_1=--devmode -p 3000:3000 -p 54657:54657 funcatron/tron:latest
+    docker run -ti --rm  -e TRON_1=--devmode -p 3001:3001 -p 54657:54657 funcatron/tron:latest
     
 When you run your app and call the `Register.register(...)` method, your app will connect to the Funcatron
-instance and you'll be able to make `http` requests on `http://localhost:3000/`. Those requests will
+instance and you'll be able to make `http` requests on `http://localhost:3001/`. Those requests will
 be forwarded to your app. If you run your app in debug mode in your IDE, you can set breakpoints in
 your running app and see what's going on.
 
