@@ -648,6 +648,10 @@ def do_deploy_to_maven():
         print "no secure env vars available, skipping deployment"
         return
 
+    if os.environ["TRAVIS_BRANCH"] != 'master':
+        print "Not on master... skipping deployment"
+        return
+
     homedir = os.path.expanduser("~")
 
     if not os.path.isfile(homedir + '/.m2/settings.xml'):

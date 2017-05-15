@@ -9,7 +9,7 @@ docker build -t funcatron/doc-o-matic:latest . || exit 1
 
 docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/doc-o-matic:latest /usr/bin/doc_it.py || exit 1
 
-if [[ $PUSH_DOCS || $TRAVIS_SECURE_ENV_VARS ]]; then
+if [[ $PUSH_DOCS || "$TRAVIS_BRANCH" -eq "master" ]]; then
     if [[ $TRAVIS_SECURE_ENV_VARS ]]; then
         echo "Copying ssh deploy key"
         mkdir ~/.ssh
