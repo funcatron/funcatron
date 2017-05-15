@@ -195,7 +195,7 @@ project_rules = {"intf": [run_javadocs],
                  "devshim": [run_javadocs],
                  "tron": [run_codox]}
 
-def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default_multilevel_frontmatter, version):
+def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default_multilevel_frontmatter, version, is_funcatron):
     """
     Do all the frontmatter stuff for a source and dest dir
 
@@ -204,6 +204,7 @@ def emit_proj_info(proj_name, source_dir, dest_dir, default_frontmatter, default
     :param dest_dir: where to spit out the files
     :param default_frontmatter: the default frontmatter file
     :param default_multilevel_frontmatter: the default frontmatter for multilevel projects
+    :param is_funcatron -- is it the top level project
     :return:
     """
     os.chdir(source_dir)
@@ -345,13 +346,18 @@ for v in verSet:
                                                         "\n".join(["* link:" + proj + "/index.html[" + proj + "]" for
                                                                    proj in projects]))
     os.chdir("/docout/" + slug_v)
+
+    os.mkdir("funcatron")
+
     for proj in projects:
         os.mkdir(proj)
 
     spit("index.adoc", local_version_master)
 
+    emit_proj_info("funcatron", "/newdata/funcatron/" , "/docout/" + slug_v + "/funcatron", generic_frontmatter, generic_multilevel_frontmatter, v, True)
+
     for proj in projects:
-        emit_proj_info(proj, "/newdata/funcatron/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter, v)
+        emit_proj_info(proj, "/newdata/funcatron/" + proj, "/docout/" + slug_v + "/" + proj, generic_frontmatter, generic_multilevel_frontmatter, v, False)
 
 print ""
 print "Done spitting out the projects... now to asciidoctor them"
