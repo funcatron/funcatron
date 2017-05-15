@@ -321,7 +321,7 @@
                  :else
                  (or
                    (-> opts :options :web_port)
-                   4000))
+                   3000))
      }))
 
 (defprotocol CalcSha256
