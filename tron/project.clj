@@ -29,6 +29,9 @@
    ;; https://mvnrepository.com/artifact/com.mesosphere.mesos.rx.java/mesos-rxjava-client
    [com.mesosphere.mesos.rx.java/mesos-rxjava-client "0.1.0"]
 
+
+   [com.timgroup/java-statsd-client "3.0.1"]
+
    [com.spotify/dns "3.1.4"]
 
    [com.taoensso/timbre "4.7.4"]

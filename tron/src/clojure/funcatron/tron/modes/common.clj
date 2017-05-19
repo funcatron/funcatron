@@ -2,7 +2,8 @@
   (:require [funcatron.tron.util :as fu]
             [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared-b])
-  (:import (java.io File)))
+  (:import (java.io File)
+           (com.timgroup.statsd StatsDClient)))
 
 (defn ^File calc-storage-directory
   "Compute the storage directory without reference to the global opts"
@@ -56,3 +57,9 @@
     (-> opts/command-line-options deref :options :tron_queue)
     "for_tron"))
 
+(def statsd-atom (atom nil))
+
+(defn ^StatsDClient statsd-client
+  "Get the StatsD client from the atom"
+  []
+  @statsd-atom)

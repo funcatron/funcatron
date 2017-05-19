@@ -20,6 +20,7 @@ ADD start_openresty.sh /usr/local/openresty/bin
 ADD rabbitmqstomp.tar.gz /tmp/
 
 ADD random.lua /usr/local/openresty/lualib
+ADD statsd.lua /usr/local/openresty/lualib
 
 RUN \
    cd /tmp && \

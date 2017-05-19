@@ -12,7 +12,8 @@
             [clojure.java.io :as cio])
   (:import (funcatron.abstractions MessageBroker$ReceivedMessage MessageBroker Lifecycle Router)
            (java.net URLEncoder)
-           (java.io File)))
+           (java.io File)
+           (com.timgroup.statsd StatsDClient)))
 
 (set! *warn-on-reflection* true)
 
@@ -20,6 +21,12 @@
   "Get the message queue from the state"
   [state]
   (-> state ::message-queue))
+
+(defn- record-execution-time
+  [^String url ^String method ^Number time]
+  (when-let [statsd common/statsd-client]
+    (.recordExecutionTime statsd (str url "$$" method) (.longValue time)))
+  )
 
 (defn- handle-http-request
   "Take an HTTP request from a frontend, run it through
@@ -33,7 +40,11 @@
         res (dissoc res :value :exception)
         res (fu/square-numbers res)
         res (assoc res :cnt 1)
+        millis-time (long (/ (or (:thread-clock-nano res) 0) 1000))
         ]
+
+    ;; send the statsd message
+    (record-execution-time (.uri router-msg) (.method router-msg) millis-time)
 
     (swap! stats (fn [m]
                    (->
@@ -44,6 +55,8 @@
                               :uri (.uri router-msg)
                               :method (.method router-msg)}
                              (fn [x] merge-with + x res)))))))
+
+
 
 (defn- load-sha-and-then
   "If the SHA of the func bundle is not known, get it from the Tron and then execute the function"
