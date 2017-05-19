@@ -24,7 +24,7 @@
 
 (defn- record-execution-time
   [^String url ^String method ^Number time]
-  (when-let [statsd common/statsd-client]
+  (when-let [statsd (common/statsd-client)]
     (.recordExecutionTime statsd (str url "$$" method) (.longValue time)))
   )
 
