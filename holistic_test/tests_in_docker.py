@@ -15,6 +15,8 @@ import getopt
 import sys
 import os.path
 import xml.dom.minidom
+import socket
+from threading import Thread
 
 try:
     opts, args = getopt.getopt(sys.argv[1:],"hcsv",["server="])
@@ -41,7 +43,8 @@ require_commit = True # set to False if we're in a development cycle
 compile = True  # set to false to speed things up
 # compile = False
 
-http_server = 'http://localhost:8680' # might be different for different configs
+# http_server = 'http://localhost:8680' # might be different for different configs
+http_server = 'http://localhost:80' # might be different for different configs
 # http_server = 'http://localhost:8780'
 
 skip_scala = False
@@ -64,6 +67,22 @@ for opt, arg in opts:
         http_server = arg
 
 print "Running tests. Check commit: ", require_commit, " Check Version: ", test_version, " server ", http_server
+
+udp_packets = []
+
+def listen_to_8125():
+    UDP_IP = "127.0.0.1"
+    UDP_PORT = 8125
+
+    sock = socket.socket(socket.AF_INET, # Internet
+                     socket.SOCK_DGRAM) # UDP
+    sock.bind((UDP_IP, UDP_PORT))
+
+    while True:
+        data, addr = sock.recvfrom(8192) # buffer size is 1024 bytes
+        print "Got packet ", data
+        udp_packets.append(data)
+
 
 def kill_java():
     subprocess.call(["killall", "java"])
@@ -166,7 +185,8 @@ def upload_and_enable(file_name, props):
 
     uuid = answer.json()['sha']
 
-    answer = requests.post('http://localhost:3000/api/v1/enable', json={'sha': uuid, 'props': props})
+    answer = requests.post('http://localhost:3000/api/v1/enable', \
+                           json={'sha': uuid, 'props': props})
 
     time.sleep(2)
 
@@ -404,8 +424,16 @@ def test_tron(intf_ver):
 
     print "Answer from the tron: ", data.json()
 
-    return tron_pid, runner_pid
+    data2 = requests.post("http://localhost:3000/api/v1/stats", \
+                          json={'enable': True, \
+                                'host': '127.0.0.1', \
+                                'port': 8125})
 
+    if data2.status_code != 200:
+        print "Failed to enable statsd ", data2.status_code
+        sys.exit(1)
+
+    return tron_pid, runner_pid
 
 ## Java Sample
 def test_java_sample(intf_ver):
@@ -642,6 +670,27 @@ def run_tests():
 
     test_devmode(intf_ver)
 
+def analyze_statsd(pkts):
+    front_end = False
+    runner = False
+    for x in pkts:
+        if 'frontend.R' in x:
+            front_end = True
+
+        if 'runner.R' in x:
+            runner = True
+
+    if not front_end:
+        print "Failed to get statsd from Front end"
+        sys.exit(1)
+
+    if not runner:
+        print "Failed t get statsd from runner"
+        sys.exit(1)
+
+    return
+
+
 
 def do_deploy_to_maven():
     if os.environ["TRAVIS_SECURE_ENV_VARS"] == "false":
@@ -767,7 +816,15 @@ def do_deploy_to_maven():
     if code != 0:
         sys.exit(code)
 
+
+
+thread = Thread(target = listen_to_8125, args = ())
+thread.setDaemon(True)
+thread.start()
+
 run_tests()
+
+analyze_statsd( udp_packets)
 
 print ""
 print "*********"
@@ -775,3 +832,5 @@ print "Successfully Ran All Tests!"
 print ""
 
 do_deploy_to_maven()
+
+sys.exit(0)

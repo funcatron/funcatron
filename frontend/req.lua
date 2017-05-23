@@ -5,6 +5,11 @@ local funcatron = require("/data/funcatron")
 local rid = ngx.var.request_id
 
 if ngx.var.uri == '/' then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          200,
+                          ngx.now() - ngx.req.start_time())
    ngx.status = 200
    ngx.header.content_type = "text/html"
    ngx.say('<!DOCTYPE html>\n<html><head><meta content="text/html" http-equiv="Content-Type"><title>Funcatron</title></head><body><br><br><br><br><br><br><br><table align="center" cellpadding="0" cellspacing="0" border="0" width="100%"><tbody><tr><td align="center"><h1 style="margin:0;padding:0;font-family: Tahoma;"><a href="https://funcatron.org">Funcatron</a></h1></td></tr></tbody></table></body></html>')
@@ -12,6 +17,11 @@ if ngx.var.uri == '/' then
 end
 
 if ngx.var.uri == '/__routes' then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          200,
+                          ngx.now() - ngx.req.start_time())
    ngx.status = 200
    ngx.header.content_type = "application/json"
    ngx.say(cjson.encode({version=funcatron.version,
@@ -22,7 +32,14 @@ end
 local target_queue, err = funcatron.route_for(ngx.var.host,
                                               ngx.var.uri)
 
+
 if err then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          ngx.HTTP_NOT_FOUND,
+                          ngx.now() - ngx.req.start_time())
+
    ngx.status = ngx.HTTP_NOT_FOUND
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
@@ -87,6 +104,12 @@ headers["content-type"] = "application/json"
 local rabbit, err = funcatron.rabbit_connection()
 
 if err then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          ngx.HTTP_INTERNAL_SERVER_ERROR,
+                          ngx.now() - ngx.req.start_time())
+
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
@@ -98,6 +121,12 @@ ngx.log(ngx.ALERT, "Sending to queue " .. target_queue)
 local ok, err = rabbit:send(msg, headers)
 
 if err then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          ngx.HTTP_INTERNAL_SERVER_ERROR,
+                          ngx.now() - ngx.req.start_time())
+
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
@@ -110,12 +139,20 @@ rabbit:close()
 local response, err = funcatron.get_response(msg_uuid, 50)
 
 if err then
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          ngx.HTTP_INTERNAL_SERVER_ERROR,
+                          ngx.now() - ngx.req.start_time())
+
    ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
    ngx.header.content_type = "text/plain; charset=utf-8"
    ngx.say(err)
    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 else
-   ngx.status = response.status or 200
+   local the_status = response.status or 200
+
+   ngx.status = the_status
    for key,value in pairs(response.headers or {})
    do
       ngx.header[key] = value
@@ -125,6 +162,12 @@ else
    ngx.header["Content-Length"] = body:len()
 
    ngx.print(body)
+
+   funcatron.record_count(ngx.var.host,
+                          ngx.var.uri,
+                          ngx.req.get_method(),
+                          the_status,
+                          ngx.now() - ngx.req.start_time())
 
    return ngx.exit(response.status)
 end

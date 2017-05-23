@@ -3,7 +3,7 @@
             [funcatron.tron.options :as opts]
             [funcatron.tron.brokers.shared :as shared-b])
   (:import (java.io File)
-           (com.timgroup.statsd StatsDClient)))
+           (com.timgroup.statsd StatsDClient NonBlockingStatsDClient)))
 
 (defn ^File calc-storage-directory
   "Compute the storage directory without reference to the global opts"
@@ -57,9 +57,57 @@
     (-> opts/command-line-options deref :options :tron_queue)
     "for_tron"))
 
-(def statsd-atom (atom nil))
+(def statsd-atom (atom {:enabled false :client nil}))
+
+(defn update-statsd
+  "Takes a message that might include information on updating statsd and
+  updates is necessary"
+  [{:keys [set_statsd] :as msg} uuid]
+  (when (true? set_statsd)
+    (let [{:keys [enabled host port]} (:statsd msg)]
+      (cond
+        (and (true? enabled)
+             (string? host)
+             (number? port))
+        (let [-host host
+              -port port]
+          (swap! statsd-atom
+                 (fn [{:keys [host port enabled] :as blob}]
+                   ;; host and port have not changed
+                   (if
+                     (and (true? enabled)
+                          (= host -host)
+                          (= port -port))
+                     blob
+
+                     ;; rebuild the atom
+                     (try
+                       (let [the-info (str "runner." uuid)
+                             the-client (NonBlockingStatsDClient. the-info -host -port)
+                             new-blob
+                             {:enabled true
+                              :host    -host
+                              :port    -port
+                              :client  the-client}]
+                         (println "New blob " new-blob)
+                         new-blob
+                         )
+                       (catch Exception e (do (println "Failed ") (println e) blob))
+                       )
+                     ))))
+
+        (false? enabled)
+        (reset! statsd-atom {:enabled false :client nil})
+
+        :else
+        nil
+        )
+      )))
 
 (defn ^StatsDClient statsd-client
   "Get the StatsD client from the atom"
   []
-  @statsd-atom)
+  (let [{:keys [enabled client]} @statsd-atom]
+    (if (and enabled client) client
+                             nil)
+    ))

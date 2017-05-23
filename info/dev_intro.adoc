@@ -651,5 +651,22 @@ To upload:
 wget -q -O - --post-file=target/thang-0.1.0-jar-with-dependencies.jar http://<SERVER>:<PORT>/api/v1/add_func
 ----
 
+=== StatsD
+
+Funcatron supports logging out to https://github.com/etsy/statsd[StatsD].
+
+To enable logging to a host (in this case, `127.0.0.1`):
+[source, shell]
+----
+curl -H "Content-Type: application/json" -d '{"enable": true, "host": "127.0.0.1", "port": 8125}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/stats
+----
+
+To disable statsd logging:
+[source, shell]
+----
+curl -H "Content-Type: application/json" -d '{"enable": false}' -X POST http://FUNCATRON_SERVER:FUNCATRON_PORT/api/v1/stats
+----
+
+
 
 == The Build File

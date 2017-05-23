@@ -4,9 +4,14 @@ local random = require "random"
 
 local cjson = require("cjson")
 
+local statsd = require("statsd")
+
 local rabbitmqstomp = require("resty/rabbitmqstomp")
 
 local semaphore = require "ngx.semaphore"
+
+local stats_host = nil
+local stats_port = nil
 
 -- generate a UUID
 function funcatron.uuid()
@@ -17,6 +22,7 @@ function funcatron.uuid()
                          return string.format('%x', v)
    end)
 end
+
 
 funcatron.random = random
 
@@ -45,6 +51,25 @@ local nginx_uuid = os.getenv("INSTANCEID") or "no-id"
 
 local keep_running = true
 
+function funcatron.record_count(host, uri, method, status, total_time)
+   if stats_host and stats_port then
+      statsd.incr("frontend." .. nginx_uuid .. "." .. host .. "." ..
+                     uri .. "." .. method .. "." .. status)
+
+      statsd.incr("frontend." .. nginx_uuid .. "." .. host .. "." ..
+                     uri .. "." .. method)
+
+      statsd.incr("frontend." .. nginx_uuid .. "." .. host .. "." ..
+                     uri)
+
+      statsd.time("frontend." .. nginx_uuid .. "." .. host .. "." ..
+                     uri, math.floor(1000 * total_time))
+
+      statsd.flush(ngx.socket.udp, stats_host, stats_port)
+   end
+end
+
+
 function funcatron.rabbit_connection()
    local rabbit, err = rabbitmqstomp:new()
 
@@ -66,6 +91,7 @@ function funcatron.rabbit_connection()
 end
 
 funcatron.instance_uuid = funcatron.uuid();
+
 
 
 -- a table of response types to handlers
@@ -187,17 +213,51 @@ funcatron.response_table = {}
 
 funcatron.routing_table = {}
 
+-- Set the statsd information
+local function set_statsd_info(msg)
+   if msg.statsd.enabled then
+      if msg.statsd.host then
+         stats_host = msg.statsd.host
+      else
+         stats_host = nil
+      end
+
+      if msg.statsd.port then
+         stats_port = msg.statsd.port
+      else
+         stats_port = nil
+      end
+   else
+      stats_host = nil
+      stats_port = nil
+   end
+end
+
 response_handlers["route"] = function(msg)
    ngx.log(ngx.ALERT, "Deploying new route table... " .. cjson.encode(msg))
    funcatron.routing_table = msg.routes or {}
+   if msg.set_statsd then
+      set_statsd_info(msg)
+   end
 end
 
 response_handlers["tron-info"] = function(msg)
    -- do nothing... we don't http to TRON
+   if msg.set_statsd then
+      set_statsd_info(msg)
+   end
+end
+
+response_handlers["set-statsd"] = function(msg)
+   ngx.log(ngx.ALERT, "Setting statsd routing " .. cjson.encode(msg))
+   set_statsd_info(msg)
 end
 
 response_handlers["heartbeat"] = function(msg)
    ngx.log(ngx.TRACE, "Got heartbeat from " .. msg.from)
+   if msg.set_statsd then
+      set_statsd_info(msg)
+   end
 end
 
 response_handlers["die"] = function(msg)

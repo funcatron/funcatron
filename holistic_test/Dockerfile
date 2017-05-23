@@ -11,10 +11,13 @@ RUN wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y maven python-pip vim emacs && \
+    apt-get install -y maven python-pip vim emacs nodejs && \
     apt remove -y openjdk-7-jre-headless openjdk-7-jre
 
 RUN pip install requests
+
+RUN git clone -b v0.7.2 https://github.com/etsy/statsd.git /opt/statsd
+ADD statsd_config.js /opt/statsd/config.js
 
 ADD sbt /usr/bin/sbt
 
@@ -25,4 +28,3 @@ RUN chmod +x /usr/bin/sbt
 ADD tests_in_docker.py /usr/bin/run_tests.py
 
 RUN chmod +x /usr/bin/run_tests.py
-

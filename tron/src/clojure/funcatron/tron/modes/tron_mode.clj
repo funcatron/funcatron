@@ -33,6 +33,22 @@
           {}
           (remove #(> too-old (:last-seen (second %))) cur))))))
 
+(defn- build_statsd_msg
+  [{:keys [::statsd]}]
+  (let [{:keys [enable host port]} @statsd]
+    (if enable
+      {:set_statsd true
+       :statsd {
+                :enabled true
+                :host host
+                :port port
+                }
+}
+      {:set_statsd true
+       :statsd     {:enabled false}})
+    )
+  )
+
 (defn- send-host-info
   "Sends a message about host information... how to HTTP to Tron"
   [dest {:keys [::queue ::opts] :as state}]
@@ -40,12 +56,13 @@
     ^MessageBroker queue
     dest
     {:content-type "application/json"}
-    {:action    "tron-info"
-     :msg-id    (fu/random-uuid)
-     :version (:version fu/version-info)
-     :tron-host (fu/compute-host-and-port opts)
-     :at        (System/currentTimeMillis)
-     })
+    (merge {:action    "tron-info"
+            :msg-id    (fu/random-uuid)
+            :version   (:version fu/version-info)
+            :tron-host (fu/compute-host-and-port opts)
+            :at        (System/currentTimeMillis)
+            }
+           (build_statsd_msg state)))
   )
 
 (defn- try-to-load-route-map
@@ -77,7 +94,7 @@
       {:action    action
        :tron-host (fu/compute-host-and-port opts)
        :msg-id    (fu/random-uuid)
-       :version (:version fu/version-info)
+       :version   (:version fu/version-info)
        :at        (System/currentTimeMillis)
        :host      host
        :basePath  path
@@ -155,24 +172,60 @@
         k
         {:content-type "application/json"}
         {:action      "die"
-         :version (:version fu/version-info)
+         :version     (:version fu/version-info)
          :msg-id      (fu/random-uuid)
          :instance-id instance-id
          :at          (System/currentTimeMillis)
          }))))
 
+
+
+(defn- update-statsd
+  "Tell all the listeners about statsd"
+  [{:keys [::queue ::network] :as state}]
+  (doseq [[where {:keys [type]}] @network]
+    (.sendMessage
+      ^MessageBroker queue where
+      {:content-type "application/json"}
+      (merge
+        {:action  "set-statsd"
+         :version (:version fu/version-info)
+         :msg-id  (fu/random-uuid)
+         :at      (System/currentTimeMillis)
+         }
+        (build_statsd_msg state)
+        )))
+  )
+
+(defn- enable-statsd
+  "Turn on statsd"
+  [{:keys [::statsd] :as state} host port]
+  (reset! statsd {:enable true :host host :port port})
+  (update-statsd state)
+  )
+
+(defn- disable-statsd
+  "Turn off statsd"
+  [{:keys [::statsd] :as state}]
+  (reset! statsd {:enable false})
+  (update-statsd state)
+  )
+
 (defn- send-route-map
   "Sends the route map to a destination"
-  ([where {:keys [::queue ::route-map]}]
+  ([where {:keys [::queue ::route-map] :as state}]
    (.sendMessage
      ^MessageBroker queue where
      {:content-type "application/json"}
-     {:action "route"
-      :version (:version fu/version-info)
-      :msg-id (fu/random-uuid)
-      :routes (or @route-map [])
-      :at     (System/currentTimeMillis)
-      })))
+     (merge
+       {:action  "route"
+        :version (:version fu/version-info)
+        :msg-id  (fu/random-uuid)
+        :routes  (or @route-map [])
+        :at      (System/currentTimeMillis)
+        }
+       (build_statsd_msg state)
+       ))))
 
 (defn- routes-changed
   "The routes changed, let all the front end instances know"
@@ -206,6 +259,39 @@
         files (filter #(.contains ^String % sha) (.list ^File (common/calc-storage-directory opts)))]
     (empty? files)))
 
+(defn- alter-stats-info
+  "Set or clear StatsD host"
+  [{:keys [json-params] :as the-msg} state]
+  (let [the-response (let [json-params (fu/keywordize-keys json-params)
+                           {:keys [enable host port]} json-params]
+                       (cond
+                         (false? enable)
+                         (do
+                           (disable-statsd state)
+                           {:status 200
+                            :body   {:accepted true
+                                     :msg      "StatsD disabled"}})
+
+                         (and (true? enable)
+                              (string? host)
+                              (number? port))
+                         (do
+                           (enable-statsd state host port)
+                           {:status 200
+                            :body   {:accepted true
+                                     :msg      (str "StatsD enabled. Host: " host " port: " port)}})
+
+                         :else
+                         {:status 400
+                          :body   {:accepted false
+                                   :error    "Must be either enable=false or enable=true with host and port"}})
+
+                       )]
+    (println "Response " the-response)
+    the-response
+    )
+  )
+
 (defn- upload-func-bundle
   "Get a func bundle"
   [{:keys [body]} {:keys [::opts ::bundles] :as state}]
@@ -214,7 +300,7 @@
       (cio/copy body file)
       (try
         ;; load the file and make sure it's a valid func bundle
-        (let [{:keys [sha type ]} (common/sha-for-file file)
+        (let [{:keys [sha type]} (common/sha-for-file file)
               thing (jarjar/build-router file {})
               swagger (fu/keywordize-keys (.swagger thing))
               host (.host thing)
@@ -244,13 +330,13 @@
               (info (str "The most likely reason is a missing or malformed funcatron.yaml file"))
               {:status 400
 
-                 :body   {:accepted false
-                          :error    "Could not determine the file type"}})))
+               :body   {:accepted false
+                        :error    "Could not determine the file type"}})))
         (catch Exception e (do
                              (error e "Failed up upload JAR")
                              {:status 400
-                                :body   {:accepted false
-                                         :error    (.toString e)}})))
+                              :body   {:accepted false
+                                       :error    (.toString e)}})))
       )
     {:status 400
      :body   {:accepted false
@@ -326,13 +412,13 @@
   "Return statistics on activity"
   [_ {:keys [::network ::route-map]}]
   {:status 200
-   :body   {:network @network
+   :body   {:network   @network
             :route-map @route-map}
    })
 
 (defn- get-routes
   "Return current routes"
-  [_ {:keys [ ::route-map]}]
+  [_ {:keys [::route-map]}]
   {:status 200
    :body   @route-map
    })
@@ -361,6 +447,7 @@
         (GET "/api/v1/routes" req (get-routes req state))
         (GET "/api/v1/known_funcs" req (get-known-funcs req state))
         (GET "/api/v1/bundle/:sha" req (return-sha req state))
+        (POST "/api/v1/stats" req (alter-stats-info req state))
         (POST "/api/v1/add_func"
               req (upload-func-bundle req state)))
       (wrap-json-response :pretty true :escape-non-ascii true)
@@ -383,7 +470,7 @@
         from
         {:content-type "application/json"}
         {:action    "resend-awake"
-         :version (:version fu/version-info)
+         :version   (:version fu/version-info)
          :tron-host (fu/compute-host-and-port opts)
          :msg-id    (fu/random-uuid)
          :at        (System/currentTimeMillis)
@@ -401,7 +488,7 @@
     destination
     {:content-type "application/json"}
     {:action    "all-bundles"
-     :version (:version fu/version-info)
+     :version   (:version fu/version-info)
      :tron-host (fu/compute-host-and-port opts)
      :msg-id    (fu/random-uuid)
      :at        (System/currentTimeMillis)
@@ -481,12 +568,14 @@
 
   (let [bundles (atom {})
         route-map (atom [])
+        statsd (atom {:enabled false})
         network (atom {})
         shutdown-http-server (atom nil)
         this (atom nil)
         state {::queue                queue
                ::bundles              bundles
                ::network              network
+               ::statsd               statsd
                ::opts                 opts
                ::this                 this
                ::shutdown-http-server shutdown-http-server

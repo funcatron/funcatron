@@ -23,9 +23,9 @@
   (-> state ::message-queue))
 
 (defn- record-execution-time
-  [^String url ^String method ^Number time]
+  [^String host ^String url ^String method ^Number time]
   (when-let [statsd (common/statsd-client)]
-    (.recordExecutionTime statsd (str url "$$" method) (.longValue time)))
+    (.recordExecutionTime statsd (str host "." url "." method) (.longValue time)))
   )
 
 (defn- handle-http-request
@@ -44,7 +44,7 @@
         ]
 
     ;; send the statsd message
-    (record-execution-time (.uri router-msg) (.method router-msg) millis-time)
+    (record-execution-time (.host router-msg) (.uri router-msg) (.method router-msg) millis-time)
 
     (swap! stats (fn [m]
                    (->
@@ -154,7 +154,8 @@
   (.endLife ^Lifecycle this))
 
 (defmethod dispatch-runner-message "tron-info"
-  [{:keys [tron-host]} _ state]
+  [{:keys [tron-host] :as msg} _ {:keys [::uuid] :as state}]
+  (common/update-statsd msg uuid)
   (reset! (::tron-host state) tron-host)
   )
 
@@ -169,8 +170,9 @@
   )
 
 (defmethod dispatch-runner-message "enable"
-  [{:keys [sha props host basePath]} _ {:keys [::message-queue ::routes] :as state}]
+  [{:keys [sha props host basePath] :as msg} _ {:keys [::message-queue ::routes ::uuid] :as state}]
 
+  (common/update-statsd msg uuid)
 
   (load-sha-and-then
     sha
@@ -215,6 +217,18 @@
       (stop-listening-to state queue info)))
 
   (fu/run-in-pool (fn [] (send-ping state))))
+
+(defmethod dispatch-runner-message "heartbeat"
+  [msg _ {:keys [::uuid] :as state}]
+
+  (common/update-statsd msg uuid)
+  )
+
+(defmethod dispatch-runner-message "set-statsd"
+  [msg _ {:keys [::uuid] :as state}]
+
+  (common/update-statsd msg uuid)
+  )
 
 (defn- handle-runner-message
   "Handle messages sent to the tron queue"
