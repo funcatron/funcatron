@@ -527,8 +527,7 @@ def test_archetype(intf_ver):
     code = subprocess.call(["mvn",
                             "archetype:generate", "-B", "-DarchetypeGroupId=funcatron", "-DarchetypeArtifactId=starter",
                             "-DarchetypeVersion=" + intf_ver, "-DgroupId=my.stellar", "-DartifactId=thang",
-                            "-Dversion=0.1.0",
-                            "-DarchetypeRepository=https://clojars.org/repo"])
+                            "-Dversion=0.1.0"])
 
     if code != 0:
         print "Failed to create project from archetype", code

@@ -33,7 +33,7 @@ repositories {
     mavenLocal()
     
     maven {
-        url "https://clojars.org/repo"
+        url "https://oss.sonatype.org/content/repositories/snapshots"
     }
 }
 

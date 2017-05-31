@@ -68,11 +68,12 @@ Funcatron currently works with Spring Boot 1.4.x.
 
 5. Include the following repositories in your pom.xml file: +
 
-            <repository>
-                <id>clojars</id>
-                <name>Clojars</name>
-                <url>https://clojars.org/repo</url>
-            </repository>
+        <repository>
+            <id>snapshots-repo</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <releases><enabled>false</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
+        </repository>
 
 3. Add the following to your pom.xml's `<plugins>` section:
 
