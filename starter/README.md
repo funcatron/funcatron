@@ -7,12 +7,13 @@ Funcatron.
 To use the archetype:
 
 ```
-mvn archetype:generate  \
-   -DarchetypeGroupId=funcatron \
-   -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.3.0-SNAPSHOT \
-   -DgroupId=my.stellar \
-   -DartifactId=thang
+mvn org.apache.maven.plugins:maven-archetype-plugin:2.4:generate -X -B  \
+    -DarchetypeGroupId=funcatron \
+    -DarchetypeArtifactId=starter \
+    -DarchetypeVersion=0.3.0-SNAPSHOT \
+    -DgroupId=my.stellar \
+    -DartifactId=thang \
+    -DarchetypeRepository=https://oss.sonatype.org/content/repositories/snapshots
 ```
 
 To run the Funcatron dev server:

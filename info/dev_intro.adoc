@@ -181,22 +181,14 @@ feature:
 
 [source,shell]
 ----
-mvn archetype:generate -B \
-   -DarchetypeGroupId=funcatron \
-   -DarchetypeArtifactId=starter \
-   -DarchetypeVersion=0.3.0-SNAPSHOT \
-   -DgroupId=my.stellar \
-   -DartifactId=thang \
-   -Dversion=0.1.0 
+mvn org.apache.maven.plugins:maven-archetype-plugin:2.4:generate -X -B  \
+    -DarchetypeGroupId=funcatron \
+    -DarchetypeArtifactId=starter \
+    -DarchetypeVersion=0.3.0-SNAPSHOT \
+    -DgroupId=my.stellar \
+    -DartifactId=thang \
+    -DarchetypeRepository=https://oss.sonatype.org/content/repositories/snapshots
 ----
-
-Or if you're using Windows PowerShell:
-
-[source,powershell]
-----
-mvn archetype:generate "-B" "-DarchetypeGroupId=funcatron" "-DarchetypeArtifactId=starter" "-DarchetypeVersion=0.3.0-SNAPSHOT" "-DgroupId=my.stellar" "-DartifactId=thang" "-Dversion=0.1.0" 
-----
-
 
 Things you'll change for your project: `-DgroupId=` and `-DartifactId`.
 
