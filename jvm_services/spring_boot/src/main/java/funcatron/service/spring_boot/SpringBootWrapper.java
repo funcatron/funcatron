@@ -88,7 +88,7 @@ public abstract class SpringBootWrapper implements OperationProvider {
     }
 
     // the thread-local context
-    private static ThreadLocal<Context> localContext;
+    private static ThreadLocal<Context> localContext = new ThreadLocal<>();
 
     /**
      * Get the context object for the current request
