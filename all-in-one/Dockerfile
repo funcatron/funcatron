@@ -122,18 +122,18 @@ RUN rabbitmq-plugins enable --offline rabbitmq_management
 RUN rabbitmq-plugins enable --offline rabbitmq_stomp
 RUN rabbitmq-plugins enable --offline rabbitmq_web_stomp
 
+COPY tron /tmp/tron
+
 RUN cd /tmp && \
     export LEIN_ROOT=yes && \
-    wget https://github.com/funcatron/tron/archive/master.zip && \
-    unzip master.zip && \
-    cd tron-master && \
+    cd tron && \
     lein uberjar && \
     cp target/uberjar/tron-*-standalone.jar /root/tron.jar && \
     cd /tmp && \
-    rm -rf master.zip tron-master
+    rm -rf master.zip tron-master tron
 
-COPY docker-entrypoint.sh /usr/local/bin/
-COPY start-all.sh         /usr/local/bin/
+COPY all-in-one/docker-entrypoint.sh /usr/local/bin/
+COPY all-in-one/start-all.sh         /usr/local/bin/
 
 EXPOSE 80 3000
 
