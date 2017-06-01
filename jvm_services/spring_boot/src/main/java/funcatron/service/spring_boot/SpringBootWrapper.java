@@ -1,6 +1,7 @@
 package funcatron.service.spring_boot;
 
 import funcatron.intf.Constants;
+import funcatron.intf.Context;
 import funcatron.intf.OperationProvider;
 import funcatron.intf.impl.ContextImpl;
 import io.swagger.models.Swagger;
@@ -86,6 +87,17 @@ public abstract class SpringBootWrapper implements OperationProvider {
 
     }
 
+    // the thread-local context
+    private static ThreadLocal<Context> localContext;
+
+    /**
+     * Get the context object for the current request
+     * @return
+     */
+    public static Context getLocalContext() {
+        return localContext.get();
+    }
+
     public WebApplicationContext getApplicationContext() {
         return applicationContext;
     }
@@ -102,109 +114,116 @@ return builder.build();
     private Map<Object, Object> serviceRequest(InputStream is, Map<Object, Object> req) {
         Logger logger = (Logger) req.get("$logger");
 
-        MockHttpServletRequestBuilder mockR;
-
+        Context ctx = new ContextImpl(req, logger);
+        Context curCtx = localContext.get();
         try {
-            String method = (String) req.get("request-method");
-            String uri = (String) req.get("uri");
+            localContext.set(ctx);
 
-            if (!"/".equals(basePath) && uri.startsWith(basePath)) {
-                uri = uri.substring(basePath.length());
-            }
+            MockHttpServletRequestBuilder mockR;
 
-            switch (method) {
-                case "get":
-                    mockR = MockMvcRequestBuilders.get(uri);
-                    break;
+            try {
+                String method = (String) req.get("request-method");
+                String uri = (String) req.get("uri");
 
-                case "put":
-                    mockR = MockMvcRequestBuilders.put(uri);
-                    break;
+                if (!"/".equals(basePath) && uri.startsWith(basePath)) {
+                    uri = uri.substring(basePath.length());
+                }
 
-                case "post":
-                    mockR = MockMvcRequestBuilders.post(uri);
-                    break;
+                switch (method) {
+                    case "get":
+                        mockR = MockMvcRequestBuilders.get(uri);
+                        break;
 
-                case "delete":
-                    mockR = MockMvcRequestBuilders.delete(uri);
-                    break;
+                    case "put":
+                        mockR = MockMvcRequestBuilders.put(uri);
+                        break;
 
-                case "patch":
-                    mockR = MockMvcRequestBuilders.patch(uri);
-                    break;
+                    case "post":
+                        mockR = MockMvcRequestBuilders.post(uri);
+                        break;
+
+                    case "delete":
+                        mockR = MockMvcRequestBuilders.delete(uri);
+                        break;
+
+                    case "patch":
+                        mockR = MockMvcRequestBuilders.patch(uri);
+                        break;
 
 
-                case "head":
-                    mockR = MockMvcRequestBuilders.patch(uri);
-                    break;
-                default:
-                    throw new RuntimeException("Unable to process HTTP request method '" + method + "'");
-            }
+                    case "head":
+                        mockR = MockMvcRequestBuilders.patch(uri);
+                        break;
+                    default:
+                        throw new RuntimeException("Unable to process HTTP request method '" + method + "'");
+                }
 
-            Map<String, Object> headers = (Map<String, Object>) req.get("headers");
+                Map<String, Object> headers = (Map<String, Object>) req.get("headers");
 
-            // set headers
-            for (String k : headers.keySet()) {
-                Object v = headers.get(k);
-                if (null != v) {
-                    if (v instanceof String) {
-                        mockR.header(k, v);
-                    } else if (v instanceof List) {
-                        List<String> sl = (List<String>) v;
-                        int sz = sl.size();
-                        String[] sa = new String[sz];
-                        for (int x = 0; x < sz; x++) {
-                            sa[x] = sl.get(x);
+                // set headers
+                for (String k : headers.keySet()) {
+                    Object v = headers.get(k);
+                    if (null != v) {
+                        if (v instanceof String) {
+                            mockR.header(k, v);
+                        } else if (v instanceof List) {
+                            List<String> sl = (List<String>) v;
+                            int sz = sl.size();
+                            String[] sa = new String[sz];
+                            for (int x = 0; x < sz; x++) {
+                                sa[x] = sl.get(x);
+                            }
+                            mockR.header(k, sa);
                         }
-                        mockR.header(k, sa);
                     }
                 }
-            }
 
-            // FIXME do query params
+                // FIXME do query params
 
-            // deal with body
-            if (null != is) {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                byte[] ba = new byte[4096];
-                int cnt;
-                do {
-                    cnt = is.read(ba);
-                    if (cnt > 0) {
-                        bos.write(ba, 0, cnt);
-                    }
-                } while (cnt >= 0);
+                // deal with body
+                if (null != is) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] ba = new byte[4096];
+                    int cnt;
+                    do {
+                        cnt = is.read(ba);
+                        if (cnt > 0) {
+                            bos.write(ba, 0, cnt);
+                        }
+                    } while (cnt >= 0);
 
-                mockR.content(bos.toByteArray());
-            }
-
-            MockMvc router = getMockMvc();
-
-            MockHttpServletResponse ra = router.perform(mockR).andReturn().getResponse();
-
-
-
-            HashMap<Object, Object> ret = new HashMap<>();
-
-            HashMap<String, Object> respHeaders = new HashMap<>();
-
-            for (String k : ra.getHeaderNames()) {
-                Object hv = ra.getHeaderValues(k);
-                if (null != hv) {
-
-                    respHeaders.put(k, hv);
+                    mockR.content(bos.toByteArray());
                 }
+
+                MockMvc router = getMockMvc();
+
+                MockHttpServletResponse ra = router.perform(mockR).andReturn().getResponse();
+
+
+                HashMap<Object, Object> ret = new HashMap<>();
+
+                HashMap<String, Object> respHeaders = new HashMap<>();
+
+                for (String k : ra.getHeaderNames()) {
+                    Object hv = ra.getHeaderValues(k);
+                    if (null != hv) {
+
+                        respHeaders.put(k, hv);
+                    }
+                }
+
+                ret.put("status", ra.getStatus());
+                ret.put("headers", respHeaders);
+                ret.put("body", ra.getContentAsByteArray());
+
+                return ret;
+            } catch (RuntimeException re) {
+                throw re;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to service request", e);
             }
-
-            ret.put("status", ra.getStatus());
-            ret.put("headers", respHeaders);
-            ret.put("body", ra.getContentAsByteArray());
-
-            return ret;
-        } catch (RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to service request", e);
+        } finally {
+            localContext.set(curCtx);
         }
     }
 
