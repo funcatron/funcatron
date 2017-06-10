@@ -7,9 +7,13 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 docker build -t funcatron/doc-o-matic:latest . || exit 1
 
-docker run -ti --rm --net=host -v $(cd ${DIR}/../.. && pwd):/data funcatron/doc-o-matic:latest /usr/bin/doc_it.py || exit 1
+DOCKER_PATH=$(cd ${DIR}/../.. && pwd)
+DOCKER_PATH=$(realpath ${DOCKER_PATH} | sed -r 's$^/mnt(/[a-z]/)$\1$'| sed -r 's$^/cygdrive(/[a-z]/)$\1$')
 
-if [[ $PUSH_DOCS || "$TRAVIS_BRANCH" -eq "master" ]]; then
+
+docker run -ti --rm --net=host -v ${DOCKER_PATH}:/data funcatron/doc-o-matic:latest /usr/bin/doc_it.py || exit 1
+
+if [[  "$TRAVIS_BRANCH" -eq "master" ]]; then
     if [[ $TRAVIS_SECURE_ENV_VARS ]]; then
         echo "Copying ssh deploy key"
         mkdir ~/.ssh

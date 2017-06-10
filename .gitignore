@@ -1,6 +1,10 @@
 # Project specific files
 /info/rendered
 
+# VIM temp files
+
+.*.swp
+
 # Emacs backup files
 *~
 
