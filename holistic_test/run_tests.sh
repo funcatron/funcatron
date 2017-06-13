@@ -13,7 +13,9 @@ ${DIR}/../scripts/start_working_frontend.sh
 docker build -t funcatron/holistic:latest .
 
 DOCKER_PATH=$(cd ${DIR}/../.. && pwd)
-DOCKER_PATH=$(realpath ${DOCKER_PATH} | sed -r 's$^/mnt(/[a-z]/)$\1$'| sed -r 's$^/cygdrive(/[a-z]/)$\1$')
+if [[ $(which realpath) ]]; then
+    DOCKER_PATH=$(realpath ${DOCKER_PATH} | sed -r 's$^/mnt(/[a-z]/)$\1$'| sed -r 's$^/cygdrive(/[a-z]/)$\1$')
+fi
 
 if [[ "--shell" == "$1" ]]; then
     docker run -ti --rm \
@@ -32,4 +34,3 @@ else
 fi
 
 docker rm -f working-func-resty || exit 0
-
