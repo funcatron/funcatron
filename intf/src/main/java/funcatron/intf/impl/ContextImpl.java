@@ -810,4 +810,13 @@ public class ContextImpl implements Context, Accumulator {
     public Map<String, Object> properties() {
         return props;
     }
+
+    /**
+     * Get the properties for the context. These were passed from
+     * to the ContextImpl at initialization time
+     * @return
+     */
+    public static Map<String, Object> staticProperties() {
+        return props;
+    }
 }

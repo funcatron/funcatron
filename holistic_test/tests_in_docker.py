@@ -612,6 +612,24 @@ def test_clojure_service(intf_ver):
         print "Failed to install Clojure Service"
         sys.exit(code)
 
+def test_jdbc_middleware(intf_ver):
+    print "Testing JDBC middleware"
+
+    os.chdir("/newdata/funcatron/jvm_services/jdbc_middleware")
+
+    test_git_status()
+
+    test_pom_deps(intf_ver, "JDBC Middleware")
+
+    if compile:
+        code = subprocess.call(["mvn", "clean", "install"])
+    else:
+        code = 0
+
+    if code != 0:
+        print "Failed to install JDBC Middleware"
+        sys.exit(code)
+
 
 
 def test_spring_boot_service(intf_ver):
@@ -642,6 +660,7 @@ def run_tests():
 
     # Test the jvm_services
     test_clojure_service(intf_ver)
+    test_jdbc_middleware(intf_ver)
     test_spring_boot_service(intf_ver)
 
     # Test other pieces
@@ -800,6 +819,21 @@ def do_deploy_to_maven():
 
     if code != 0:
         sys.exit(code)
+
+    os.chdir('/newdata/funcatron/jvm_services/jdbc_middleware/')
+
+    e = parse_xml(read_file('pom.xml'))
+
+    intf_ver = e.find("./version").text
+
+
+    if "SNAPSHOT" in intf_ver:
+        print "Deploying jdbc middleware"
+        code = subprocess.call(["mvn", "clean", "deploy", "--settings", "/root/.m2/mySettings.xml"])
+
+    if code != 0:
+        sys.exit(code)
+
 
     os.chdir('/newdata/funcatron/jvm_services/spring_boot')
 
