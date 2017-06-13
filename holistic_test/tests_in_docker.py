@@ -169,7 +169,7 @@ def test_http_sample(base_url_path):
 
 
     if answer.status_code != 200 or len(answer.json()["time"]) < 5:
-        print "Got a bad answer from our app ", answer.status_code
+        print "Got a bad answer from our app (1) ", answer.status_code
         sys.exit(1)
 
 def upload_and_enable(file_name, props):
@@ -557,13 +557,13 @@ def test_archetype(intf_ver):
     answer = requests.get(http_server + "/api/sample")
 
     if answer.status_code != 200 or len(answer.json()["name"]) < 5:
-        print "Got a bad answer from our app ", answer.status_code
+        print "Got a bad answer from our app (2) ", answer.status_code
         sys.exit(1)
 
     answer = requests.post(http_server + "/api/sample", json={"name": "David", "age": 52})
 
     if answer.status_code != 200 or answer.json()["age"] != 53:
-        print "Got a bad answer from our app ", answer.status_code
+        print "Got a bad answer from our app (3) ", answer.status_code
         sys.exit(1)
 
 def test_devmode(intf_ver):
