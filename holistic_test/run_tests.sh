@@ -31,4 +31,5 @@ else
            --net=host -v ${DOCKER_PATH}:/data funcatron/holistic:latest /usr/bin/run_tests.py $@ || (docker rm -f working-func-resty ; exit 1)
 fi
 
-docker rm -f working-func-resty
+docker rm -f working-func-resty || exit 0
+
