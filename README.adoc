@@ -2,7 +2,7 @@ image:artwork/40x40.png[logo]
 
 == Funcatron
 
-Serverless Java (and Clojure and Scala) functions on your Mesos or Kubernetes cluster.
+Serverless Java (and Clojure and Scala) functions on your Mesos cluster.
 
 ### Status
 
