@@ -3,13 +3,11 @@ env:
   global:
   - SONATYPE_USERNAME=bearfeeder
   - secure: YxHVdBUz1Pfb1vgtZMNaLfDtyj1e+Owi13IHzcDtwa1o/vhkrJ5iXstXA1hatGYwV+P0t3FapUnDRCFB0GOZ5aCnfyHsJCjhRGU5va3RIsIceSCHSUyzQozZIZCf6YnM+kPXyxqft/v/G2G1BoS4LoB8xr7OojFIiskAufgG+rI3xILveqxmOlp+6J9neA7ZsM/UeFGqZwPVhh9qilLf4detN9sE+njWYZ3R3t9l7rNHJ7vG4rVn7q/HxnJPzytaZ4hTEqaZyjOuqaFi4gx5wjDcDhg0v1NbhCor2Oh00zyVHY4FwbIk1rEuDK9ILQ8llt/ShCoaB3tBlX5xFwV/FkmreRcT34U6JCgGZ5ZGyC7Kajyc/4jEUjc9kiXVF93P7au946AhTQ/S09hD/b8D5rEueWwZHPac8u6GSsmMbvFH3owCVdvOzFlxZXdRzKi/PxrhkFukrPnx60zMJDKOgwX736gGZqz7Ij0CEVwST+a8rBHvyB6tn6ZPu72q1eyhlJC43P3QKXHjmKeok8Di6OiTZXJtVzRogwutU1k0vlxEmiA1CWPhpeML6I27yqgnPjLuqFok8sHI6SG4/60zjZ7D56FLuY+I3xMSGms2slFCK4KbI/EtpxWoZ4/4quHXT+yFz7nMRwZ+kG75i2s3RgGX42dEm8H3TX4RRH941t4=
-
 services:
 - docker
-
 script: cd holistic_test && ./run_tests.sh -c && cd ../doc_o_matic/ && ./build-docs.sh
-
 before_install:
+- openssl aes-256-cbc -K $encrypted_6bbbceaeb3b8_key -iv $encrypted_6bbbceaeb3b8_iv
+  -in push_to_telegram.sh.enc -out push_to_telegram.sh -d
 - openssl aes-256-cbc -K $encrypted_40f1715ae021_key -iv $encrypted_40f1715ae021_iv
-  -in id_funcatron_deploy.enc -out id_ed25519
-  -d
+  -in id_funcatron_deploy.enc -out id_ed25519 -d

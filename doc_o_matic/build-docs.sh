@@ -16,20 +16,14 @@ fi
 docker run -ti --rm --net=host -v ${DOCKER_PATH}:/data funcatron/doc-o-matic:latest /usr/bin/doc_it.py || exit 1
 
 if [[  "$TRAVIS_BRANCH" -eq "master" ]]; then
-    if [[ $TRAVIS_SECURE_ENV_VARS ]]; then
-        echo "Copying ssh deploy key"
-        mkdir ~/.ssh
-        cp $DIR/../id_ed25519 ~/.ssh
-        chmod -R og-rwx ~/.ssh
-    fi
-
     THE_DATE=$(date +"%Y%m%d%H%M%S")
     NEW_PLACE="funcatron_${THE_DATE}"
     cd $DIR
     echo "Copying docs"
-    cat ../../doc.tgz | \
-        ssh -oStrictHostKeyChecking=no ubuntu@funcatron.org \
-            "tar -xzf - ;  mkdir ${NEW_PLACE} ; mv docout ${NEW_PLACE}/ ; rm funcatron ; ln -s ${NEW_PLACE} funcatron" || exit 1
+    cd ..
+    chmod +x push_to_telegram.sh
+    cp ../doc.tgz mysite.tar.gz
+    ./push_to_telegram.sh
     echo "Deposited docs"
 fi
 
